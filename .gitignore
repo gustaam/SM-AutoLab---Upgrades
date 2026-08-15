@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build/package outputs
+build/
+dist/
+*.spec
+*.exe
+*.zip
+
+# Runtime/local data
+*.log
+*.tmp
+SM AutoLab/
+checkpoint*.json
+*_checkpoint*.json
+feegow_config.json
+.env
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
