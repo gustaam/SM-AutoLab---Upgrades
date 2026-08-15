@@ -1,0 +1,6 @@
+customtkinter
+pandas
+openpyxl
+python-dotenv
+selenium
+Pillow
