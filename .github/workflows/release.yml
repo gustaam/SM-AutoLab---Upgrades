@@ -1,0 +1,57 @@
+name: Build and publish release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*"
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Get-Content VERSION -Raw).Trim()
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Build SM AutoLab
+        shell: cmd
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab v${{ steps.version.outputs.version }}" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+
+      - name: Build updater
+        shell: cmd
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab Updater" updater.py
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/SM AutoLab v${{ steps.version.outputs.version }}.exe
+            dist/SM AutoLab Updater.exe
