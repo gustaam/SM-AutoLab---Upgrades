@@ -1,55 +1,21 @@
-# SM AutoLab v2.42
+# SM AutoLab — Upgrades
 
-Versão padrão estável de referência do SM AutoLab.
+Repositório do SM AutoLab.
 
-## Estado desta versão
+## Atualizações automáticas
 
-A v2.42 é a base estável para futuras alterações. Ela preserva:
+A arquitetura de atualização foi preparada para usar GitHub Releases:
 
-- retomada automática após interrupções por checkpoint;
-- recuperação do navegador;
-- fechamento do navegador ao fechar o aplicativo;
-- interface e menus da linha v2.42;
-- histórico, atividade e erros;
-- seleção de planilha e processamento dos códigos;
-- requisitos com Pillow.
+- `updater.py` consulta a última Release pública do repositório;
+- o executável principal pode solicitar o `SM AutoLab Updater.exe` para baixar e substituir a versão atual;
+- o updater verifica o SHA-256 informado pela Release antes de substituir o executável;
+- `.github/workflows/release.yml` compila o aplicativo e o updater e publica os dois arquivos quando uma tag `vX.YY` ou `vX.YY.Z` é enviada.
 
-## Estrutura
+### Publicar uma nova versão
 
-- `main.py` — ponto de entrada.
-- `app.py` — inicialização da aplicação.
-- `interface.py` — interface gráfica.
-- `automacao.py` — automação Selenium/Feegow.
-- `config.py` — configurações persistentes.
-- `planilha.py` — leitura da planilha.
-- `resultados.py` — resultados e histórico.
-- `splash.py` — tela de inicialização.
-- `assets/` — recursos visuais.
-- `requirements.txt` — dependências.
+1. Atualize `VERSION` para a nova versão.
+2. Gere a tag correspondente, por exemplo `v2.65`.
+3. Envie a tag ao GitHub.
+4. O workflow `Build and publish release` cria a Release e anexa o executável do SM AutoLab e o updater.
 
-## Segurança
-
-Credenciais reais **não fazem parte deste repositório**.
-
-O usuário e a senha do Feegow são configurados pelo próprio aplicativo e armazenados localmente em:
-
-`%USERPROFILE%/SM AutoLab/feegow_config.json`
-
-Esse arquivo está no `.gitignore` e não deve ser enviado ao GitHub.
-
-## Instalação
-
-```bash
-python -m pip install -r requirements.txt
-python main.py
-```
-
-## Build do Windows
-
-Use `build_windows.bat` após instalar as dependências.
-
-## Referência de versão
-
-**v2.42 — Retomada na abertura, navegador e menus**
-
-Esta versão deve ser tratada como a base estável antes de qualquer nova alteração.
+Os dados locais do usuário não fazem parte do executável e não são substituídos durante a atualização.
