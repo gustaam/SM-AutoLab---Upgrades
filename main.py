@@ -1,4 +1,8 @@
-from app import main
+from splash import run_splash
+from interface import App
+
 
 if __name__ == "__main__":
-    main()
+    run_splash()
+    app = App()
+    app.app.mainloop()
