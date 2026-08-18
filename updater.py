@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -34,7 +35,7 @@ def current_version(base: Path | None = None) -> str:
             return value
     except OSError:
         pass
-    return "2.64"
+    return "2.66"
 
 
 def fetch_latest_release(timeout: int = 8) -> dict:
@@ -46,6 +47,46 @@ def fetch_latest_release(timeout: int = 8) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def _asset_version(name: str) -> tuple[int, ...] | None:
+    """Extract the semantic version from an SM AutoLab application asset."""
+    name = str(name)
+    if not name.lower().endswith(".exe") or "updater" in name.lower():
+        return None
+
+    match = re.search(r"(?:^|[^0-9])v(\d+(?:\.\d+){1,2})(?:[^0-9]|$)", name, re.IGNORECASE)
+    if not match:
+        match = re.search(r"SM[ _-]*AutoLab[^0-9]*(\d+(?:\.\d+){1,2})(?:[^0-9]|$)", name, re.IGNORECASE)
+    if not match:
+        return None
+    return _version_tuple(match.group(1))
+
+
+def _select_release_executable(release: dict, latest: str) -> dict | None:
+    expected = _version_tuple(latest)
+    assets = release.get("assets") or []
+
+    candidates = []
+    for asset in assets:
+        name = str(asset.get("name", ""))
+        version = _asset_version(name)
+        if version == expected:
+            candidates.append(asset)
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # If the release has exactly one non-updater EXE, accept it as a
+    # compatibility fallback. Otherwise refuse to guess between binaries.
+    exe_assets = [
+        asset for asset in assets
+        if str(asset.get("name", "")).lower().endswith(".exe")
+        and "updater" not in str(asset.get("name", "")).lower()
+    ]
+    if len(exe_assets) == 1:
+        return exe_assets[0]
+    return None
+
+
 def find_update(timeout: int = 8) -> dict | None:
     release = fetch_latest_release(timeout)
     latest = str(release.get("tag_name", "")).lstrip("vV")
@@ -53,13 +94,7 @@ def find_update(timeout: int = 8) -> dict | None:
     if not latest or _version_tuple(latest) <= _version_tuple(current):
         return None
 
-    assets = release.get("assets") or []
-    exe_assets = [
-        asset for asset in assets
-        if str(asset.get("name", "")).lower().endswith(".exe")
-        and "updater" not in str(asset.get("name", "")).lower()
-    ]
-    asset = exe_assets[0] if exe_assets else None
+    asset = _select_release_executable(release, latest)
     if asset is None:
         return {
             "version": latest,
@@ -68,6 +103,7 @@ def find_update(timeout: int = 8) -> dict | None:
             "download_url": "",
             "sha256": "",
             "release_url": release.get("html_url") or "",
+            "error": "A release possui mais de um executável e nenhum corresponde de forma inequívoca à versão publicada.",
         }
 
     digest = str(asset.get("digest") or "")
@@ -110,7 +146,7 @@ def launch_updater(update: dict) -> tuple[bool, str]:
     if not updater_exe.exists():
         return False, "O componente SM AutoLab Updater não foi encontrado."
     if not update.get("download_url"):
-        return False, "A release encontrada não possui um executável para download."
+        return False, update.get("error") or "A release encontrada não possui um executável correspondente à versão."
     command = [
         str(updater_exe),
         "--target", str(target),
