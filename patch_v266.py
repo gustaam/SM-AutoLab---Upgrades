@@ -205,6 +205,12 @@ def _abrir_historico_planilha_v266(self):
 def _aplicar_status_finalizado_v266(self, texto):
     low = str(texto).lower()
     if "finalizado" not in low:
+        if getattr(self, "_status_finalizado_job", None) is not None:
+            try:
+                self.app.after_cancel(self._status_finalizado_job)
+            except Exception:
+                pass
+            self._status_finalizado_job = None
         return self.__v265_aplicar_status(texto)
     if getattr(self, "_status_finalizado_job", None) is not None:
         try:
