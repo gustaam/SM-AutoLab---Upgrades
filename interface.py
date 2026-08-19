@@ -148,8 +148,7 @@ class App:
             font=("Segoe UI", 13, "bold")
         )
         self.botao_configuracoes.pack(side="left", padx=(0, 10))
-        self.botao_configuracoes.bind("<Enter>", self._mostrar_menu_configuracoes)
-        self.botao_configuracoes.bind("<Leave>", self._agendar_fechar_menus)
+        self.botao_configuracoes.configure(command=self._alternar_menu_configuracoes)
 
         # Status com geometria fixa. A animação ocorre somente dentro do
         # canvas, sem alterar o tamanho do controle ou empurrar Configurações.
@@ -395,19 +394,28 @@ class App:
     def _reposicionar_menus(self, _event=None):
         if self._closing:
             return
-
-        # When the native window moves, keep the floating menus attached.
         try:
             if self._menu_config is not None and self._menu_config.winfo_exists():
-                bx = self.botao_configuracoes.winfo_rootx()
-                by = self.botao_configuracoes.winfo_rooty() + self.botao_configuracoes.winfo_height() + 4
-                self._menu_config.geometry(f"205x94+{max(bx - 40, 0)}+{max(by, 0)}")
+                self.app.update_idletasks()
+                app_x = self.app.winfo_rootx()
+                app_y = self.app.winfo_rooty()
+                bx = self.botao_configuracoes.winfo_rootx() - app_x
+                by = self.botao_configuracoes.winfo_rooty() - app_y + self.botao_configuracoes.winfo_height() + 4
+                self._menu_config.place(x=max(0, bx - 40), y=max(0, by))
+                self._menu_config.lift()
+
             if self._menu_aparencia is not None and self._menu_aparencia.winfo_exists():
+                self.app.update_idletasks()
+                app_x = self.app.winfo_rootx()
+                app_y = self.app.winfo_rooty()
                 if self._menu_config is not None and self._menu_config.winfo_exists():
-                    self._menu_config.update_idletasks()
-                    x = self._menu_config.winfo_rootx() + self._menu_config.winfo_width() - 2
-                    y = self._menu_config.winfo_rooty()
-                    self._menu_aparencia.geometry(f"225x158+{max(x,0)}+{max(y,0)}")
+                    x = self._menu_config.winfo_rootx() - app_x + self._menu_config.winfo_width() - 2
+                    y = self._menu_config.winfo_rooty() - app_y
+                else:
+                    x = self.botao_configuracoes.winfo_rootx() - app_x + self.botao_configuracoes.winfo_width()
+                    y = self.botao_configuracoes.winfo_rooty() - app_y
+                self._menu_aparencia.place(x=max(0, x), y=max(0, y))
+                self._menu_aparencia.lift()
         except Exception:
             pass
 
@@ -493,8 +501,19 @@ class App:
         )
         self._fechar_aplicativo()
 
+    def _alternar_menu_configuracoes(self):
+        if self._menu_config is not None:
+            try:
+                if self._menu_config.winfo_exists():
+                    self._fechar_menus()
+                    return
+            except Exception:
+                pass
+        self._mostrar_menu_configuracoes()
+
     def _mostrar_menu_configuracoes(self, _event=None):
         self._cancelar_fechar_menus()
+
         if self._menu_config is not None:
             try:
                 if self._menu_config.winfo_exists():
@@ -502,12 +521,18 @@ class App:
             except Exception:
                 pass
 
-        menu = ctk.CTkToplevel(self.app)
+        menu = ctk.CTkFrame(
+            self.app,
+            fg_color=self.CARD,
+            corner_radius=8,
+            border_width=1,
+            border_color=self.BORDER,
+            width=205,
+            height=138
+        )
+        menu.place(x=0, y=0)
+        menu.pack_propagate(False)
         self._menu_config = menu
-        menu.overrideredirect(True)
-        menu.transient(self.app)
-        menu.attributes("-topmost", True)
-        menu.configure(fg_color=self.CARD, border_width=1, border_color=self.BORDER)
 
         aparencia = ctk.CTkButton(
             menu,
@@ -523,9 +548,6 @@ class App:
             anchor="w"
         )
         aparencia.pack(fill="x", padx=6, pady=(7, 3))
-        aparencia.bind("<Enter>", self._mostrar_menu_aparencia)
-        aparencia.bind("<Enter>", self._cancelar_fechar_menus, add="+")
-        aparencia.bind("<Leave>", self._agendar_fechar_menus)
 
         mudar = ctk.CTkButton(
             menu,
@@ -541,8 +563,6 @@ class App:
             anchor="w"
         )
         mudar.pack(fill="x", padx=6, pady=(3, 7))
-        mudar.bind("<Enter>", self._entrar_mudar_feegow)
-        mudar.bind("<Leave>", self._agendar_fechar_menus)
 
         atualizar = ctk.CTkButton(
             menu,
@@ -558,53 +578,52 @@ class App:
             anchor="w"
         )
         atualizar.pack(fill="x", padx=6, pady=(3, 7))
-        atualizar.bind("<Enter>", self._cancelar_fechar_menus)
-        atualizar.bind("<Leave>", self._agendar_fechar_menus)
 
-        menu.bind("<Enter>", self._cancelar_fechar_menus)
-        menu.bind("<Leave>", self._agendar_fechar_menus)
-
+        # Explicit close/toggle: clicking Configurações again closes the menu.
         self.app.update_idletasks()
-        x = self.botao_configuracoes.winfo_rootx()
-        y = self.botao_configuracoes.winfo_rooty() + self.botao_configuracoes.winfo_height() + 4
-        menu.geometry(f"205x138+{x-40}+{y}")
-        menu.lift()
+        self._reposicionar_menus()
 
     def _mostrar_menu_aparencia(self, _event=None):
         self._cancelar_fechar_menus()
-        if self._menu_aparencia is not None:
-            try:
-                if self._menu_aparencia.winfo_exists():
-                    return
-            except Exception:
-                pass
-        if self._menu_config is None:
+
+        if self._menu_config is None or not self._menu_config.winfo_exists():
             self._mostrar_menu_configuracoes()
             return
 
-        self._menu_config.update_idletasks()
-        x = self._menu_config.winfo_rootx() + self._menu_config.winfo_width() - 2
-        y = self._menu_config.winfo_rooty()
+        if self._menu_aparencia is not None:
+            try:
+                if self._menu_aparencia.winfo_exists():
+                    self._menu_aparencia.destroy()
+            except Exception:
+                pass
+            self._menu_aparencia = None
+            return
 
-        sub = ctk.CTkToplevel(self.app)
+        sub = ctk.CTkFrame(
+            self.app,
+            fg_color=self.CARD,
+            corner_radius=8,
+            border_width=1,
+            border_color=self.BORDER,
+            width=225,
+            height=158
+        )
+        sub.place(x=0, y=0)
+        sub.pack_propagate(False)
         self._menu_aparencia = sub
-        sub.overrideredirect(True)
-        sub.transient(self.app)
-        sub.attributes("-topmost", True)
-        sub.configure(fg_color=self.CARD, border_width=1, border_color=self.BORDER)
 
         titulo = ctk.CTkLabel(
-            sub, text="Aparência", text_color=self.TEXT,
-            font=("Segoe UI", 12, "bold")
+            sub,
+            text="Aparência",
+            text_color=self.TEXT,
+            font=("Segoe UI", 12, "bold"),
+            anchor="w"
         )
-        titulo.pack(anchor="w", padx=12, pady=(9, 4))
+        titulo.pack(fill="x", padx=12, pady=(9, 4))
 
-        for modo, rotulo in (
-            ("light", "Claro"),
-            ("dark", "Escuro"),
-            ("system", "Padrão do Windows"),
-        ):
-            marcado = "✓  " if modo == self._tema else "   "
+        for modo in ("light", "dark", "system"):
+            rotulo = self.THEME_LABELS[modo]
+            marcado = "✓  " if modo == self._tema else "    "
             btn = ctk.CTkButton(
                 sub,
                 text=marcado + rotulo,
@@ -615,22 +634,15 @@ class App:
                 fg_color=self.CARD,
                 hover_color=("#F3F3F3", "#3A3A3A"),
                 text_color=self.TEXT,
-                font=("Segoe UI", 11)
+                font=("Segoe UI", 11),
+                anchor="w"
             )
             btn.pack(fill="x", padx=6, pady=2)
-            btn.configure(anchor="w")
-            btn.bind("<Enter>", self._cancelar_fechar_menus)
-            btn.bind("<Leave>", self._agendar_fechar_aparencia)
 
-        sub.bind("<Enter>", self._cancelar_fechar_menus)
-        sub.bind("<Leave>", self._agendar_fechar_aparencia)
-
-        sub.geometry(f"225x158+{max(x,0)}+{max(y,0)}")
-        sub.lift()
+        self.app.update_idletasks()
+        self._reposicionar_menus()
 
     def _entrar_mudar_feegow(self, _event=None):
-        # O submenu Aparência deve desaparecer ao sair da opção Aparência.
-        self._cancelar_fechar_menus()
         if self._menu_aparencia is not None:
             try:
                 self._menu_aparencia.destroy()
@@ -639,8 +651,8 @@ class App:
             self._menu_aparencia = None
 
     def _agendar_fechar_aparencia(self, _event=None):
+        # Kept for compatibility with older bindings.
         self._cancelar_fechar_menus()
-        self._menu_close_job = self.app.after(160, self._fechar_submenu_aparencia)
 
     def _fechar_submenu_aparencia(self):
         self._menu_close_job = None
@@ -660,8 +672,9 @@ class App:
             self._menu_close_job = None
 
     def _agendar_fechar_menus(self, _event=None):
+        # Menus are explicit click-to-open/click-to-close controls.
+        # No delayed hover destruction is used.
         self._cancelar_fechar_menus()
-        self._menu_close_job = self.app.after(280, self._fechar_menus)
 
     def _fechar_menus(self):
         self._menu_close_job = None
