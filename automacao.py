@@ -7,6 +7,9 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, StaleElementReferenceException, ElementClickInterceptedException
 from config import *
 
+# As configurações do portal podem ser alteradas pela interface.
+# Recarregamos antes de iniciar ou recuperar o navegador.
+
 class AutomacaoError(Exception):
     def __init__(self, mensagem, tipo="erro_site", recuperado=False):
         super().__init__(mensagem); self.tipo=tipo; self.recuperado=recuperado
@@ -41,9 +44,12 @@ class Automacao:
         except TimeoutException as e: raise AutomacaoError("Não foi possível abrir Autorizar Procedimento.","autorizacao") from e
         except WebDriverException as e: raise AutomacaoError("O navegador apresentou um problema ao abrir Autorizar Procedimento.","navegador") from e
     def executar_codigo(self,codigo):
-        try: self._executar_codigo_uma_vez(codigo)
+        try:
+            self._executar_codigo_uma_vez(codigo)
         except Exception as e:
-            tipo=self._classificar_erro(e); self.tentar_fechar_alerta(); recuperado=self.recuperar_apos_erro(tipo); msg=str(e)
+            tipo=self._classificar_erro(e); self.tentar_fechar_alerta()
+            recuperado=self.recuperar_apos_erro(tipo)
+            msg=str(e)
             raise AutomacaoError(msg,tipo,recuperado) from e
     def _executar_codigo_uma_vez(self,codigo):
         try:
@@ -62,15 +68,21 @@ class Automacao:
         if self.driver is None or not self._navegador_vivo(): return self._reiniciar_navegador()
         try:
             self._status("Recuperando a tela para o próximo código...")
-            self.tentar_fechar_alerta(); WebDriverWait(self.driver,RECOVERY_TIMEOUT,poll_frequency=.15).until(EC.presence_of_element_located((By.XPATH,CODE_INPUT_XPATH))); return True
+            self.tentar_fechar_alerta()
+            WebDriverWait(self.driver,RECOVERY_TIMEOUT,poll_frequency=.15).until(EC.presence_of_element_located((By.XPATH,CODE_INPUT_XPATH)))
+            return True
         except Exception: return self._reiniciar_navegador()
     def _navegador_vivo(self):
         try: _=self.driver.current_url; return True
         except Exception: return False
     def _reiniciar_navegador(self):
-        carregar_configuracoes(); self._status("Recuperando o navegador e entrando novamente..."); self.fechar(); self.driver=webdriver.Chrome(); self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT); self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao(); self._status("Navegador recuperado. Continuando..."); return True
+        carregar_configuracoes()
+        self._status("Recuperando o navegador e entrando novamente...")
+        self.fechar()
+        self.driver=webdriver.Chrome(); self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT); self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao(); self._status("Navegador recuperado. Continuando..."); return True
     def tentar_fechar_alerta(self):
-        try: WebDriverWait(self.driver,ALERT_TIMEOUT,poll_frequency=.1).until(EC.alert_is_present()); self.driver.switch_to.alert.accept(); return True
+        try:
+            WebDriverWait(self.driver,ALERT_TIMEOUT,poll_frequency=.1).until(EC.alert_is_present()); self.driver.switch_to.alert.accept(); return True
         except Exception: return False
     def fechar(self):
         if self.driver:

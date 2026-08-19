@@ -1,17 +1,24 @@
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
+
+# Prefer the Windows/system certificate store in packaged builds.
+# This avoids CERTIFICATE_VERIFY_FAILED when Python's bundled CA set is incomplete.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
 
 REPO = "gustaam/SM-AutoLab---Upgrades"
 API_LATEST = f"https://api.github.com/repos/{REPO}/releases/latest"
@@ -29,62 +36,26 @@ def _version_tuple(value: str) -> tuple[int, ...]:
 
 def current_version(base: Path | None = None) -> str:
     base = base or Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    version_file = base / "VERSION"
     try:
-        value = (base / "VERSION").read_text(encoding="utf-8").strip()
+        value = version_file.read_text(encoding="utf-8").strip()
         if value:
             return value
     except OSError:
         pass
-    return "2.66"
+    return "2.64"
 
 
 def fetch_latest_release(timeout: int = 8) -> dict:
     request = urllib.request.Request(
         API_LATEST,
-        headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": USER_AGENT,
+        },
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
-
-
-def _asset_version(name: str) -> tuple[int, ...] | None:
-    """Extract the semantic version from an SM AutoLab application asset."""
-    name = str(name)
-    if not name.lower().endswith(".exe") or "updater" in name.lower():
-        return None
-
-    match = re.search(r"(?:^|[^0-9])v(\d+(?:\.\d+){1,2})(?:[^0-9]|$)", name, re.IGNORECASE)
-    if not match:
-        match = re.search(r"SM[ _-]*AutoLab[^0-9]*(\d+(?:\.\d+){1,2})(?:[^0-9]|$)", name, re.IGNORECASE)
-    if not match:
-        return None
-    return _version_tuple(match.group(1))
-
-
-def _select_release_executable(release: dict, latest: str) -> dict | None:
-    expected = _version_tuple(latest)
-    assets = release.get("assets") or []
-
-    candidates = []
-    for asset in assets:
-        name = str(asset.get("name", ""))
-        version = _asset_version(name)
-        if version == expected:
-            candidates.append(asset)
-
-    if len(candidates) == 1:
-        return candidates[0]
-
-    # If the release has exactly one non-updater EXE, accept it as a
-    # compatibility fallback. Otherwise refuse to guess between binaries.
-    exe_assets = [
-        asset for asset in assets
-        if str(asset.get("name", "")).lower().endswith(".exe")
-        and "updater" not in str(asset.get("name", "")).lower()
-    ]
-    if len(exe_assets) == 1:
-        return exe_assets[0]
-    return None
 
 
 def find_update(timeout: int = 8) -> dict | None:
@@ -94,16 +65,31 @@ def find_update(timeout: int = 8) -> dict | None:
     if not latest or _version_tuple(latest) <= _version_tuple(current):
         return None
 
-    asset = _select_release_executable(release, latest)
+    assets = release.get("assets") or []
+    expected_version = latest.replace(".", "")
+    exe_assets = [
+        asset for asset in assets
+        if str(asset.get("name", "")).lower().endswith(".exe")
+        and "updater" not in str(asset.get("name", "")).lower()
+    ]
+
+    # Use only the executable belonging to the exact release version.
+    def _asset_matches(asset):
+        name = str(asset.get("name", "")).lower()
+        normalized = "".join(ch for ch in name if ch.isalnum())
+        return expected_version in normalized and "smautolab" in normalized
+
+    matching = [asset for asset in exe_assets if _asset_matches(asset)]
+    asset = matching[0] if len(matching) == 1 else None
     if asset is None:
         return {
             "version": latest,
             "current": current,
             "name": release.get("name") or f"SM AutoLab v{latest}",
+            "url": release.get("html_url") or "",
             "download_url": "",
             "sha256": "",
             "release_url": release.get("html_url") or "",
-            "error": "A release possui mais de um executável e nenhum corresponde de forma inequívoca à versão publicada.",
         }
 
     digest = str(asset.get("digest") or "")
@@ -114,6 +100,7 @@ def find_update(timeout: int = 8) -> dict | None:
         "version": latest,
         "current": current,
         "name": release.get("name") or f"SM AutoLab v{latest}",
+        "url": release.get("html_url") or "",
         "download_url": asset.get("browser_download_url") or "",
         "sha256": digest,
         "asset_name": asset.get("name") or "",
@@ -131,22 +118,33 @@ def download_file(url: str, destination: Path, expected_sha256: str = "") -> Non
                 break
             output.write(chunk)
             hasher.update(chunk)
-    if expected_sha256 and hasher.hexdigest().lower() != expected_sha256.lower():
-        try:
-            destination.unlink()
-        except OSError:
-            pass
-        raise RuntimeError("A verificação SHA-256 da atualização falhou.")
+
+    if expected_sha256:
+        digest = hasher.hexdigest().lower()
+        if digest != expected_sha256.lower():
+            try:
+                destination.unlink()
+            except OSError:
+                pass
+            raise RuntimeError("A verificação SHA-256 da atualização falhou.")
 
 
 def launch_updater(update: dict) -> tuple[bool, str]:
     target = Path(sys.executable).resolve()
     app_dir = target.parent
     updater_exe = app_dir / "SM AutoLab Updater.exe"
+
     if not updater_exe.exists():
-        return False, "O componente SM AutoLab Updater não foi encontrado."
+        # Development fallback: run updater.py when the project is not packaged.
+        candidate = app_dir / "updater.py"
+        if candidate.exists():
+            updater_exe = candidate
+        else:
+            return False, "O componente SM AutoLab Updater não foi encontrado."
+
     if not update.get("download_url"):
-        return False, update.get("error") or "A release encontrada não possui um executável correspondente à versão."
+        return False, "A release encontrada não possui um executável correspondente à versão."
+
     command = [
         str(updater_exe),
         "--target", str(target),
@@ -154,7 +152,10 @@ def launch_updater(update: dict) -> tuple[bool, str]:
         "--sha256", str(update.get("sha256") or ""),
         "--restart",
     ]
+
     try:
+        if updater_exe.suffix.lower() == ".py":
+            command = [sys.executable] + command
         subprocess.Popen(command, close_fds=True)
         return True, ""
     except OSError as exc:
@@ -162,12 +163,15 @@ def launch_updater(update: dict) -> tuple[bool, str]:
 
 
 def _cli() -> int:
+    import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--target")
-    parser.add_argument("--url")
+    parser.add_argument("--target", required=False)
+    parser.add_argument("--url", required=False)
     parser.add_argument("--sha256", default="")
     parser.add_argument("--restart", action="store_true")
     args = parser.parse_args()
+
     if not args.target or not args.url:
         print("SM AutoLab Updater pronto.")
         return 0
@@ -175,6 +179,8 @@ def _cli() -> int:
     target = Path(args.target).resolve()
     temp_dir = Path(tempfile.mkdtemp(prefix="sm_autolab_update_"))
     temp_file = temp_dir / target.name
+
+    # Wait for the main program to close before replacing its executable.
     deadline = time.time() + 30
     while time.time() < deadline:
         try:
