@@ -5,6 +5,7 @@ import threading
 import sys
 from datetime import datetime
 from tkinter import filedialog, messagebox, Canvas, Frame, ttk, TclError, Entry
+from CTkToolTip import *
 
 import customtkinter as ctk
 
@@ -386,10 +387,65 @@ class App:
         )
         self.botao_iniciar.pack(side="left")
 
+        #DETALHES BOTÕES     
+        class details_buttons:     
+            CTkToolTip(
+                widget=self.botao_iniciar, 
+                delay= 0.5,
+                message= "Clique para iniciar!",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3),
+                x_offset= -45, y_offset= -45
+            )
+
+            CTkToolTip(
+                widget=self.botao_parar, 
+                delay= 0.5,
+                message= "Parar",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -45, y_offset= -45
+            )
+
+        
+            CTkToolTip(
+                widget=self.tab_buttons["Atividade"], 
+                delay= 0.2,
+                message= "Atividade",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -25, y_offset= -45
+            )    
+
+            CTkToolTip(
+                widget=self.tab_buttons["Erros"], 
+                delay= 0.2,
+                message= "Erros",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -25, y_offset= -45
+            )    
+            CTkToolTip(
+                widget=self.tab_buttons["Histórico"], 
+                delay= 0.2,
+                message= "Histórico",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -25, y_offset= -45
+            )    
+
+            CTkToolTip(
+                widget=self.botao_configuracoes, 
+                delay= 0.2,
+                message= "Configurações",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -45, y_offset= -45
+            )
+
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
         self._iniciar_pisca_status()
         self.app.after(350, self._verificar_retomada_pendente)
-
 
     def _reposicionar_menus(self, _event=None):
         if self._closing:
@@ -2667,3 +2723,4 @@ class App:
 
     def run(self):
         self.app.mainloop()
+
