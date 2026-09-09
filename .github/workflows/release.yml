@@ -40,7 +40,7 @@ jobs:
       - name: Build SM AutoLab
         shell: cmd
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab v${{ steps.version.outputs.version }}" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
       - name: Build updater
         shell: cmd
@@ -53,5 +53,5 @@ jobs:
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            dist/SM AutoLab v${{ steps.version.outputs.version }}.exe
+            dist/SM AutoLab.exe
             dist/SM AutoLab Updater.exe
