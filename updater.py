@@ -43,7 +43,7 @@ def current_version(base: Path | None = None) -> str:
             return value
     except OSError:
         pass
-    return "2.64"
+    return "0.0.0"
 
 
 def fetch_latest_release(timeout: int = 8) -> dict:
@@ -66,18 +66,21 @@ def find_update(timeout: int = 8) -> dict | None:
         return None
 
     assets = release.get("assets") or []
-    expected_version = latest.replace(".", "")
     exe_assets = [
         asset for asset in assets
         if str(asset.get("name", "")).lower().endswith(".exe")
         and "updater" not in str(asset.get("name", "")).lower()
     ]
 
-    # Use only the executable belonging to the exact release version.
+    # O executável principal usa nome fixo e é substituído a cada atualização.
+    # Mantemos como fallback o padrão antigo versionado para compatibilidade.
     def _asset_matches(asset):
-        name = str(asset.get("name", "")).lower()
+        name = str(asset.get("name", "")).strip().lower()
         normalized = "".join(ch for ch in name if ch.isalnum())
-        return expected_version in normalized and "smautolab" in normalized
+        return (
+            name == "sm autolab.exe"
+            or ("smautolab" in normalized and latest.replace(".", "") in normalized)
+        )
 
     matching = [asset for asset in exe_assets if _asset_matches(asset)]
     asset = matching[0] if len(matching) == 1 else None
