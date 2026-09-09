@@ -18,6 +18,42 @@ if not defined APP_VERSION (
 echo Versao detectada: v!APP_VERSION!
 echo.
 
+REM ----------------------------------------------------------
+REM VALIDACAO DE CONSISTENCIA DO CODIGO-FONTE
+REM Impede build com interface/patch de versoes conflitantes.
+REM ----------------------------------------------------------
+echo Verificando codigo-fonte da versao v!APP_VERSION!...
+%SystemRoot%\System32\findstr.exe /c:"def _renderizar_calendario_arquivos" interface.py >nul
+if errorlevel 1 (
+    echo ERRO: interface.py nao contem o calendario de Arquivos.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"Canvas(" interface.py >nul
+if errorlevel 1 (
+    echo ERRO: interface.py nao contem o calendario nativo Canvas.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"ARQUIVOS_DIAS = 60" interface.py >nul
+if errorlevel 1 (
+    echo ERRO: interface.py nao esta configurado para 60 dias.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"tkcalendar" interface.py >nul
+if not errorlevel 1 (
+    echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"app_class.abrir_historico_planilha = _abrir_historico_planilha_v266" patch_v266.py >nul
+if not errorlevel 1 (
+    echo ERRO: patch_v266.py esta sobrescrevendo a tela Arquivos.
+    goto :erro
+)
+echo Validacao do codigo-fonte: OK
+echo.
+
+REM Remover caches Python locais para evitar referencias obsoletas.
+for /d /r %%D in (__pycache__) do if exist "%%D" rmdir /s /q "%%D" >nul 2>nul
+
 set "PYTHON="
 where py >nul 2>nul
 if %errorlevel%==0 (
@@ -52,10 +88,10 @@ if exist "*.spec" del /q "*.spec"
 
 echo.
 echo Gerando SM AutoLab v!APP_VERSION!...
-%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab v!APP_VERSION!" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 if errorlevel 1 goto :erro
 
-if not exist "dist\SM AutoLab v!APP_VERSION!.exe" (
+if not exist "dist\SM AutoLab.exe" (
     echo ERRO: executavel principal nao foi gerado.
     goto :erro
 )
@@ -72,7 +108,7 @@ if not exist "dist\SM AutoLab Updater.exe" (
 
 echo.
 echo BUILD CONCLUIDO:
-echo dist\SM AutoLab v!APP_VERSION!.exe
+echo dist\SM AutoLab.exe
 echo dist\SM AutoLab Updater.exe
 echo.
 pause
