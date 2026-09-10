@@ -1,14 +1,35 @@
 from pathlib import Path
 from updater import find_update, launch_updater
 import json
+import calendar as pycalendar
+import tkinter as tk
 import threading
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from tkinter import filedialog, messagebox, Canvas, Frame, ttk, TclError, Entry
+from CTkToolTip import *
 
 import customtkinter as ctk
 
 from app import (ler_checkpoint, salvar_checkpoint, principal, principal_interno, ler_checkpoint_interno, salvar_checkpoint_interno, excluir_checkpoint_interno)
+
+
+def _ler_versao_aplicativo():
+    """Lê a versão embutida no executável/projeto."""
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    caminho = base / "VERSION"
+    try:
+        valor = caminho.read_text(encoding="utf-8").strip()
+        if valor:
+            return valor.lstrip("vV")
+    except OSError:
+        pass
+    return "desconhecida"
+
+
+APP_VERSION = _ler_versao_aplicativo()
+HISTORICO_DIAS = 60
+ARQUIVOS_DIAS = 60
 
 
 class App:
@@ -65,6 +86,14 @@ class App:
         self._menu_config = None
         self._menu_aparencia = None
         self._menu_close_job = None
+        self._planilha_historico_window = None
+        self._arquivos_body = None
+        self._arquivos_calendar_widget = None
+        self._arquivos_calendar_canvas = None
+        self._arquivos_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        self._arquivos_data_selecionada = None
+        self._arquivos_calendar_widget = None
+        self.arquivos_contador_label = None
         self._status_blink_job = None
         self._status_blink_visible = True
         self._status_blink_fast = False
@@ -116,12 +145,22 @@ class App:
         title = ctk.CTkFrame(header, fg_color="transparent")
         title.pack(side="left", padx=20, pady=11)
 
+        title_row = ctk.CTkFrame(title, fg_color="transparent")
+        title_row.pack(anchor="w")
+
         ctk.CTkLabel(
-            title,
+            title_row,
             text="SM AutoLab",
             text_color=self.TEXT,
             font=("Segoe UI", 23, "bold")
-        ).pack(anchor="w")
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            title_row,
+            text=f"v{APP_VERSION}",
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 11, "bold")
+        ).pack(side="left", padx=(9, 0), pady=(7, 0))
 
         ctk.CTkLabel(
             title,
@@ -230,6 +269,13 @@ class App:
             font=("Segoe UI", 12, "bold")
         )
         self.botao_historico_planilha.pack(side="left")
+        self.arquivos_contador_label = ctk.CTkLabel(
+            plan_buttons,
+            text="0 códigos no mês",
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 9, "bold")
+        )
+        self.arquivos_contador_label.pack(side="left", padx=(8, 0))
         self.planilha_estado_label = ctk.CTkLabel(
             config,
             text="",
@@ -264,9 +310,9 @@ class App:
         stats = ctk.CTkFrame(main, fg_color="transparent")
         stats.pack(fill="x", pady=(0, 6))
         stats.grid_columnconfigure((0, 1, 2), weight=1)
-        self.sucesso_card = self._stat_card(stats, "✓", "Sucesso", "0", self.SUCCESS)
+        self.sucesso_card = self._stat_card(stats, "✓", "Executados", "0", self.SUCCESS)
         self.sucesso_card.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        self.erro_card = self._stat_card(stats, "!", "Erros", "0", self.ERROR)
+        self.erro_card = self._stat_card(stats, "!", "Não executados", "0", self.ERROR)
         self.erro_card.grid(row=0, column=1, sticky="ew", padx=5)
         self.codigo_card = self._stat_card(stats, "›", "Código atual", "—", self.INFO)
         self.codigo_card.grid(row=0, column=2, sticky="ew", padx=(5, 0))
@@ -282,7 +328,7 @@ class App:
         tabs.pack(pady=(5, 5), padx=14)
 
         self.tab_buttons = {}
-        for name in ("Atividade", "Erros", "Histórico"):
+        for name in ("Atividade", "Não executados", "Histórico"):
             btn = ctk.CTkButton(
                 tabs, text=name, command=lambda n=name: self._selecionar_aba(n),
                 width=86, height=30, corner_radius=6,
@@ -313,7 +359,7 @@ class App:
         erro_info = ctk.CTkFrame(self.aba_erros, fg_color="transparent")
         erro_info.pack(fill="x", pady=(0, 6))
         self.erros_titulo = ctk.CTkLabel(
-            erro_info, text="Nenhum código com erro", text_color=self.SUBTEXT,
+            erro_info, text="Nenhum código não executado", text_color=self.SUBTEXT,
             font=("Segoe UI", 12, "bold")
         )
         self.erros_titulo.pack(side="left")
@@ -336,7 +382,7 @@ class App:
         history_header = ctk.CTkFrame(self.aba_historico, fg_color="transparent")
         history_header.pack(fill="x", pady=(0, 5))
         ctk.CTkLabel(
-            history_header, text="Execuções recentes (máx. 5)",
+            history_header, text="Execuções dos últimos 60 dias",
             text_color=self.TEXT, font=("Segoe UI", 12, "bold")
         ).pack(side="left")
         self.botao_limpar_historico = ctk.CTkButton(
@@ -386,10 +432,67 @@ class App:
         )
         self.botao_iniciar.pack(side="left")
 
+        #DETALHES BOTÕES     
+        class details_buttons:     
+            CTkToolTip(
+                widget=self.botao_iniciar, 
+                delay= 0.5,
+                message= "Clique para iniciar!",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3),
+                x_offset= -45, y_offset= -45
+            )
+
+            CTkToolTip(
+                widget=self.botao_parar, 
+                delay= 0.5,
+                message= "Parar",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -45, y_offset= -45
+            )
+
+        
+            CTkToolTip(
+                widget=self.tab_buttons["Atividade"], 
+                delay= 0.2,
+                message= "Atividade",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -25, y_offset= -45
+            )    
+
+            CTkToolTip(
+                widget=self.tab_buttons["Não executados"], 
+                delay= 0.2,
+                message= "Não executados",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -25, y_offset= -45
+            )    
+            CTkToolTip(
+                widget=self.tab_buttons["Histórico"], 
+                delay= 0.2,
+                message= "Histórico",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -25, y_offset= -45
+            )    
+
+            CTkToolTip(
+                widget=self.botao_configuracoes, 
+                delay= 0.2,
+                message= "Configurações",
+                alpha= 0.80,
+                corner_radius= 20, follow= True, padding= (3,3), 
+                x_offset= -45, y_offset= -45
+            )
+
+        self._atualizar_contador_arquivos()
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
         self._iniciar_pisca_status()
         self.app.after(350, self._verificar_retomada_pendente)
-
+        self.app.after(1200, self._verificar_atualizacao_automatica)
 
     def _reposicionar_menus(self, _event=None):
         if self._closing:
@@ -421,6 +524,35 @@ class App:
 
     def _fixar_menu_configuracoes(self):
         self._mostrar_menu_configuracoes()
+
+    def _verificar_atualizacao_automatica(self):
+        """Verifica silenciosamente se há uma Release mais nova.
+        Só apresenta a tela de atualização quando existe versão superior
+        com executável correspondente. Falhas de rede não interrompem o app.
+        """
+        if self._closing:
+            return
+
+        def worker():
+            try:
+                info = find_update()
+            except Exception:
+                return
+
+            if not info:
+                return
+            if not info.get("version") or not info.get("download_url"):
+                return
+
+            try:
+                self.app.after(
+                    0,
+                    lambda data=info: self._mostrar_resultado_atualizacao(data)
+                )
+            except Exception:
+                pass
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _verificar_atualizacoes_interativo(self):
         self._fechar_menus()
@@ -895,7 +1027,7 @@ class App:
             frame.pack_forget()
         mapa = {
             "Atividade": self.aba_atividade,
-            "Erros": self.aba_erros,
+            "Não executados": self.aba_erros,
             "Histórico": self.aba_historico,
         }
         mapa[nome].pack(fill="both", expand=True)
@@ -958,6 +1090,21 @@ class App:
         self.atividade.see("end")
         self.atividade.configure(state="disabled")
 
+    def _filtrar_historico_execucoes_60_dias(self, execucoes):
+        agora = datetime.now()
+        limite = agora - timedelta(days=HISTORICO_DIAS)
+        validas = []
+        for execucao in execucoes or []:
+            if not isinstance(execucao, dict):
+                continue
+            try:
+                inicio = datetime.fromisoformat(str(execucao.get("inicio", "")))
+            except Exception:
+                continue
+            if limite <= inicio <= agora:
+                validas.append(execucao)
+        return validas
+
     def _carregar_estado_persistente(self):
         try:
             if not self._historico_arquivo.exists():
@@ -969,7 +1116,7 @@ class App:
             if tema in ("light", "dark", "system"):
                 self._tema = tema
             if isinstance(execucoes, list):
-                self._historico_execucoes = [x for x in execucoes if isinstance(x, dict)][-5:]
+                self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(execucoes)
             if isinstance(erros, list):
                 self._erros_codigos = [str(x) for x in erros][-200:]
         except Exception:
@@ -978,8 +1125,9 @@ class App:
 
     def _salvar_estado_persistente(self):
         try:
+            self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(self._historico_execucoes)
             dados = {
-                "historico_execucoes": self._historico_execucoes[-5:],
+                "historico_execucoes": self._historico_execucoes,
                 "erros": self._erros_codigos[-200:],
                 "tema": self._tema,
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -998,8 +1146,8 @@ class App:
         for codigo in self._erros_codigos:
             self._criar_botao_erro(codigo)
         self.erros_titulo.configure(
-            text=f"{len(self._erros_codigos)} código(s) com erro" if self._erros_codigos
-            else "Nenhum código com erro"
+            text=f"{len(self._erros_codigos)} código(s) não executado(s)" if self._erros_codigos
+            else "Nenhum código não executado"
         )
 
     def _criar_botao_erro(self, codigo, parent=None):
@@ -1019,7 +1167,7 @@ class App:
         for w in self.erros_frame.winfo_children():
             w.destroy()
         self._erros_codigos = []
-        self.erros_titulo.configure(text="Nenhum código com erro")
+        self.erros_titulo.configure(text="Nenhum código não executado")
         if salvar:
             self._salvar_estado_persistente()
 
@@ -1028,7 +1176,7 @@ class App:
         if codigo in self._erros_codigos:
             return
         self._erros_codigos.append(codigo)
-        self.erros_titulo.configure(text=f"{len(self._erros_codigos)} código(s) com erro")
+        self.erros_titulo.configure(text=f"{len(self._erros_codigos)} código(s) não executado(s)")
         self._criar_botao_erro(codigo)
         self._salvar_estado_persistente()
 
@@ -1164,12 +1312,14 @@ class App:
         self._execucao_atual["total"] = int(getattr(resultado, "total_planejado", 0) or 0)
         self._execucao_atual["sucessos"] = int(getattr(resultado, "sucessos", 0) or 0)
         self._execucao_atual["erros"] = int(getattr(resultado, "erros", 0) or 0)
+        self._execucao_atual["processados"] = int(getattr(resultado, "processados", 0) or 0)
         self._execucao_atual["codigos_erros"] = [str(item.codigo) for item in resultado.itens if item.status == "Erro"]
         self._historico_execucoes.append(dict(self._execucao_atual))
-        self._historico_execucoes = self._historico_execucoes[-5:]
+        self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(self._historico_execucoes)
         self._execucao_atual = None
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
+        self._atualizar_contador_arquivos()
 
     def _registrar_falha_historico(self, mensagem):
         if not self._execucao_atual:
@@ -1179,10 +1329,11 @@ class App:
         self._execucao_atual["status"] = "Erro geral"
         self._execucao_atual["mensagem"] = str(mensagem)
         self._historico_execucoes.append(dict(self._execucao_atual))
-        self._historico_execucoes = self._historico_execucoes[-5:]
+        self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(self._historico_execucoes)
         self._execucao_atual = None
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
+        self._atualizar_contador_arquivos()
 
     def _restaurar_historico_na_tela(self):
         if not hasattr(self, "historico_lista"):
@@ -1194,7 +1345,7 @@ class App:
         if self._execucao_atual:
             self._criar_pasta_historico(self._execucao_atual, atual=True)
 
-        historico_visivel = self._historico_execucoes[-4:] if self._execucao_atual else self._historico_execucoes[-5:]
+        historico_visivel = list(self._historico_execucoes)
 
         if not historico_visivel and not self._execucao_atual:
             ctk.CTkLabel(
@@ -1207,26 +1358,26 @@ class App:
             self._criar_pasta_historico(execucao)
 
     def _criar_pasta_historico(self, execucao, atual=False):
-        container = ctk.CTkFrame(self.historico_lista, fg_color=("#FFFFFF", "#2D3338"), corner_radius=8, border_width=1, border_color=self.BORDER, width=155, height=118)
+        container = ctk.CTkFrame(self.historico_lista, fg_color=("#FFFFFF", "#2D3338"), corner_radius=8, border_width=1, border_color=self.BORDER, width=92, height=78)
         container.pack_propagate(False)
-        # grid of square-like folders, centered in the history panel
+        # grid of compact folders, centered in the history panel
         # use a dedicated parent row grid when possible
         parent=self.historico_lista
         if not hasattr(self, "_hist_grid") or self._hist_grid is None:
             self._hist_grid=ctk.CTkFrame(parent,fg_color="transparent")
             self._hist_grid.pack(fill="x",padx=6,pady=4)
-        # distribute in 3 columns
+        # distribute in 6 compact columns
         count=len(self._hist_grid.winfo_children())
-        row=count//3; col=count%3
-        self._hist_grid.grid_columnconfigure((0,1,2),weight=1)
-        tile=ctk.CTkFrame(self._hist_grid,fg_color=("#FFFFFF", "#2D3338"),corner_radius=8,border_width=1,border_color=self.BORDER,width=150,height=118)
-        tile.grid(row=row,column=col,padx=5,pady=5,sticky="nsew")
+        row=count//6; col=count%6
+        self._hist_grid.grid_columnconfigure(tuple(range(6)),weight=1)
+        tile=ctk.CTkFrame(self._hist_grid,fg_color=("#FFFFFF", "#2D3338"),corner_radius=7,border_width=1,border_color=self.BORDER,width=92,height=78)
+        tile.grid(row=row,column=col,padx=3,pady=3,sticky="nsew")
         tile.grid_propagate(False)
         inicio=execucao.get("inicio",""); status=execucao.get("status",""); erros=int(execucao.get("erros",0) or 0)
-        icon=ctk.CTkLabel(tile,text="📁",font=("Segoe UI Emoji",28),text_color=self.ACCENT); icon.pack(pady=(10,2))
-        ctk.CTkLabel(tile,text=inicio.split(" ")[0] if inicio else "",text_color=self.TEXT,font=("Segoe UI",10,"bold")).pack()
-        ctk.CTkLabel(tile,text=inicio.split(" ")[1] if " " in inicio else "",text_color=self.SUBTEXT,font=("Segoe UI",9)).pack()
-        ctk.CTkLabel(tile,text=f"{status} • {erros} erro(s)",text_color=self.SUBTEXT,font=("Segoe UI",8),wraplength=130).pack(pady=(3,0))
+        icon=ctk.CTkLabel(tile,text="📁",font=("Segoe UI Emoji",18),text_color=self.ACCENT); icon.pack(pady=(5,0))
+        ctk.CTkLabel(tile,text=inicio.split(" ")[0] if inicio else "",text_color=self.TEXT,font=("Segoe UI",8,"bold")).pack()
+        ctk.CTkLabel(tile,text=inicio.split(" ")[1] if " " in inicio else "",text_color=self.SUBTEXT,font=("Segoe UI",7)).pack()
+        ctk.CTkLabel(tile,text=f"{status} • {erros} não exec.",text_color=self.SUBTEXT,font=("Segoe UI",7),wraplength=82).pack(pady=(3,0))
         detalhe=ctk.CTkToplevel(self.app) if False else None
         def selecionar(_e=None):
             for sibling in self._hist_grid.winfo_children():
@@ -1267,13 +1418,13 @@ class App:
             parent,
             text=(f"Início: {inicio}    Fim: {fim}\n"
                    f"Planilha: {planilha}    Página: {pagina}\n"
-                   f"Status: {status}    Processados: {total}    Sucesso: {sucessos}    Erros: {erros}"),
+                   f"Status: {status}    Processados: {total}    Executados: {sucessos}    Não executados: {erros}"),
             text_color=self.SUBTEXT, font=("Segoe UI", 9), anchor="w", justify="left"
         ).pack(fill="x", padx=8, pady=(7, 4))
 
         if erros and codigos:
             ctk.CTkLabel(
-                parent, text="Códigos com erro (clique para copiar):",
+                parent, text="Códigos não executados (clique para copiar):",
                 text_color=self.ERROR, font=("Segoe UI", 11, "bold"), anchor="w"
             ).pack(fill="x", padx=8, pady=(0, 3))
             for codigo in codigos:
@@ -1291,7 +1442,7 @@ class App:
         confirmar = messagebox.askyesno(
             "Limpar histórico",
             "Tem certeza que deseja apagar todas as execuções salvas no histórico?\n\n"
-            "Essa ação não apaga a aba 'Erros' da execução atual."
+            "Essa ação não apaga a aba 'Não executados' da execução atual."
         )
         if not confirmar:
             return
@@ -1299,6 +1450,7 @@ class App:
         self._execucao_atual = None
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
+        self._atualizar_contador_arquivos()
         self._add_activity("Histórico de execuções apagado.", self.WARNING)
         self.atualizar_status("Histórico limpo")
 
@@ -1960,91 +2112,78 @@ class App:
     def _garantir_pasta_planilha(self):
         self._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
 
+    def _filtrar_arquivos_60_dias(self, itens):
+        agora = datetime.now()
+        limite = agora - timedelta(days=ARQUIVOS_DIAS)
+        validos = []
+        for item in itens or []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            if limite <= salvo <= agora:
+                validos.append(item)
+        validos.sort(key=lambda item: str(item.get("saved_at", "")))
+        return validos
+
     def _carregar_historico_planilhas(self):
         self._garantir_pasta_planilha()
         if not self._planilha_historico_arquivo.exists():
             return []
         try:
-            data=json.loads(
-                self._planilha_historico_arquivo.read_text(encoding="utf-8")
-            )
-            itens=data.get("items",[]) if isinstance(data,dict) else []
-            if not isinstance(itens,list):
+            data = json.loads(self._planilha_historico_arquivo.read_text(encoding="utf-8"))
+            itens = data.get("items", []) if isinstance(data, dict) else []
+            if not isinstance(itens, list):
                 return []
-
-            agora=datetime.now()
-            limite=agora-__import__("datetime").timedelta(days=30)
-            filtrados=[]
-            for item in itens:
-                try:
-                    salvo=datetime.fromisoformat(str(item.get("saved_at","")))
-                except Exception:
-                    continue
-                if limite <= salvo <= agora:
-                    filtrados.append(item)
-
+            filtrados = self._filtrar_arquivos_60_dias(itens)
             if filtrados != itens:
                 try:
                     self._salvar_historico_planilhas(filtrados)
                 except Exception:
                     pass
-
             return filtrados
         except Exception:
             return []
 
     def _salvar_historico_planilhas(self, itens):
         self._garantir_pasta_planilha()
-        agora=datetime.now()
-        limite=agora-__import__("datetime").timedelta(days=30)
-        validos=[]
-        for item in itens:
-            try:
-                salvo=datetime.fromisoformat(str(item.get("saved_at","")))
-            except Exception:
-                continue
-            if limite <= salvo <= agora:
-                validos.append(item)
-
-        # Não há limite de quantidade: apenas a janela temporal de 30 dias.
-        payload={"version":2,"items":validos}
-        tmp=self._planilha_historico_arquivo.with_suffix(".tmp")
-        tmp.write_text(
-            json.dumps(payload,ensure_ascii=False,indent=2),
-            encoding="utf-8"
-        )
+        validos = self._filtrar_arquivos_60_dias(itens)
+        payload = {"version": 3, "items": validos}
+        tmp = self._planilha_historico_arquivo.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(self._planilha_historico_arquivo)
 
     def _registrar_historico_planilha(self, cells, timestamp=None):
-        cells={str(k):str(v) for k,v in cells.items() if str(v)!=""}
+        cells = {str(k): str(v) for k, v in cells.items() if str(v) != ""}
         if not cells:
             return
-        agora=timestamp or datetime.now()
-        itens=self._carregar_historico_planilhas()
-        linhas=set()
+        agora = timestamp or datetime.now()
+        itens = self._carregar_historico_planilhas()
+        linhas = set()
         for chave, valor in cells.items():
-            if str(valor).strip()=="":
+            if str(valor).strip() == "":
                 continue
             try:
-                linha,coluna=[int(x) for x in str(chave).split(",")]
+                linha, coluna = [int(x) for x in str(chave).split(",")]
             except Exception:
                 continue
             if 0 <= coluna < 3:
                 linhas.add(linha)
-        entrada={
+        entrada = {
             "id": agora.strftime("%Y%m%d_%H%M%S_%f"),
             "saved_at": agora.isoformat(timespec="seconds"),
             "cells": cells,
             "filled": len(linhas),
         }
-        # Não duplica exatamente o último snapshot.
         if itens:
-            ultimo=itens[-1]
-            if ultimo.get("cells")==cells:
-                entrada["id"]=ultimo.get("id",entrada["id"])
-                entrada["saved_at"]=ultimo.get("saved_at",entrada["saved_at"])
-                entrada["filled"]=ultimo.get("filled",len(cells))
-                itens[-1]=entrada
+            ultimo = itens[-1]
+            if ultimo.get("cells") == cells:
+                entrada["id"] = ultimo.get("id", entrada["id"])
+                entrada["saved_at"] = ultimo.get("saved_at", entrada["saved_at"])
+                entrada["filled"] = ultimo.get("filled", len(linhas))
+                itens[-1] = entrada
             else:
                 itens.append(entrada)
         else:
@@ -2057,31 +2196,24 @@ class App:
         if not self._planilha_arquivo.exists():
             return
         try:
-            data=json.loads(self._planilha_arquivo.read_text(encoding="utf-8"))
-            cells=data.get("cells",{}) if isinstance(data,dict) else {}
-            updated_at=data.get("updated_at") if isinstance(data,dict) else None
-            if not isinstance(cells,dict) or not cells:
+            data = json.loads(self._planilha_arquivo.read_text(encoding="utf-8"))
+            cells = data.get("cells", {}) if isinstance(data, dict) else {}
+            updated_at = data.get("updated_at") if isinstance(data, dict) else None
+            if not isinstance(cells, dict) or not cells or not updated_at:
                 return
-            if not updated_at:
-                return
-            salvo=datetime.fromisoformat(str(updated_at))
-            hoje=datetime.now().date()
-            if salvo.date() < hoje:
-                self._registrar_historico_planilha(cells,salvo)
-                payload={
-                    "version":1,
-                    "updated_at":datetime.now().isoformat(timespec="seconds"),
-                    "cells":{}
-                }
-                tmp=self._planilha_arquivo.with_suffix(".tmp")
-                tmp.write_text(json.dumps(payload,ensure_ascii=False,indent=2),encoding="utf-8")
+            salvo = datetime.fromisoformat(str(updated_at))
+            if salvo.date() < datetime.now().date():
+                self._registrar_historico_planilha(cells, salvo)
+                payload = {"version": 1, "updated_at": datetime.now().isoformat(timespec="seconds"), "cells": {}}
+                tmp = self._planilha_arquivo.with_suffix(".tmp")
+                tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
                 tmp.replace(self._planilha_arquivo)
         except Exception:
             pass
 
     def _abrir_snapshot_historico(self, item):
-        cells=item.get("cells",{}) if isinstance(item,dict) else {}
-        if not isinstance(cells,dict):
+        cells = item.get("cells", {}) if isinstance(item, dict) else {}
+        if not isinstance(cells, dict):
             return
         self._fechar_historico_planilha()
         self.abrir_planilha(cells)
@@ -2092,25 +2224,31 @@ class App:
             pass
 
     def _fechar_historico_planilha(self):
-        w=getattr(self,"_planilha_historico_window",None)
+        w = getattr(self, "_planilha_historico_window", None)
         if w is not None:
-            try:w.destroy()
-            except Exception:pass
-        self._planilha_historico_window=None
+            try:
+                w.destroy()
+            except Exception:
+                pass
+        self._planilha_historico_window = None
+        self._arquivos_body = None
 
     def _excluir_historico_planilha(self, item):
-        ident=str(item.get("id",""))
-        itens=self._carregar_historico_planilhas()
-        novos=[x for x in itens if str(x.get("id","")) != ident]
+        ident = str(item.get("id", ""))
+        itens = self._carregar_historico_planilhas()
+        novos = [x for x in itens if str(x.get("id", "")) != ident]
         self._salvar_historico_planilhas(novos)
-        self.abrir_historico_planilha()
+        if self._arquivos_data_selecionada is not None:
+            self._mostrar_planilhas_do_dia(self._arquivos_data_selecionada)
+        else:
+            self._renderizar_calendario_arquivos()
 
     def _limpar_historico_planilhas(self):
-        itens=self._carregar_historico_planilhas()
+        itens = self._carregar_historico_planilhas()
         if not itens:
             messagebox.showinfo("Arquivos", "Não há arquivos no histórico.", parent=self._planilha_historico_window)
             return
-        confirmar=messagebox.askyesno(
+        confirmar = messagebox.askyesno(
             "Limpar Arquivos",
             "Tem certeza que deseja apagar todos os arquivos do histórico?",
             parent=self._planilha_historico_window
@@ -2118,69 +2256,475 @@ class App:
         if not confirmar:
             return
         self._salvar_historico_planilhas([])
-        self.abrir_historico_planilha()
+        self._arquivos_data_selecionada = None
+        self._renderizar_calendario_arquivos()
+
+    def _contar_codigos_mes(self, referencia=None):
+        """Retorna a quantidade de códigos do mês exibido no calendário.
+
+        A fonte principal é o histórico de execuções. Quando o mês não possui
+        registros de execução (por exemplo, históricos antigos migrados apenas
+        como planilhas salvas), faz fallback para o histórico de Arquivos e soma
+        as linhas preenchidas das planilhas daquele mês. Isso evita que meses
+        antigos apareçam como zero apesar de possuírem arquivos registrados.
+        """
+        referencia = referencia or datetime.now()
+        if hasattr(referencia, "year") and hasattr(referencia, "month"):
+            ano = int(referencia.year)
+            mes = int(referencia.month)
+        else:
+            hoje = datetime.now()
+            ano, mes = hoje.year, hoje.month
+
+        total_execucoes = 0
+        encontrou_execucao = False
+        for execucao in self._filtrar_historico_execucoes_60_dias(self._historico_execucoes):
+            try:
+                inicio = datetime.fromisoformat(str(execucao.get("inicio", "")))
+            except Exception:
+                continue
+            if inicio.year != ano or inicio.month != mes:
+                continue
+            encontrou_execucao = True
+
+            # Compatibilidade com históricos antigos: algumas execuções
+            # podem ter processados=0/ausente mesmo tendo códigos concluídos.
+            # Nesses casos, usamos a soma Executados + Não executados; como
+            # último recurso, usamos o total planejado.
+            processados = int(execucao.get("processados", 0) or 0)
+            sucessos = int(execucao.get("sucessos", 0) or 0)
+            erros = int(execucao.get("erros", 0) or 0)
+            planejados = int(execucao.get("total", 0) or 0)
+
+            if processados > 0:
+                quantidade = processados
+            elif (sucessos + erros) > 0:
+                quantidade = sucessos + erros
+            else:
+                quantidade = planejados
+            total_execucoes += quantidade
+
+        if encontrou_execucao and total_execucoes > 0:
+            return total_execucoes
+
+        # Fallback para meses que possuem Arquivos salvos, mas não possuem
+        # histórico de execução compatível (situação comum em dados antigos).
+        total_arquivos = 0
+        try:
+            for item in self._carregar_historico_planilhas():
+                try:
+                    salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
+                except Exception:
+                    continue
+                if salvo.year != ano or salvo.month != mes:
+                    continue
+                try:
+                    preenchidas = int(item.get("filled", 0) or 0)
+                except Exception:
+                    preenchidas = 0
+                total_arquivos += max(0, preenchidas)
+        except Exception:
+            total_arquivos = 0
+        return total_arquivos
+
+    def _formatar_contador_arquivos(self, referencia=None):
+        valor = self._contar_codigos_mes(referencia)
+        return f"{valor:,}".replace(",", ".") + " códigos no mês"
+
+    def _atualizar_contador_arquivos(self, referencia=None):
+        """Atualiza os contadores. O contador da janela usa o mês exibido no calendário."""
+        texto_main = self._formatar_contador_arquivos()
+        if self.arquivos_contador_label is not None:
+            try:
+                self.arquivos_contador_label.configure(text=texto_main)
+            except Exception:
+                pass
+
+        label = getattr(self, "_arquivos_contador_janela", None)
+        if label is not None:
+            try:
+                texto_janela = self._formatar_contador_arquivos(referencia)
+                label.configure(text=texto_janela)
+            except Exception:
+                pass
+
+    def _mes_anterior(self, data):
+        if data.month == 1:
+            return data.replace(year=data.year - 1, month=12, day=1)
+        return data.replace(month=data.month - 1, day=1)
+
+    def _mes_proximo(self, data):
+        if data.month == 12:
+            return data.replace(year=data.year + 1, month=1, day=1)
+        return data.replace(month=data.month + 1, day=1)
+
+    @staticmethod
+    def _nome_mes(mes):
+        meses = (
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+        )
+        return meses[mes - 1]
+
+    def _cor_fluente(self, valor):
+        """Resolve uma cor CTk (tupla claro/escuro) para um widget tkinter nativo."""
+        if isinstance(valor, (tuple, list)):
+            modo = str(ctk.get_appearance_mode()).lower()
+            return str(valor[1] if modo == "dark" else valor[0])
+        return str(valor)
+
+    def _mes_minimo_arquivos(self):
+        limite = datetime.now().date() - timedelta(days=ARQUIVOS_DIAS)
+        return datetime(limite.year, limite.month, 1)
+
+    def _mes_atual_arquivos(self):
+        agora = datetime.now()
+        return datetime(agora.year, agora.month, 1)
+
+    def _renderizar_calendario_arquivos(self):
+        """Renderiza um calendário Fluent 2 nativo, sem dependências externas."""
+        if self._arquivos_body is None:
+            return
+
+        for widget in self._arquivos_body.winfo_children():
+            widget.destroy()
+        self._arquivos_data_selecionada = None
+        self._arquivos_calendar_canvas = None
+        self._arquivos_calendar_widget = None
+
+        hoje = datetime.now().date()
+        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        itens = self._carregar_historico_planilhas()
+        por_dia = {}
+        for item in itens:
+            try:
+                dt = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            por_dia.setdefault(dt.date(), []).append(item)
+
+        card = ctk.CTkFrame(
+            self._arquivos_body, fg_color=self.CARD, corner_radius=12,
+            border_width=1, border_color=self.BORDER
+        )
+        card.pack(fill="both", expand=True, padx=8, pady=(0, 4))
+
+        intro = ctk.CTkFrame(card, fg_color="transparent")
+        intro.pack(fill="x", padx=18, pady=(14, 4))
+        ctk.CTkLabel(
+            intro, text="Selecione uma data", text_color=self.TEXT,
+            font=("Segoe UI", 15, "bold")
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            intro,
+            text="Os dias com planilhas salvas ficam destacados. O histórico mantém até 60 dias.",
+            text_color=self.SUBTEXT, font=("Segoe UI", 9)
+        ).pack(anchor="w", pady=(2, 0))
+
+        nav = ctk.CTkFrame(card, fg_color="transparent")
+        nav.pack(fill="x", padx=18, pady=(10, 8))
+        self._arquivos_btn_mes_anterior = ctk.CTkButton(
+            nav, text="‹", width=38, height=32, corner_radius=7,
+            fg_color=self.CARD, hover_color=self.ACCENT_HOVER,
+            border_width=1, border_color=self.BORDER, text_color=self.TEXT,
+            font=("Segoe UI", 17, "bold"), command=lambda: self._mudar_mes_arquivos(-1)
+        )
+        self._arquivos_btn_mes_anterior.pack(side="left")
+        self._arquivos_mes_label = ctk.CTkLabel(
+            nav, text="", text_color=self.TEXT, font=("Segoe UI", 14, "bold")
+        )
+        self._arquivos_mes_label.pack(side="left", expand=True)
+        self._arquivos_btn_mes_proximo = ctk.CTkButton(
+            nav, text="›", width=38, height=32, corner_radius=7,
+            fg_color=self.CARD, hover_color=self.ACCENT_HOVER,
+            border_width=1, border_color=self.BORDER, text_color=self.TEXT,
+            font=("Segoe UI", 17, "bold"), command=lambda: self._mudar_mes_arquivos(1)
+        )
+        self._arquivos_btn_mes_proximo.pack(side="right")
+
+        hint = ctk.CTkFrame(card, fg_color="transparent")
+        hint.pack(fill="x", padx=18, pady=(0, 4))
+        dot_color = self._cor_fluente(self.ACCENT)
+        ctk.CTkLabel(
+            hint, text="●", text_color=dot_color, font=("Segoe UI", 12, "bold")
+        ).pack(side="left")
+        ctk.CTkLabel(
+            hint, text=" possui planilhas salvas", text_color=self.SUBTEXT,
+            font=("Segoe UI", 9)
+        ).pack(side="left", padx=(4, 0))
+
+        canvas = tk.Canvas(
+            card,
+            height=360,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            bg=self._cor_fluente(self.CARD),
+        )
+        canvas.pack(fill="both", expand=True, padx=18, pady=(2, 16))
+        canvas.bind("<Button-1>", self._clique_calendario_arquivos)
+        canvas.bind("<Configure>", lambda _e: self._desenhar_calendario_arquivos())
+        self._arquivos_calendar_canvas = canvas
+        self._desenhar_calendario_arquivos()
+
+    def _desenhar_calendario_arquivos(self):
+        canvas = self._arquivos_calendar_canvas
+        if canvas is None or not canvas.winfo_exists():
+            return
+        canvas.delete("all")
+
+        hoje = datetime.now().date()
+        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        mes = self._arquivos_mes
+        if not mes:
+            mes = self._mes_atual_arquivos()
+            self._arquivos_mes = mes
+
+        itens = self._carregar_historico_planilhas()
+        por_dia = {}
+        for item in itens:
+            try:
+                dt = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            por_dia.setdefault(dt.date(), []).append(item)
+
+        modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
+        bg = self._cor_fluente(self.CARD)
+        border = self._cor_fluente(self.BORDER)
+        text = self._cor_fluente(self.TEXT)
+        subtext = self._cor_fluente(self.SUBTEXT)
+        accent = self._cor_fluente(self.ACCENT)
+        accent_hover = self._cor_fluente(self.ACCENT_HOVER)
+        disabled = "#555B61" if modo_escuro else "#B7B7B7"
+        today_fill = "#E8F1FB" if not modo_escuro else "#20384B"
+        today_outline = accent
+
+        self._arquivos_mes_label.configure(text=f"{self._nome_mes(mes.month)} {mes.year}")
+        # O contador da janela acompanha exatamente o mês atualmente exibido.
+        self._atualizar_contador_arquivos(mes)
+        self._arquivos_btn_mes_anterior.configure(
+            state="normal" if mes > self._mes_minimo_arquivos() else "disabled"
+        )
+        self._arquivos_btn_mes_proximo.configure(
+            state="normal" if mes < self._mes_atual_arquivos() else "disabled"
+        )
+
+        largura = max(canvas.winfo_width(), 640)
+        altura = max(canvas.winfo_height(), 330)
+        margem_x = 8
+        margem_y = 4
+        header_h = 30
+        grid_top = margem_y + header_h
+        col_w = (largura - 2 * margem_x) / 7
+        row_h = (altura - grid_top - 8) / 6
+
+        nomes = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]
+        for col, nome in enumerate(nomes):
+            x0 = margem_x + col * col_w
+            x1 = x0 + col_w
+            canvas.create_text(
+                (x0 + x1) / 2, margem_y + header_h / 2,
+                text=nome, fill=subtext, font=("Segoe UI", 9, "bold")
+            )
+
+        calendario = pycalendar.Calendar(firstweekday=0)
+        semanas = calendario.monthdayscalendar(mes.year, mes.month)
+        while len(semanas) < 6:
+            semanas.append([0] * 7)
+
+        for row in range(6):
+            y0 = grid_top + row * row_h + 2
+            y1 = grid_top + (row + 1) * row_h - 2
+            for col in range(7):
+                dia = semanas[row][col]
+                if not dia:
+                    continue
+                data = mes.replace(day=dia).date()
+                x0 = margem_x + col * col_w + 3
+                x1 = margem_x + (col + 1) * col_w - 3
+                centro_x = (x0 + x1) / 2
+                centro_y = (y0 + y1) / 2
+                valido = limite <= data <= hoje
+                tem_arquivo = data in por_dia
+                eh_hoje = data == hoje
+                fill = bg
+                outline = border
+                fg = text if valido else disabled
+                width = 1
+                if tem_arquivo and valido:
+                    fill = "#EAF4FF" if not modo_escuro else "#183B54"
+                    outline = accent
+                    width = 1
+                elif eh_hoje and valido:
+                    fill = today_fill
+                    outline = today_outline
+                    width = 2
+
+                canvas.create_rectangle(
+                    x0, y0, x1, y1,
+                    fill=fill, outline=outline, width=width,
+                    tags=(f"dia:{data.isoformat()}",)
+                )
+                canvas.create_text(
+                    centro_x, centro_y - 3,
+                    text=str(dia), fill=fg,
+                    font=("Segoe UI", 11, "bold" if (tem_arquivo or eh_hoje) else "normal"),
+                    tags=(f"dia:{data.isoformat()}",)
+                )
+                if tem_arquivo and valido:
+                    canvas.create_oval(
+                        centro_x - 3, y1 - 14, centro_x + 3, y1 - 8,
+                        fill=accent, outline="", tags=(f"dia:{data.isoformat()}",)
+                    )
+
+    def _clique_calendario_arquivos(self, event):
+        canvas = self._arquivos_calendar_canvas
+        if canvas is None:
+            return
+        try:
+            item_id = canvas.find_closest(event.x, event.y)[0]
+        except Exception:
+            return
+        tags = canvas.gettags(item_id)
+        data = None
+        for tag in tags:
+            if tag.startswith("dia:"):
+                try:
+                    data = datetime.fromisoformat(tag[4:]).date()
+                except Exception:
+                    data = None
+                break
+        if data is None:
+            return
+        hoje = datetime.now().date()
+        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        if limite <= data <= hoje:
+            self._mostrar_planilhas_do_dia(data)
+
+    def _mudar_mes_arquivos(self, direcao):
+        atual = self._arquivos_mes or self._mes_atual_arquivos()
+        novo = self._mes_proximo(atual) if direcao > 0 else self._mes_anterior(atual)
+        if novo < self._mes_minimo_arquivos() or novo > self._mes_atual_arquivos():
+            return
+        self._arquivos_mes = novo
+        self._atualizar_contador_arquivos(novo)
+        self._desenhar_calendario_arquivos()
+
+    def _mostrar_planilhas_do_dia(self, data):
+        if self._arquivos_body is None:
+            return
+        hoje = datetime.now().date()
+        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        if data < limite or data > hoje:
+            return
+        itens = []
+        for item in self._carregar_historico_planilhas():
+            try:
+                dt = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            if dt.date() == data:
+                itens.append(item)
+
+        self._arquivos_data_selecionada = data
+        for widget in self._arquivos_body.winfo_children():
+            widget.destroy()
+
+        header = ctk.CTkFrame(self._arquivos_body, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 8))
+        ctk.CTkButton(
+            header, text="← Voltar", command=self._renderizar_calendario_arquivos,
+            width=88, height=30, corner_radius=6, fg_color=self.CARD,
+            hover_color=("#F3F3F3", "#3A3A3A"), border_width=1,
+            border_color=self.BORDER, text_color=self.TEXT, font=("Segoe UI", 10, "bold")
+        ).pack(side="left")
+        ctk.CTkLabel(
+            header, text=data.strftime("%d/%m/%Y"), text_color=self.TEXT,
+            font=("Segoe UI", 15, "bold")
+        ).pack(side="left", padx=12)
+
+        if not itens:
+            ctk.CTkLabel(
+                self._arquivos_body, text="Nenhuma planilha foi salva nesta data.",
+                text_color=self.SUBTEXT, font=("Segoe UI", 10)
+            ).pack(anchor="w", pady=24)
+            return
+
+        ctk.CTkLabel(
+            self._arquivos_body, text=f"{len(itens)} planilha(s) salva(s) nesta data",
+            text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold")
+        ).pack(anchor="w", pady=(0, 6))
+
+        lista = ctk.CTkScrollableFrame(self._arquivos_body, fg_color="transparent")
+        lista.pack(fill="both", expand=True)
+        for item in reversed(itens):
+            saved = str(item.get("saved_at", ""))
+            try:
+                dt = datetime.fromisoformat(saved)
+                hora = dt.strftime("%H:%M")
+            except Exception:
+                hora = ""
+            filled = int(item.get("filled", 0) or 0)
+            card = ctk.CTkFrame(lista, fg_color=self.CARD, corner_radius=8, border_width=1, border_color=self.BORDER)
+            card.pack(fill="x", pady=4)
+            left = ctk.CTkFrame(card, fg_color="transparent")
+            left.pack(side="left", fill="x", expand=True, padx=10, pady=8)
+            ctk.CTkLabel(left, text=f"{hora}  •  {filled} linhas preenchidas", text_color=self.TEXT, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+            actions = ctk.CTkFrame(card, fg_color="transparent")
+            actions.pack(side="right", padx=8, pady=6)
+            ctk.CTkButton(
+                actions, text="Abrir", width=70, height=30, corner_radius=6,
+                fg_color=self.ACCENT, hover_color=self.ACCENT_HOVER,
+                text_color="#FFFFFF", font=("Segoe UI", 10, "bold"),
+                command=lambda it=item: self._abrir_snapshot_historico(it)
+            ).pack(side="left", padx=(0, 5))
+            ctk.CTkButton(
+                actions, text="×", width=30, height=30, corner_radius=6,
+                fg_color=self.CARD, hover_color=("#FDECEC", "#3A2424"),
+                border_width=1, border_color=self.ERROR, text_color=self.ERROR,
+                font=("Segoe UI", 14, "bold"), command=lambda it=item: self._excluir_historico_planilha(it)
+            ).pack(side="left")
 
     def abrir_historico_planilha(self):
         self._fechar_historico_planilha()
-        itens=list(reversed(self._carregar_historico_planilhas()))
-
-        win=ctk.CTkToplevel(self.app)
-        self._planilha_historico_window=win
+        # Janela nativa para maximizar a estabilidade do container; o conteúdo continua Fluent 2.
+        win = tk.Toplevel(self.app)
+        self._planilha_historico_window = win
         win.title("Arquivos — SM AutoLab")
-        win.geometry("760x460")
-        win.minsize(650,380)
+        win.geometry("820x650")
+        win.minsize(760, 590)
+        win.resizable(True, True)
         win.transient(self.app)
-        win.configure(fg_color=self.BG)
+        win.configure(bg=self._cor_fluente(self.BG))
         win.protocol("WM_DELETE_WINDOW", self._fechar_historico_planilha)
+        try:
+            self.app.update_idletasks()
+            px = self.app.winfo_rootx() + max(0, (self.app.winfo_width() - 820) // 2)
+            py = self.app.winfo_rooty() + max(0, (self.app.winfo_height() - 650) // 2)
+            win.geometry(f"820x650+{px}+{py}")
+        except Exception:
+            pass
 
-        header=ctk.CTkFrame(win,fg_color="transparent")
-        header.pack(fill="x",padx=20,pady=(18,10))
-        ctk.CTkLabel(header,text="Arquivos",text_color=self.TEXT,font=("Segoe UI",20,"bold")).pack(side="left")
+        header = ctk.CTkFrame(win, fg_color="transparent")
+        header.pack(fill="x", padx=18, pady=(16, 8))
+        ctk.CTkLabel(header, text="Arquivos", text_color=self.TEXT, font=("Segoe UI", 20, "bold")).pack(side="left")
+        self._arquivos_contador_janela = ctk.CTkLabel(header, text="0 códigos no mês", text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold"))
+        self._arquivos_contador_janela.pack(side="left", padx=(10, 0))
         ctk.CTkButton(
-            header,text="Limpar histórico",command=self._limpar_historico_planilhas,
-            width=125,height=34,corner_radius=7,fg_color=self.CARD,
-            hover_color=("#FDECEC","#3A2424"),border_width=1,border_color=self.ERROR,
-            text_color=self.ERROR,font=("Segoe UI",11,"bold")
+            header, text="Limpar histórico", command=self._limpar_historico_planilhas,
+            width=125, height=32, corner_radius=7, fg_color=self.CARD,
+            hover_color=("#FDECEC", "#3A2424"), border_width=1, border_color=self.ERROR,
+            text_color=self.ERROR, font=("Segoe UI", 10, "bold")
         ).pack(side="right")
-        ctk.CTkLabel(
-            win,text="Planilhas salvas nos últimos 30 dias.",
-            text_color=self.SUBTEXT,font=("Segoe UI",11)
-        ).pack(anchor="w",padx=20,pady=(0,12))
-
-        body=ctk.CTkScrollableFrame(win,fg_color="transparent")
-        body.pack(fill="both",expand=True,padx=14,pady=(0,14))
-
-        if not itens:
-            ctk.CTkLabel(body,text="Nenhum arquivo no histórico.",text_color=self.SUBTEXT,font=("Segoe UI",11)).pack(anchor="center",pady=40)
-            return
-
-        for item in itens:
-            saved=str(item.get("saved_at",""))
-            try:
-                dt=datetime.fromisoformat(saved)
-                dia=dt.strftime("%d/%m/%Y")
-                hora=dt.strftime("%H:%M")
-            except Exception:
-                dia=saved; hora=""
-            filled=int(item.get("filled",0) or 0)
-            card=ctk.CTkFrame(body,fg_color=self.CARD,corner_radius=10,border_width=1,border_color=self.BORDER)
-            card.pack(fill="x",pady=5)
-            left=ctk.CTkFrame(card,fg_color="transparent")
-            left.pack(side="left",fill="x",expand=True,padx=14,pady=10)
-            ctk.CTkLabel(left,text=dia,text_color=self.TEXT,font=("Segoe UI",13,"bold")).pack(anchor="w")
-            ctk.CTkLabel(left,text=f"{hora}  •  {filled} linhas preenchidas",text_color=self.SUBTEXT,font=("Segoe UI",10)).pack(anchor="w",pady=(2,0))
-
-            actions=ctk.CTkFrame(card,fg_color="transparent")
-            actions.pack(side="right",padx=10,pady=8)
-            ctk.CTkButton(
-                actions,text="Abrir",width=78,height=34,corner_radius=7,fg_color=self.ACCENT,hover_color=self.ACCENT_HOVER,
-                text_color="#FFFFFF",font=("Segoe UI",11,"bold"),command=lambda it=item:self._abrir_snapshot_historico(it)
-            ).pack(side="left",padx=(0,6))
-            ctk.CTkButton(
-                actions,text="×",width=34,height=34,corner_radius=7,fg_color=self.CARD,hover_color=("#FDECEC","#3A2424"),
-                border_width=1,border_color=self.ERROR,text_color=self.ERROR,font=("Segoe UI",16,"bold"),
-                command=lambda it=item:self._excluir_historico_planilha(it)
-            ).pack(side="left")
+        self._arquivos_body = ctk.CTkFrame(win, fg_color="transparent")
+        self._arquivos_body.pack(fill="both", expand=True, padx=16, pady=(0, 14))
+        hoje = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        self._arquivos_mes = hoje
+        self._arquivos_data_selecionada = None
+        self._atualizar_contador_arquivos()
+        self._renderizar_calendario_arquivos()
+        win.update_idletasks()
 
     def _fechar_janela_planilha(self):
         self._planilha_encerrar_janela()
@@ -2366,20 +2910,20 @@ class App:
         for item in resultado.itens:
             if item.status == "Erro":
                 self._add_erro_codigo(item.codigo)
-        self._selecionar_aba("Erros" if resultado.erros else "Atividade")
+        self._selecionar_aba("Não executados" if resultado.erros else "Atividade")
 
         if resultado.erros == 0 and not self._parar:
             messagebox.showinfo(
                 "Processo concluído",
-                f"Processados: {resultado.processados}\nSucesso: {resultado.sucessos}\nErros: 0"
+                f"Processados: {resultado.processados}\nExecutados: {resultado.sucessos}\nNão executados: 0"
             )
         elif resultado.erros > 0:
             messagebox.showwarning(
-                "Processo concluído com erros",
+                "Processo concluído",
                 f"Processados: {resultado.processados}\n"
-                f"Sucesso: {resultado.sucessos}\n"
-                f"Erros: {resultado.erros}\n\n"
-                "Os códigos com erro estão na aba 'Erros'."
+                f"Executados: {resultado.sucessos}\n"
+                f"Não executados: {resultado.erros}\n\n"
+                "Os códigos não executados estão na aba 'Não executados'."
             )
 
     def parar(self):
@@ -2667,3 +3211,4 @@ class App:
 
     def run(self):
         self.app.mainloop()
+
