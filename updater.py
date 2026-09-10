@@ -72,14 +72,14 @@ def find_update(timeout: int = 8) -> dict | None:
         and "updater" not in str(asset.get("name", "")).lower()
     ]
 
-    # O executável principal usa nome fixo e é substituído a cada atualização.
-    # Mantemos como fallback o padrão antigo versionado para compatibilidade.
+    # O PyInstaller transforma o nome do executável em ponto em alguns ambientes
+    # ("SM AutoLab.exe" -> "SM.AutoLab.exe"). Aceitamos ambos os formatos.
     def _asset_matches(asset):
         name = str(asset.get("name", "")).strip().lower()
         normalized = "".join(ch for ch in name if ch.isalnum())
         return (
-            name == "sm autolab.exe"
-            or ("smautolab" in normalized and latest.replace(".", "") in normalized)
+            name in {"sm autolab.exe", "sm.autolab.exe"}
+            or (normalized.startswith("smautolab") and latest.replace(".", "") in normalized)
         )
 
     matching = [asset for asset in exe_assets if _asset_matches(asset)]
