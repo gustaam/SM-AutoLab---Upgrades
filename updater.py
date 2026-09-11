@@ -73,6 +73,8 @@ def find_update(timeout: int = 8) -> dict | None:
     for release in releases:
         if release.get("draft") or release.get("prerelease"):
             continue
+        if f"<!-- {UPDATE_CHANNEL} -->" not in str(release.get("body") or ""):
+            continue
         assets = release.get("assets") or []
         manifest = next((a for a in assets if str(a.get("name", "")).strip().lower() == MANIFEST_ASSET.lower()), None)
         if manifest is None:
