@@ -1,64 +1,76 @@
 name: Build and publish release
 
 on:
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: "Tag da release (ex.: v2.99)"
-        required: true
-        default: "v2.99"
-        type: string
   push:
-    branches:
-      - "v2.99.1"
     tags:
       - "v*.*.*"
       - "v*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag exata da release (ex.: v2.99.1)"
+        required: true
+        type: string
 
 permissions:
   contents: write
-
-env:
-  RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
 
 jobs:
   release:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout da versão exata
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
+          fetch-depth: 1
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.14"
 
-      - name: Validate source and version
+      - name: Validate source, version and required files
         shell: pwsh
         run: |
-          $v = (Get-Content VERSION -Raw).Trim()
-          $tagVersion = $env:RELEASE_TAG.TrimStart('v')
-          if ($v -ne $tagVersion) {
-            throw "VERSION ($v) não corresponde à release ($env:RELEASE_TAG)."
+          $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
+          $tagVersion = $tag.TrimStart('vV')
+          $version = (Get-Content VERSION -Raw).Trim()
+
+          if ($version -ne $tagVersion) {
+            throw "VERSION ($version) não corresponde à tag ($tag). Release cancelada para impedir publicação de código de outra versão."
+          }
+
+          $required = @(
+            "main.py",
+            "interface.py",
+            "app.py",
+            "automacao.py",
+            "config.py",
+            "planilha.py",
+            "resultados.py",
+            "splash.py",
+            "updater.py",
+            "patch_v266.py",
+            "requirements.txt",
+            "VERSION",
+            "SM AutoLab.ico",
+            "assets"
+          )
+
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Arquivo/recurso obrigatório ausente: $path"
+            }
           }
 
           $interface = Get-Content interface.py -Raw
-          $required = @(
-            'def _renderizar_calendario_arquivos',
-            'Canvas(',
-            'ARQUIVOS_DIAS = 60'
-          )
-          foreach ($marker in $required) {
-            if ($interface -notlike "*$marker*") {
-              throw "interface.py não contém o marcador esperado: $marker"
-            }
+          if ($interface -notmatch "Canvas\(") {
+            throw "interface.py não contém o calendário Canvas esperado."
           }
-          if ($interface -match 'tkcalendar') {
-            throw "interface.py ainda contém dependência tkcalendar."
-          }
-          if ($interface -match 'self\.abrir_historico_planilha\s*=\s*self\._abrir_historico_planilha_v266') {
-            throw "patch_v266 ainda está sobrescrevendo abrir_historico_planilha."
+          if ($interface -match "tkcalendar") {
+            throw "Dependência tkcalendar detectada; build interrompido para proteger a versão-base."
           }
 
       - name: Install dependencies
@@ -78,11 +90,37 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab Updater" updater.py
 
+      - name: Verify build outputs and create release manifest
+        shell: pwsh
+        run: |
+          $main = "dist\SM AutoLab.exe"
+          $updater = "dist\SM AutoLab Updater.exe"
+          if (-not (Test-Path $main)) { throw "Executável principal não foi gerado: $main" }
+          if (-not (Test-Path $updater)) { throw "Updater não foi gerado: $updater" }
+          if ((Get-Item $main).Length -lt 1000000) { throw "Executável principal suspeitamente pequeno." }
+          if ((Get-Item $updater).Length -lt 1000000) { throw "Updater suspeitamente pequeno." }
+
+          $version = (Get-Content VERSION -Raw).Trim()
+          $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
+          $manifest = @{
+            channel = "SM-AUTOLAB-RESET-2026-09"
+            version = $version
+            tag = $tag
+            commit = "${{ github.sha }}"
+            main_asset = "SM AutoLab.exe"
+            updater_asset = "SM AutoLab Updater.exe"
+          } | ConvertTo-Json -Compress
+          Set-Content -Path "release-manifest.json" -Value $manifest -Encoding UTF8
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
+          body: "<!-- SM-AUTOLAB-RESET-2026-09 -->"
+          append_body: true
           files: |
             dist/SM AutoLab.exe
             dist/SM AutoLab Updater.exe
+            release-manifest.json
