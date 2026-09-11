@@ -82,7 +82,12 @@ def find_update(timeout: int = 8) -> dict | None:
             if str(a.get("name", "")).lower().endswith(".exe")
             and "updater" not in str(a.get("name", "")).lower()
         ]
-        if not main_assets:
+        updater_assets = [
+            a for a in assets
+            if str(a.get("name", "")).lower().endswith(".exe")
+            and "updater" in str(a.get("name", "")).lower()
+        ]
+        if not main_assets or not updater_assets:
             continue
         latest = str(release.get("tag_name", "")).lstrip("vV")
         if _version_tuple(latest) <= current_tuple:
