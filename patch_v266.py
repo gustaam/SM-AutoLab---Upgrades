@@ -51,7 +51,7 @@ def _carregar_historico_planilhas_v266(self):
         if not isinstance(itens, list):
             return []
         agora = datetime.now()
-        limite = agora - timedelta(days=30)
+        limite = agora - timedelta(days=60)
         filtrados = []
         for item in itens:
             if not isinstance(item, dict):
@@ -75,7 +75,7 @@ def _carregar_historico_planilhas_v266(self):
 def _salvar_historico_planilhas_v266(self, itens):
     _garantir_pasta_planilha(self)
     agora = datetime.now()
-    limite = agora - timedelta(days=30)
+    limite = agora - timedelta(days=60)
     validos = []
     for item in itens:
         if not isinstance(item, dict):
@@ -86,7 +86,7 @@ def _salvar_historico_planilhas_v266(self, itens):
             continue
         if limite <= salvo <= agora:
             validos.append(item)
-    # Sem limite de quantidade: somente a janela de 30 dias.
+    # Sem limite de quantidade: somente a janela de 60 dias na interface principal.
     payload = {"version": 2, "items": validos}
     tmp = self._planilha_historico_arquivo.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -190,7 +190,7 @@ def _abrir_historico_planilha_v266(self):
         font=("Segoe UI", 11, "bold")
     ).pack(side="right")
     ctk.CTkLabel(
-        win, text="Planilhas salvas nos últimos 30 dias.",
+        win, text="Planilhas salvas nos últimos 60 dias.",
         text_color=self.SUBTEXT, font=("Segoe UI", 11)
     ).pack(anchor="w", padx=20, pady=(0, 12))
 
@@ -287,14 +287,11 @@ def aplicar_patch(app_class):
     # Keep original status renderer available to the patched method.
     app_class.__v265_aplicar_status = app_class._aplicar_status
 
+    # O histórico de planilhas e a tela Arquivos possuem implementação própria
+    # na interface atual (60 dias + calendário Fluent 2 nativo). Não sobrescrever
+    # esses métodos aqui: este patch legado é mantido apenas para as correções de
+    # compatibilidade que ainda não foram absorvidas na interface principal.
     app_class._planilha_atualizar_contador = _planilha_atualizar_contador_v266
-    app_class._carregar_historico_planilhas = _carregar_historico_planilhas_v266
-    app_class._salvar_historico_planilhas = _salvar_historico_planilhas_v266
-    app_class._registrar_historico_planilha = _registrar_historico_planilha_v266
-    app_class._excluir_historico_planilha = _excluir_historico_planilha_v266
-    app_class._limpar_historico_planilhas = _limpar_historico_planilhas_v266
-    app_class._abrir_snapshot_historico = _abrir_snapshot_historico_v266
-    app_class.abrir_historico_planilha = _abrir_historico_planilha_v266
     app_class._aplicar_status = _aplicar_status_finalizado_v266
 
     original_config = app_class.config_app
