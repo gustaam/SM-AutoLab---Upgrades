@@ -21,8 +21,10 @@ except Exception:
     pass
 
 REPO = "gustaam/SM-AutoLab---Upgrades"
-API_LATEST = f"https://api.github.com/repos/{REPO}/releases/latest"
+API_RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
 USER_AGENT = "SM-AutoLab-Updater"
+UPDATE_CHANNEL = "SM-AUTOLAB-RESET-2026-09"
+MANIFEST_ASSET = "SM AutoLab Release Manifest.json"
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
@@ -46,25 +48,52 @@ def current_version(base: Path | None = None) -> str:
     return "0.0.0"
 
 
-def fetch_latest_release(timeout: int = 8) -> dict:
+def fetch_releases(timeout: int = 8) -> list[dict]:
     request = urllib.request.Request(
-        API_LATEST,
+        API_RELEASES,
         headers={
             "Accept": "application/vnd.github+json",
             "User-Agent": USER_AGENT,
         },
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
+        data = json.loads(response.read().decode("utf-8"))
+    return data if isinstance(data, list) else []
 
 
 def find_update(timeout: int = 8) -> dict | None:
-    release = fetch_latest_release(timeout)
-    latest = str(release.get("tag_name", "")).lstrip("vV")
     current = current_version()
-    if not latest or _version_tuple(latest) <= _version_tuple(current):
+    current_tuple = _version_tuple(current)
+    releases = fetch_releases(timeout)
+
+    # Só considera releases da nova linha-base criada após o reset do projeto.
+    # Isso impede que instalações desta versão sejam atualizadas para releases
+    # antigos que ficaram no GitHub antes da reinicialização.
+    compatible = []
+    for release in releases:
+        if release.get("draft") or release.get("prerelease"):
+            continue
+        assets = release.get("assets") or []
+        manifest = next((a for a in assets if str(a.get("name", "")).strip().lower() == MANIFEST_ASSET.lower()), None)
+        if manifest is None:
+            continue
+        main_assets = [
+            a for a in assets
+            if str(a.get("name", "")).lower().endswith(".exe")
+            and "updater" not in str(a.get("name", "")).lower()
+        ]
+        if not main_assets:
+            continue
+        latest = str(release.get("tag_name", "")).lstrip("vV")
+        if _version_tuple(latest) <= current_tuple:
+            continue
+        compatible.append((release, _version_tuple(latest)))
+
+    if not compatible:
         return None
 
+    release = max(compatible, key=lambda item: item[1])[0]
+    latest = str(release.get("tag_name", "")).lstrip("vV")
     assets = release.get("assets") or []
     exe_assets = [
         asset for asset in assets
@@ -72,14 +101,14 @@ def find_update(timeout: int = 8) -> dict | None:
         and "updater" not in str(asset.get("name", "")).lower()
     ]
 
-    # O PyInstaller transforma o nome do executável em ponto em alguns ambientes
-    # ("SM AutoLab.exe" -> "SM.AutoLab.exe"). Aceitamos ambos os formatos.
+    # O executável principal usa nome fixo e é substituído a cada atualização.
+    # Mantemos como fallback o padrão antigo versionado para compatibilidade.
     def _asset_matches(asset):
         name = str(asset.get("name", "")).strip().lower()
         normalized = "".join(ch for ch in name if ch.isalnum())
         return (
-            name in {"sm autolab.exe", "sm.autolab.exe"}
-            or (normalized.startswith("smautolab") and latest.replace(".", "") in normalized)
+            name == "sm autolab.exe"
+            or ("smautolab" in normalized and latest.replace(".", "") in normalized)
         )
 
     matching = [asset for asset in exe_assets if _asset_matches(asset)]
@@ -135,10 +164,27 @@ def download_file(url: str, destination: Path, expected_sha256: str = "") -> Non
 def launch_updater(update: dict) -> tuple[bool, str]:
     target = Path(sys.executable).resolve()
     app_dir = target.parent
-    updater_exe = app_dir / "SM AutoLab Updater.exe"
+    # Aceita todas as nomenclaturas que já foram usadas nas versões anteriores.
+    updater_names = (
+        "SM AutoLab Updater.exe",
+        "SM.AutoLab Updater.exe",
+        "SM.AutoLab.Updater.exe",
+        "SM_AutoLab_Updater.exe",
+    )
+    updater_exe = next((app_dir / name for name in updater_names if (app_dir / name).exists()), None)
 
-    if not updater_exe.exists():
-        # Development fallback: run updater.py when the project is not packaged.
+    # Fallback adicional: normaliza separadores/pontuação para reconhecer
+    # qualquer uma das variações sem confundir com o executável principal.
+    if updater_exe is None:
+        expected = "smautolabupdaterexe"
+        for candidate in app_dir.glob("*.exe"):
+            normalized = "".join(ch for ch in candidate.name.lower() if ch.isalnum())
+            if normalized == expected:
+                updater_exe = candidate
+                break
+
+    if updater_exe is None:
+        # Desenvolvimento: executa updater.py quando o projeto não está empacotado.
         candidate = app_dir / "updater.py"
         if candidate.exists():
             updater_exe = candidate
