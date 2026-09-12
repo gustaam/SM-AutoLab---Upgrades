@@ -1,10 +1,10 @@
-# SM AutoLab — v2.99
+# SM AutoLab — v2.99.1
 
-## Base
+## Base atual
 
-Esta versão parte da base v2.96 e substitui o mecanismo externo de calendário por um calendário nativo desenhado em `tkinter.Canvas`, integrado ao visual Fluent 2 do aplicativo.
+Esta é a base estável atual do SM AutoLab. A aplicação usa calendário nativo com `tkinter.Canvas` e elementos `CustomTkinter` no visual Fluent 2. A numeração de versões futuras não altera a estrutura funcional da base.
 
-## Arquivos
+## Arquivos e histórico
 
 - calendário mensal interativo;
 - navegação entre meses dentro da janela de retenção;
@@ -12,13 +12,17 @@ Esta versão parte da base v2.96 e substitui o mecanismo externo de calendário 
 - botão `← Voltar` para retornar ao calendário;
 - destaque visual para dias com planilhas;
 - retenção de até 60 dias;
-- contador de códigos do mês;
-- janela de Arquivos com tamanho mínimo explícito.
+- seleção múltipla de datas;
+- animação/estado visual de seleção;
+- contador de células selecionadas;
+- exclusão somente das datas selecionadas;
+- botão `Limpar todo histórico` para limpar tudo;
+- contador de códigos calculado somente a partir do histórico existente.
 
-## Por que o calendário foi alterado
+## Estrutura de manutenção
 
-As versões anteriores com `tkcalendar` chegaram a empacotar a dependência, mas o executável continuou apresentando uma janela branca/pequena. Para reduzir pontos de falha no executável Windows, esta versão não depende de `tkcalendar` nem de `Babel`. O calendário usa somente Tkinter padrão para a grade e CustomTkinter para os elementos Fluent 2.
+`main.py` usa nomes neutros (`patch_base.py` e `patch_arquivos.py`) para que funcionalidades não fiquem vinculadas a números históricos de versão. Os módulos versionados antigos são mantidos apenas como camadas de compatibilidade interna até uma futura consolidação segura.
 
-## Build
+## Build e releases
 
-Execute `build_windows.bat`. O script instala as dependências, limpa caches e valida os componentes essenciais antes de chamar o PyInstaller.
+O workflow de release valida a versão da tag contra `VERSION`, verifica os componentes obrigatórios, executa a validação sintática, gera o aplicativo e o updater e recusa sobrescrever uma release existente. O updater aceita as nomenclaturas históricas do executável updater e só considera releases da linha-base atual com manifesto válido e versão superior à instalada.
