@@ -37,9 +37,8 @@ jobs:
           $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
           $tagVersion = $tag.TrimStart('vV')
           $version = (Get-Content VERSION -Raw).Trim()
-
           if ($version -ne $tagVersion) {
-            throw "VERSION ($version) não corresponde à tag ($tag). Release cancelada para impedir publicação de código de outra versão."
+            throw "VERSION ($version) não corresponde à tag ($tag)."
           }
 
           $required = @(
@@ -52,6 +51,8 @@ jobs:
             "resultados.py",
             "splash.py",
             "updater.py",
+            "patch_base.py",
+            "patch_arquivos.py",
             "patch_v266.py",
             "patch_v267.py",
             "requirements.txt",
@@ -66,48 +67,41 @@ jobs:
           }
 
           $interface = Get-Content interface.py -Raw
-          $patch267 = Get-Content patch_v267.py -Raw
           $main = Get-Content main.py -Raw
+          $arquivos = Get-Content patch_arquivos.py -Raw
+          $base = Get-Content patch_base.py -Raw
           $updater = Get-Content updater.py -Raw
 
           if ($interface -notmatch "Canvas\(") {
             throw "interface.py não contém o calendário Canvas esperado."
           }
           if ($interface -match "tkcalendar") {
-            throw "Dependência tkcalendar detectada; build interrompido para proteger a versão-base."
+            throw "Dependência tkcalendar detectada."
           }
-
-          $markers = @(
+          foreach ($marker in @(
             "_toggle_modo_selecao_arquivos",
             "_toggle_data_selecionada",
             "_apagar_datas_selecionadas",
-            "_atualizar_contador_selecao",
-            "_renderizar_calendario_arquivos",
-            "_contar_codigos_mes_v267"
-          )
-          foreach ($marker in $markers) {
-            if ($patch267 -notlike "*$marker*") {
-              throw "patch_v267.py não contém o componente obrigatório: $marker"
+            "_atualizar_contador_selecao"
+          )) {
+            if ($arquivos -notlike "*$marker*") {
+              throw "patch_arquivos.py não expõe o componente obrigatório: $marker"
             }
           }
-
-          if ($main -notmatch "aplicar_patch\(App\)") {
-            throw "main.py não aplica o patch legado obrigatório."
+          if ($main -notmatch "from patch_base import aplicar_patch_base") {
+            throw "main.py não usa a camada base neutra."
           }
-          if ($main -notmatch "aplicar_patch_v267\(App\)") {
-            throw "main.py não aplica o patch v267 obrigatório."
+          if ($main -notmatch "from patch_arquivos import aplicar_patch_arquivos") {
+            throw "main.py não usa a camada de Arquivos neutra."
           }
-          $mainMethods = @(
-            "abrir_historico_planilha",
-            "_renderizar_calendario_arquivos",
-            "_toggle_modo_selecao_arquivos",
-            "_toggle_data_selecionada",
-            "_apagar_datas_selecionadas",
-            "_atualizar_contador_selecao",
-            "_contar_codigos_mes"
-          )
-          if ($main -notmatch "_REQUIRED_BASE_METHODS") {
-            throw "main.py não contém a validação de integridade da base."
+          if ($main -notmatch "_validar_base_aplicacao") {
+            throw "main.py não contém a validação de integridade."
+          }
+          if ($base -notmatch "patch_v266") {
+            throw "patch_base.py não aponta para a implementação-base compatível."
+          }
+          if ($arquivos -notmatch "patch_v267") {
+            throw "patch_arquivos.py não aponta para a implementação de Arquivos compatível."
           }
           if ($updater -notmatch "SM AutoLab Updater\.exe" -or $updater -notmatch "SM\.AutoLab Updater\.exe" -or $updater -notmatch "SM\.AutoLab\.Updater\.exe") {
             throw "updater.py não reconhece todas as nomenclaturas obrigatórias."
@@ -136,13 +130,9 @@ jobs:
           $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
           $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "X-GitHub-Api-Version" = "2022-11-28" }
           $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
-          try {
-            $response = Invoke-WebRequest -Uri $uri -Headers $headers -Method Get -SkipHttpErrorCheck
-            if ($response.StatusCode -eq 200) {
-              throw "A release $tag já existe. O workflow não sobrescreve releases existentes. Crie uma nova versão/tag."
-            }
-          } catch {
-            if ($_.Exception.Message -like "*já existe*") { throw }
+          $response = Invoke-WebRequest -Uri $uri -Headers $headers -Method Get -SkipHttpErrorCheck
+          if ($response.StatusCode -eq 200) {
+            throw "A release $tag já existe. O workflow não sobrescreve releases existentes."
           }
 
       - name: Build SM AutoLab
@@ -160,8 +150,8 @@ jobs:
         run: |
           $main = "dist\SM AutoLab.exe"
           $updater = "dist\SM AutoLab Updater.exe"
-          if (-not (Test-Path $main)) { throw "Executável principal não foi gerado: $main" }
-          if (-not (Test-Path $updater)) { throw "Updater não foi gerado: $updater" }
+          if (-not (Test-Path $main)) { throw "Executável principal não foi gerado." }
+          if (-not (Test-Path $updater)) { throw "Updater não foi gerado." }
           if ((Get-Item $main).Length -lt 1000000) { throw "Executável principal suspeitamente pequeno." }
           if ((Get-Item $updater).Length -lt 1000000) { throw "Updater suspeitamente pequeno." }
 
