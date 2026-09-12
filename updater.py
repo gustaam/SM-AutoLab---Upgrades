@@ -22,6 +22,7 @@ API_RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
 USER_AGENT = "SM-AutoLab-Updater"
 UPDATE_CHANNEL = "SM-AUTOLAB-RESET-2026-09"
 MANIFEST_ASSET_NAMES = {
+    "release-manifest.json",
     "sm autolab release manifest.json",
     "sm.autolab.release.manifest.json",
 }
@@ -96,7 +97,7 @@ def find_update(timeout: int = 8) -> dict | None:
         assets = release.get("assets") or []
         if not any(_is_manifest_asset(asset) for asset in assets):
             continue
-        if not _main_asset_candidates(assets) or not _updater_asset_candidates(assets):
+        if len(_main_asset_candidates(assets)) < 1 or len(_updater_asset_candidates(assets)) < 1:
             continue
 
         latest = str(release.get("tag_name", "")).lstrip("vV")
