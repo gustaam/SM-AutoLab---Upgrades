@@ -20,7 +20,8 @@ echo.
 
 REM ----------------------------------------------------------
 REM VALIDACAO DE CONSISTENCIA DO CODIGO-FONTE
-REM Impede build com interface/patch de versoes conflitantes.
+REM A build deve usar a estrutura atual da base, sem depender de
+REM numeracao historica nos nomes dos modulos de inicializacao.
 REM ----------------------------------------------------------
 echo Verificando codigo-fonte da versao v!APP_VERSION!...
 %SystemRoot%\System32\findstr.exe /c:"def _renderizar_calendario_arquivos" interface.py >nul
@@ -43,9 +44,22 @@ if not errorlevel 1 (
     echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
     goto :erro
 )
-%SystemRoot%\System32\findstr.exe /c:"app_class.abrir_historico_planilha = _abrir_historico_planilha_v266" patch_v266.py >nul
-if not errorlevel 1 (
-    echo ERRO: patch_v266.py esta sobrescrevendo a tela Arquivos.
+if not exist "patch_base.py" (
+    echo ERRO: patch_base.py nao encontrado.
+    goto :erro
+)
+if not exist "patch_arquivos.py" (
+    echo ERRO: patch_arquivos.py nao encontrado.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"from patch_base import aplicar_patch_base" main.py >nul
+if errorlevel 1 (
+    echo ERRO: main.py nao esta usando a camada base atual.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"from patch_arquivos import aplicar_patch_arquivos" main.py >nul
+if errorlevel 1 (
+    echo ERRO: main.py nao esta usando a camada de Arquivos atual.
     goto :erro
 )
 echo Validacao do codigo-fonte: OK
@@ -85,6 +99,12 @@ if errorlevel 1 goto :erro
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if exist "*.spec" del /q "*.spec"
+
+%PYTHON% -m compileall -q .
+if errorlevel 1 (
+    echo ERRO: falha na validacao da sintaxe Python.
+    goto :erro
+)
 
 echo.
 echo Gerando SM AutoLab v!APP_VERSION!...
