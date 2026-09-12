@@ -111,7 +111,7 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab Updater" updater.py
 
-      - name: Verify build outputs and create release manifest
+      - name: Verify build outputs and create release manifests
         shell: pwsh
         run: |
           $main = "dist\SM AutoLab.exe"
@@ -132,6 +132,7 @@ jobs:
             updater_asset = "SM AutoLab Updater.exe"
           } | ConvertTo-Json -Compress
           Set-Content -Path "release-manifest.json" -Value $manifest -Encoding UTF8
+          Set-Content -Path "SM AutoLab Release Manifest.json" -Value $manifest -Encoding UTF8
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -145,3 +146,4 @@ jobs:
             dist/SM AutoLab.exe
             dist/SM AutoLab Updater.exe
             release-manifest.json
+            SM AutoLab Release Manifest.json
