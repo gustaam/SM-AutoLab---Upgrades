@@ -55,12 +55,12 @@ jobs:
             "splash.py",
             "updater.py",
             "patch_v266.py",
+            "patch_v267.py",
             "requirements.txt",
             "VERSION",
             "SM AutoLab.ico",
             "assets"
           )
-
           foreach ($path in $required) {
             if (-not (Test-Path $path)) {
               throw "Arquivo/recurso obrigatório ausente: $path"
@@ -68,7 +68,7 @@ jobs:
           }
 
           $interface = Get-Content interface.py -Raw
-          $patch = Get-Content patch_v266.py -Raw
+          $patch267 = Get-Content patch_v267.py -Raw
           $main = Get-Content main.py -Raw
 
           if ($interface -notmatch "Canvas\(") {
@@ -79,19 +79,22 @@ jobs:
           }
 
           $markers = @(
-            "_iniciar_modo_selecao_arquivos",
+            "_toggle_modo_selecao_arquivos",
             "_toggle_data_selecionada",
             "_apagar_datas_selecionadas",
             "_atualizar_contador_selecao"
           )
           foreach ($marker in $markers) {
-            if ($patch -notlike "*$marker*") {
-              throw "patch_v266.py não contém o componente obrigatório: $marker"
+            if ($patch267 -notlike "*$marker*") {
+              throw "patch_v267.py não contém o componente obrigatório: $marker"
             }
           }
 
           if ($main -notmatch "aplicar_patch\(App\)") {
-            throw "main.py não aplica o patch obrigatório da interface."
+            throw "main.py não aplica o patch legado obrigatório."
+          }
+          if ($main -notmatch "aplicar_patch_v267\(App\)") {
+            throw "main.py não aplica o patch v267 obrigatório."
           }
 
       - name: Install dependencies
@@ -133,6 +136,7 @@ jobs:
           } | ConvertTo-Json -Compress
           Set-Content -Path "release-manifest.json" -Value $manifest -Encoding UTF8
           Set-Content -Path "SM AutoLab Release Manifest.json" -Value $manifest -Encoding UTF8
+          Set-Content -Path "SM.AutoLab.Release.Manifest.json" -Value $manifest -Encoding UTF8
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -147,3 +151,4 @@ jobs:
             dist/SM AutoLab Updater.exe
             release-manifest.json
             SM AutoLab Release Manifest.json
+            SM.AutoLab.Release.Manifest.json
