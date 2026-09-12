@@ -21,8 +21,8 @@ Esta é a base estável atual do SM AutoLab. A aplicação usa calendário nativ
 
 ## Estrutura de manutenção
 
-`main.py` usa nomes neutros (`patch_base.py` e `patch_arquivos.py`) para que funcionalidades não fiquem vinculadas a números históricos de versão. Os módulos versionados antigos são mantidos apenas como camadas de compatibilidade interna até uma futura consolidação segura.
+`main.py` usa módulos com nomes neutros: `patch_base.py` e `patch_arquivos.py`. Assim, a versão do aplicativo não fica vinculada ao nome de uma implementação histórica. Os componentes internos permanecem encapsulados nesses módulos e a inicialização valida a presença das funcionalidades essenciais antes de abrir a aplicação.
 
 ## Build e releases
 
-O workflow de release valida a versão da tag contra `VERSION`, verifica os componentes obrigatórios, executa a validação sintática, gera o aplicativo e o updater e recusa sobrescrever uma release existente. O updater aceita as nomenclaturas históricas do executável updater e só considera releases da linha-base atual com manifesto válido e versão superior à instalada.
+O workflow de release valida a versão da tag contra `VERSION`, verifica os componentes obrigatórios, executa a validação sintática, gera o aplicativo e o updater e recusa sobrescrever uma release existente. O updater aceita as três nomenclaturas históricas do executável updater e só considera releases da linha-base atual com manifesto válido e versão superior à instalada.
