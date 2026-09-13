@@ -588,7 +588,7 @@ class App:
                     from updater import current_version
                     versao_atual = current_version()
                 except Exception:
-                    versao_atual = "2.64"
+                    versao_atual = APP_VERSION
             messagebox.showinfo(
                 "Atualizações",
                 f"Você já está usando a versão mais recente do SM AutoLab.\n\n"

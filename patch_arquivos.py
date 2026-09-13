@@ -6,7 +6,7 @@ import tkinter as tk
 import customtkinter as ctk
 
 
-UPDATE_MARKER = "SM-AUTOLAB-ARQUIVOS-SELECAO-V267"
+ARQUIVOS_COMPONENT_MARKER = "SM-AUTOLAB-ARQUIVOS-SELECAO"
 
 
 def _ensure_selection_state(self):
@@ -39,7 +39,7 @@ def _dados_arquivos_por_dia(self):
     return por_dia
 
 
-def _contar_codigos_mes_v267(self, referencia=None):
+def _contar_codigos_mes_arquivos(self, referencia=None):
     """Conta exclusivamente os códigos presentes no histórico de Arquivos."""
     referencia = referencia or datetime.now()
     ano = int(getattr(referencia, "year", datetime.now().year))
@@ -62,12 +62,12 @@ def _contar_codigos_mes_v267(self, referencia=None):
     return total
 
 
-def _formatar_contador_arquivos_v267(self, referencia=None):
+def _formatar_contador_arquivos_arquivos(self, referencia=None):
     valor = self._contar_codigos_mes(referencia)
     return f"{valor:,}".replace(",", ".") + " códigos no mês"
 
 
-def _atualizar_contador_arquivos_v267(self, referencia=None):
+def _atualizar_contador_arquivos_arquivos(self, referencia=None):
     if referencia is None:
         referencia = datetime.now()
     try:
@@ -90,7 +90,7 @@ def _atualizar_contador_arquivos_v267(self, referencia=None):
             pass
 
 
-def _atualizar_contador_selecao_v267(self):
+def _atualizar_contador_selecao_arquivos(self):
     _ensure_selection_state(self)
     total = len(self._arquivos_datas_selecionadas)
     texto = f"{total} célula selecionada" if total == 1 else f"{total} células selecionadas"
@@ -124,7 +124,7 @@ def _atualizar_contador_selecao_v267(self):
             pass
 
 
-def _cancelar_animacao_selecao_v267(self):
+def _cancelar_animacao_selecao_arquivos(self):
     job = getattr(self, "_arquivos_animacao_job", None)
     if job is not None:
         try:
@@ -136,7 +136,7 @@ def _cancelar_animacao_selecao_v267(self):
     self._arquivos_animacao_frame = 0
 
 
-def _animar_selecao_data_v267(self, data):
+def _animar_selecao_data_arquivos(self, data):
     _ensure_selection_state(self)
     self._cancelar_animacao_selecao()
     self._arquivos_animacao_data = data
@@ -144,7 +144,7 @@ def _animar_selecao_data_v267(self, data):
     self._executar_animacao_selecao()
 
 
-def _executar_animacao_selecao_v267(self):
+def _executar_animacao_selecao_arquivos(self):
     if getattr(self, "_arquivos_calendar_canvas", None) is None:
         self._cancelar_animacao_selecao()
         return
@@ -160,7 +160,7 @@ def _executar_animacao_selecao_v267(self):
     self._arquivos_animacao_job = self.app.after(55, self._executar_animacao_selecao)
 
 
-def _toggle_modo_selecao_arquivos_v267(self):
+def _toggle_modo_selecao_arquivos_arquivos(self):
     _ensure_selection_state(self)
     self._arquivos_modo_selecao = not self._arquivos_modo_selecao
     if not self._arquivos_modo_selecao:
@@ -190,7 +190,7 @@ def _toggle_modo_selecao_arquivos_v267(self):
     self._desenhar_calendario_arquivos()
 
 
-def _toggle_data_selecionada_v267(self, data):
+def _toggle_data_selecionada_arquivos(self, data):
     _ensure_selection_state(self)
     por_dia = _dados_arquivos_por_dia(self)
     hoje = datetime.now().date()
@@ -206,7 +206,7 @@ def _toggle_data_selecionada_v267(self, data):
     self._animar_selecao_data(data)
 
 
-def _apagar_datas_selecionadas_v267(self):
+def _apagar_datas_selecionadas_arquivos(self):
     _ensure_selection_state(self)
     selecionadas = set(self._arquivos_datas_selecionadas)
     if not selecionadas:
@@ -248,7 +248,7 @@ def _apagar_datas_selecionadas_v267(self):
     self._renderizar_calendario_arquivos()
 
 
-def _limpar_historico_planilhas_v267(self):
+def _limpar_historico_planilhas_arquivos(self):
     from tkinter import messagebox
     itens = self._carregar_historico_planilhas()
     if not itens:
@@ -274,7 +274,7 @@ def _limpar_historico_planilhas_v267(self):
     self._renderizar_calendario_arquivos()
 
 
-def _clique_calendario_arquivos_v267(self, event):
+def _clique_calendario_arquivos_arquivos(self, event):
     canvas = getattr(self, "_arquivos_calendar_canvas", None)
     if canvas is None:
         return
@@ -309,7 +309,7 @@ def _clique_calendario_arquivos_v267(self, event):
         self._mostrar_planilhas_do_dia(data)
 
 
-def _desenhar_calendario_arquivos_v267(self):
+def _desenhar_calendario_arquivos_arquivos(self):
     canvas = getattr(self, "_arquivos_calendar_canvas", None)
     if canvas is None or not canvas.winfo_exists():
         return
@@ -437,7 +437,7 @@ def _desenhar_calendario_arquivos_v267(self):
                 )
 
 
-def _renderizar_calendario_arquivos_v267(self):
+def _renderizar_calendario_arquivos_arquivos(self):
     if self._arquivos_body is None:
         return
     _ensure_selection_state(self)
@@ -511,7 +511,7 @@ def _renderizar_calendario_arquivos_v267(self):
     self._desenhar_calendario_arquivos()
 
 
-def _mudar_mes_arquivos_v267(self, direcao):
+def _mudar_mes_arquivos_arquivos(self, direcao):
     atual = self._arquivos_mes or self._mes_atual_arquivos()
     novo = self._mes_proximo(atual) if direcao > 0 else self._mes_anterior(atual)
     if novo < self._mes_minimo_arquivos() or novo > self._mes_atual_arquivos():
@@ -521,7 +521,7 @@ def _mudar_mes_arquivos_v267(self, direcao):
     self._desenhar_calendario_arquivos()
 
 
-def _fechar_historico_planilha_v267(self):
+def _fechar_historico_planilha_arquivos(self):
     _ensure_selection_state(self)
     self._cancelar_animacao_selecao()
     w = getattr(self, "_planilha_historico_window", None)
@@ -536,7 +536,7 @@ def _fechar_historico_planilha_v267(self):
     self._arquivos_calendar_widget = None
 
 
-def _abrir_historico_planilha_v267(self):
+def _abrir_historico_planilha_arquivos(self):
     _ensure_selection_state(self)
     self._fechar_historico_planilha()
     win = tk.Toplevel(self.app)
@@ -609,7 +609,7 @@ def _abrir_historico_planilha_v267(self):
     win.update_idletasks()
 
 
-def _excluir_historico_planilha_v267(self, item):
+def _excluir_historico_planilha_arquivos(self, item):
     ident = str(item.get("id", ""))
     itens = self._carregar_historico_planilhas()
     novos = [x for x in itens if str(x.get("id", "")) != ident]
@@ -624,46 +624,46 @@ def _excluir_historico_planilha_v267(self, item):
         self._renderizar_calendario_arquivos()
 
 
-def _registrar_historico_planilha_v267(self, cells, timestamp=None):
-    if not hasattr(self, "__v266_registrar_historico_planilha"):
+def _registrar_historico_planilha_arquivos(self, cells, timestamp=None):
+    if not hasattr(self, "__base_registrar_historico_planilha"):
         return
-    self.__v266_registrar_historico_planilha(cells, timestamp)
+    self.__base_registrar_historico_planilha(cells, timestamp)
     try:
         self._atualizar_contador_arquivos(self._arquivos_mes or datetime.now())
     except Exception:
         pass
 
 
-def _instalar_v267_metodos(app_class):
-    app_class._contar_codigos_mes = _contar_codigos_mes_v267
-    app_class._formatar_contador_arquivos = _formatar_contador_arquivos_v267
-    app_class._atualizar_contador_arquivos = _atualizar_contador_arquivos_v267
-    app_class._atualizar_contador_selecao = _atualizar_contador_selecao_v267
-    app_class._cancelar_animacao_selecao = _cancelar_animacao_selecao_v267
-    app_class._animar_selecao_data = _animar_selecao_data_v267
-    app_class._executar_animacao_selecao = _executar_animacao_selecao_v267
-    app_class._toggle_modo_selecao_arquivos = _toggle_modo_selecao_arquivos_v267
-    app_class._toggle_data_selecionada = _toggle_data_selecionada_v267
-    app_class._apagar_datas_selecionadas = _apagar_datas_selecionadas_v267
-    app_class._limpar_historico_planilhas = _limpar_historico_planilhas_v267
-    app_class._clique_calendario_arquivos = _clique_calendario_arquivos_v267
-    app_class._desenhar_calendario_arquivos = _desenhar_calendario_arquivos_v267
-    app_class._renderizar_calendario_arquivos = _renderizar_calendario_arquivos_v267
-    app_class._mudar_mes_arquivos = _mudar_mes_arquivos_v267
-    app_class._fechar_historico_planilha = _fechar_historico_planilha_v267
-    app_class.abrir_historico_planilha = _abrir_historico_planilha_v267
-    app_class._excluir_historico_planilha = _excluir_historico_planilha_v267
-    app_class._registrar_historico_planilha = _registrar_historico_planilha_v267
+def _instalar_metodos_arquivos(app_class):
+    app_class._contar_codigos_mes = _contar_codigos_mes_arquivos
+    app_class._formatar_contador_arquivos = _formatar_contador_arquivos_arquivos
+    app_class._atualizar_contador_arquivos = _atualizar_contador_arquivos_arquivos
+    app_class._atualizar_contador_selecao = _atualizar_contador_selecao_arquivos
+    app_class._cancelar_animacao_selecao = _cancelar_animacao_selecao_arquivos
+    app_class._animar_selecao_data = _animar_selecao_data_arquivos
+    app_class._executar_animacao_selecao = _executar_animacao_selecao_arquivos
+    app_class._toggle_modo_selecao_arquivos = _toggle_modo_selecao_arquivos_arquivos
+    app_class._toggle_data_selecionada = _toggle_data_selecionada_arquivos
+    app_class._apagar_datas_selecionadas = _apagar_datas_selecionadas_arquivos
+    app_class._limpar_historico_planilhas = _limpar_historico_planilhas_arquivos
+    app_class._clique_calendario_arquivos = _clique_calendario_arquivos_arquivos
+    app_class._desenhar_calendario_arquivos = _desenhar_calendario_arquivos_arquivos
+    app_class._renderizar_calendario_arquivos = _renderizar_calendario_arquivos_arquivos
+    app_class._mudar_mes_arquivos = _mudar_mes_arquivos_arquivos
+    app_class._fechar_historico_planilha = _fechar_historico_planilha_arquivos
+    app_class.abrir_historico_planilha = _abrir_historico_planilha_arquivos
+    app_class._excluir_historico_planilha = _excluir_historico_planilha_arquivos
+    app_class._registrar_historico_planilha = _registrar_historico_planilha_arquivos
 
 
-def aplicar_patch_v267(app_class):
-    if getattr(app_class, "_v267_patch_aplicado", False):
+def aplicar_patch_arquivos(app_class):
+    if getattr(app_class, "_patch_arquivos_aplicado", False):
         return
-    app_class._v267_patch_aplicado = True
-    app_class.__v266_registrar_historico_planilha = app_class._registrar_historico_planilha
+    app_class._patch_arquivos_aplicado = True
+    app_class.__base_registrar_historico_planilha = app_class._registrar_historico_planilha
     original_init = app_class.__init__
 
-    def init_v267(self, *args, **kwargs):
+    def init_arquivos(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
         self._arquivos_modo_selecao = False
         self._arquivos_datas_selecionadas = set()
@@ -674,5 +674,5 @@ def aplicar_patch_v267(app_class):
         self._arquivos_btn_apagar_selecionados = None
         self._arquivos_contador_selecao = None
 
-    app_class.__init__ = init_v267
-    _instalar_v267_metodos(app_class)
+    app_class.__init__ = init_arquivos
+    _instalar_metodos_arquivos(app_class)

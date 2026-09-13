@@ -20,7 +20,7 @@ def _linhas_preenchidas(self):
     return linhas
 
 
-def _planilha_atualizar_contador_v266(self):
+def _planilha_atualizar_contador_base(self):
     n = len(_linhas_preenchidas(self))
     label = getattr(self, "_planilha_contador_label", None)
     if label is not None:
@@ -214,7 +214,7 @@ def _clique_calendario_arquivos_selecao(self, event):
 def _desenhar_calendario_arquivos_com_selecao(self):
     """Mantém o calendário original e desenha a camada visual das seleções."""
     _inicializar_selecao_arquivos(self)
-    self._desenhar_calendario_arquivos_original_v266()
+    self._desenhar_calendario_arquivos_original_base()
     canvas = self._arquivos_calendar_canvas
     if canvas is None or not canvas.winfo_exists():
         return
@@ -367,7 +367,7 @@ def _fechar_historico_planilha_selecao(self):
     self._arquivos_selecao_contador = None
     self._arquivos_btn_selecionar = None
     self._arquivos_btn_apagar_selecionados = None
-    self._fechar_historico_planilha_original_v266()
+    self._fechar_historico_planilha_original_base()
 
 
 def _abrir_historico_planilha_selecao(self):
@@ -447,7 +447,7 @@ def _abrir_historico_planilha_selecao(self):
     win.update_idletasks()
 
 
-def _aplicar_status_finalizado_v266(self, texto):
+def _aplicar_status_finalizado_base(self, texto):
     low = str(texto).lower()
     if "finalizado" not in low:
         if getattr(self, "_status_finalizado_job", None) is not None:
@@ -456,7 +456,7 @@ def _aplicar_status_finalizado_v266(self, texto):
             except Exception:
                 pass
             self._status_finalizado_job = None
-        return self.__v265_aplicar_status(texto)
+        return self.__base_aplicar_status(texto)
 
     if getattr(self, "_status_finalizado_job", None) is not None:
         try:
@@ -480,16 +480,16 @@ def _aplicar_status_finalizado_v266(self, texto):
     except Exception:
         pass
     self._status_finalizado_job = self.app.after(
-        10000, lambda: self.__v265_aplicar_status("Pronto")
+        10000, lambda: self.__base_aplicar_status("Pronto")
     )
 
 
-def aplicar_patch(app_class):
-    if getattr(app_class, "_v266_patch_aplicado", False):
+def aplicar_patch_base(app_class):
+    if getattr(app_class, "_patch_base_aplicado", False):
         return
 
-    app_class.__v265_aplicar_status = app_class._aplicar_status
-    app_class._planilha_atualizar_contador = _planilha_atualizar_contador_v266
+    app_class.__base_aplicar_status = app_class._aplicar_status
+    app_class._planilha_atualizar_contador = _planilha_atualizar_contador_base
     app_class._contar_codigos_mes = _contar_codigos_mes_apenas_arquivos
     app_class._atualizar_contador_selecao = _atualizar_contador_selecao
     app_class._inicializar_selecao_arquivos = _inicializar_selecao_arquivos
@@ -498,17 +498,17 @@ def aplicar_patch(app_class):
     app_class._clique_calendario_arquivos = _clique_calendario_arquivos_selecao
     app_class._apagar_datas_selecionadas = _apagar_datas_selecionadas
 
-    app_class._desenhar_calendario_arquivos_original_v266 = app_class._desenhar_calendario_arquivos
-    app_class._fechar_historico_planilha_original_v266 = app_class._fechar_historico_planilha
+    app_class._desenhar_calendario_arquivos_original_base = app_class._desenhar_calendario_arquivos
+    app_class._fechar_historico_planilha_original_base = app_class._fechar_historico_planilha
     app_class._desenhar_calendario_arquivos = _desenhar_calendario_arquivos_com_selecao
     app_class._fechar_historico_planilha = _fechar_historico_planilha_selecao
     app_class.abrir_historico_planilha = _abrir_historico_planilha_selecao
     app_class._limpar_historico_planilhas = _limpar_historico_planilhas_selecao
-    app_class._aplicar_status = _aplicar_status_finalizado_v266
+    app_class._aplicar_status = _aplicar_status_finalizado_base
 
     original_config = app_class.config_app
 
-    def config_app_v266(self):
+    def config_app_base(self):
         original_config(self)
         try:
             if hasattr(self, "botao_historico_planilha"):
@@ -516,6 +516,6 @@ def aplicar_patch(app_class):
         except Exception:
             pass
 
-    app_class.config_app = config_app_v266
+    app_class.config_app = config_app_base
     app_class._status_finalizado_job = None
-    app_class._v266_patch_aplicado = True
+    app_class._patch_base_aplicado = True

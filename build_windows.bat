@@ -52,6 +52,16 @@ if not exist "patch_arquivos.py" (
     echo ERRO: patch_arquivos.py nao encontrado.
     goto :erro
 )
+%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_base" patch_base.py >nul
+if errorlevel 1 (
+    echo ERRO: patch_base.py nao expoe a camada base neutra.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_arquivos" patch_arquivos.py >nul
+if errorlevel 1 (
+    echo ERRO: patch_arquivos.py nao expoe a camada de Arquivos neutra.
+    goto :erro
+)
 %SystemRoot%\System32\findstr.exe /c:"from patch_base import aplicar_patch_base" main.py >nul
 if errorlevel 1 (
     echo ERRO: main.py nao esta usando a camada base atual.
@@ -103,6 +113,12 @@ if exist "*.spec" del /q "*.spec"
 %PYTHON% -m compileall -q .
 if errorlevel 1 (
     echo ERRO: falha na validacao da sintaxe Python.
+    goto :erro
+)
+
+%PYTHON% -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
+if errorlevel 1 (
+    echo ERRO: falha na integracao das camadas da base.
     goto :erro
 )
 

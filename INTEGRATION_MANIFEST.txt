@@ -1,6 +1,6 @@
-SM AutoLab — Base estável v2.99.1
+SM AutoLab — Base estável
 
-Este arquivo documenta a composição funcional da base atual. Os hashes históricos não são usados para decidir qual código entra em um release.
+Este arquivo documenta a composição funcional da base atual. A versão vigente é definida exclusivamente por VERSION; hashes históricos não são usados para decidir qual código entra em um release.
 
 Componentes principais:
 - main.py — ponto de entrada e validação de integridade;

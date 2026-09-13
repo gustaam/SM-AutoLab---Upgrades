@@ -1,0 +1,121 @@
+name: Validate main for release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout da main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Validar versão, estrutura e referências legadas
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "VERSION deve usar o formato X.Y.Z; valor encontrado: $version"
+          }
+
+          $required = @(
+            "main.py", "interface.py", "app.py", "automacao.py", "config.py",
+            "planilha.py", "resultados.py", "splash.py", "updater.py",
+            "patch_base.py", "patch_arquivos.py", "requirements.txt", "VERSION",
+            "SM AutoLab.ico", "assets"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Arquivo/recurso obrigatório ausente: $path"
+            }
+          }
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py")) {
+            if (Test-Path $legacyPath) {
+              throw "Arquivo legado não deve fazer parte da base atual: $legacyPath"
+            }
+          }
+
+          $main = Get-Content main.py -Raw
+          $interface = Get-Content interface.py -Raw
+          $base = Get-Content patch_base.py -Raw
+          $arquivos = Get-Content patch_arquivos.py -Raw
+          $updater = Get-Content updater.py -Raw
+
+          foreach ($expected in @(
+            "from patch_base import aplicar_patch_base",
+            "from patch_arquivos import aplicar_patch_arquivos",
+            "_validar_base_aplicacao"
+          )) {
+            if ($main -notlike "*$expected*") {
+              throw "main.py não contém a integração obrigatória: $expected"
+            }
+          }
+          if ($interface -notmatch "Canvas\(") {
+            throw "interface.py não contém o calendário Canvas esperado."
+          }
+          if ($interface -match "tkcalendar") {
+            throw "Dependência tkcalendar detectada."
+          }
+          if ($base -notmatch "def\s+aplicar_patch_base\s*\(") {
+            throw "patch_base.py não expõe a camada-base neutra."
+          }
+          if ($arquivos -notmatch "def\s+aplicar_patch_arquivos\s*\(") {
+            throw "patch_arquivos.py não expõe a camada neutra de Arquivos."
+          }
+          foreach ($marker in @(
+            "_toggle_modo_selecao_arquivos",
+            "_toggle_data_selecionada",
+            "_apagar_datas_selecionadas",
+            "_atualizar_contador_selecao"
+          )) {
+            if ($arquivos -notlike "*$marker*") {
+              throw "patch_arquivos.py não expõe o componente obrigatório: $marker"
+            }
+          }
+          if ($updater -notmatch "SM AutoLab Updater\.exe" -or $updater -notmatch "SM\.AutoLab Updater\.exe" -or $updater -notmatch "SM\.AutoLab\.Updater\.exe") {
+            throw "updater.py não reconhece todas as nomenclaturas obrigatórias."
+          }
+
+          $sourceFiles = @(
+            "main.py", "interface.py", "updater.py", "patch_base.py",
+            "patch_arquivos.py", "build_windows.bat", "README.md",
+            "INTEGRATION_MANIFEST.txt"
+          )
+          foreach ($sourcePath in $sourceFiles) {
+            $source = Get-Content $sourcePath -Raw
+            if ($source -match 'patch_v|_v\d+|(?<![\d.])[vV]?2\.(?:64|67|85|93|96|99)(?![\d.])') {
+              throw "Referência legada detectada em $sourcePath"
+            }
+          }
+
+      - name: Instalar dependências
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validar sintaxe e integração das camadas
+        shell: pwsh
+        run: |
+          python -m compileall -q .
+          if ($LASTEXITCODE -ne 0) {
+            throw "Falha na compilação sintática dos arquivos Python."
+          }
+          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); _validar_base_aplicacao(); print('Integracao da main: OK')"

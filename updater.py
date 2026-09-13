@@ -46,7 +46,7 @@ def current_version(base: Path | None = None) -> str:
             return value
     except OSError:
         pass
-    return "0.0.0"
+    return ""
 
 
 def fetch_releases(timeout: int = 8) -> list[dict]:
@@ -83,6 +83,53 @@ def _updater_asset_candidates(assets: list[dict]) -> list[dict]:
     ]
 
 
+def _release_asset_by_name(assets: list[dict], expected_name: str) -> dict | None:
+    expected = str(expected_name).strip().lower()
+    return next(
+        (asset for asset in assets if str(asset.get("name", "")).strip().lower() == expected),
+        None,
+    )
+
+
+def _load_release_manifest(release: dict, timeout: int) -> dict | None:
+    """Confirma que os assets pertencem à mesma release e à linha atual."""
+    assets = release.get("assets") or []
+    manifest_asset = next((asset for asset in assets if _is_manifest_asset(asset)), None)
+    if manifest_asset is None:
+        return None
+
+    url = str(manifest_asset.get("browser_download_url") or "")
+    if not url:
+        return None
+
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            manifest = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+
+    if not isinstance(manifest, dict) or manifest.get("channel") != UPDATE_CHANNEL:
+        return None
+
+    release_tag = str(release.get("tag_name", "")).strip().lstrip("vV")
+    manifest_tag = str(manifest.get("tag", "")).strip().lstrip("vV")
+    manifest_version = str(manifest.get("version", "")).strip().lstrip("vV")
+    if not release_tag or manifest_tag != release_tag or manifest_version != release_tag:
+        return None
+
+    main_asset = _release_asset_by_name(assets, str(manifest.get("main_asset", "")))
+    updater_asset = _release_asset_by_name(assets, str(manifest.get("updater_asset", "")))
+    if main_asset is None or updater_asset is None:
+        return None
+    if main_asset not in _main_asset_candidates(assets):
+        return None
+    if updater_asset not in _updater_asset_candidates(assets):
+        return None
+
+    return manifest
+
+
 def find_update(timeout: int = 8) -> dict | None:
     current = current_version()
     current_tuple = _version_tuple(current)
@@ -97,46 +144,29 @@ def find_update(timeout: int = 8) -> dict | None:
         assets = release.get("assets") or []
         if not any(_is_manifest_asset(asset) for asset in assets):
             continue
-        if len(_main_asset_candidates(assets)) < 1 or len(_updater_asset_candidates(assets)) < 1:
+        manifest = _load_release_manifest(release, timeout)
+        if manifest is None:
             continue
 
         latest = str(release.get("tag_name", "")).lstrip("vV")
         if not latest or _version_tuple(latest) <= current_tuple:
             continue
-        compatible.append((release, _version_tuple(latest)))
+        compatible.append((release, _version_tuple(latest), manifest))
 
     if not compatible:
         return None
 
-    release = max(compatible, key=lambda item: item[1])[0]
+    release, _, manifest = max(compatible, key=lambda item: item[1])
     latest = str(release.get("tag_name", "")).lstrip("vV")
     assets = release.get("assets") or []
-    exe_assets = _main_asset_candidates(assets)
-
-    def _asset_matches(asset: dict) -> bool:
-        name = str(asset.get("name", "")).strip().lower()
-        normalized = "".join(ch for ch in name if ch.isalnum())
-        return (
-            name in {"sm autolab.exe", "sm.autolab.exe"}
-            or (normalized.startswith("smautolab") and latest.replace(".", "") in normalized)
-        )
-
-    matching = [asset for asset in exe_assets if _asset_matches(asset)]
-    if len(matching) != 1:
-        return {
-            "version": latest,
-            "current": current,
-            "name": release.get("name") or f"SM AutoLab v{latest}",
-            "url": release.get("html_url") or "",
-            "download_url": "",
-            "sha256": "",
-            "release_url": release.get("html_url") or "",
-        }
-
-    asset = matching[0]
+    asset = _release_asset_by_name(assets, str(manifest["main_asset"]))
+    if asset is None:
+        return None
     digest = str(asset.get("digest") or "")
     if digest.lower().startswith("sha256:"):
         digest = digest.split(":", 1)[1]
+    if not digest:
+        digest = str(manifest.get("main_sha256") or "")
 
     return {
         "version": latest,

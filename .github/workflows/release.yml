@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Tag exata da release (ex.: v2.99.1)"
+        description: "Tag exata da release (ex.: vX.Y.Z)"
         required: true
         type: string
 
@@ -30,6 +30,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.14"
+
+      - name: Confirmar que a tag corresponde à main atual
+        shell: pwsh
+        run: |
+          git fetch origin main --depth=1
+          $mainCommit = (git rev-parse FETCH_HEAD).Trim()
+          $tagCommit = (git rev-parse HEAD).Trim()
+          if ($tagCommit -ne $mainCommit) {
+            throw "A tag deve apontar exatamente para o commit atual da main. Tag: $tagCommit; main: $mainCommit"
+          }
 
       - name: Validar origem, versão e componentes obrigatórios
         shell: pwsh
@@ -53,8 +63,6 @@ jobs:
             "updater.py",
             "patch_base.py",
             "patch_arquivos.py",
-            "patch_v266.py",
-            "patch_v267.py",
             "requirements.txt",
             "VERSION",
             "SM AutoLab.ico",
@@ -63,6 +71,11 @@ jobs:
           foreach ($path in $required) {
             if (-not (Test-Path $path)) {
               throw "Arquivo/recurso obrigatório ausente: $path"
+            }
+          }
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py")) {
+            if (Test-Path $legacyPath) {
+              throw "Arquivo legado não deve fazer parte da base atual: $legacyPath"
             }
           }
 
@@ -97,11 +110,22 @@ jobs:
           if ($main -notmatch "_validar_base_aplicacao") {
             throw "main.py não contém a validação de integridade."
           }
-          if ($base -notmatch "patch_v266") {
-            throw "patch_base.py não aponta para a implementação-base compatível."
+          if ($base -notmatch "def\\s+aplicar_patch_base\\s*\\(") {
+            throw "patch_base.py não expõe a camada-base neutra."
           }
-          if ($arquivos -notmatch "patch_v267") {
-            throw "patch_arquivos.py não aponta para a implementação de Arquivos compatível."
+          if ($arquivos -notmatch "def\\s+aplicar_patch_arquivos\\s*\\(") {
+            throw "patch_arquivos.py não expõe a camada neutra de Arquivos."
+          }
+          $sourceFiles = @(
+            "main.py", "interface.py", "updater.py", "patch_base.py",
+            "patch_arquivos.py", "build_windows.bat", "README.md",
+            "INTEGRATION_MANIFEST.txt"
+          )
+          foreach ($sourcePath in $sourceFiles) {
+            $source = Get-Content $sourcePath -Raw
+            if ($source -match 'patch_v|_v\d+|(?<![\d.])[vV]?2\.(?:64|67|85|93|96|99)(?![\d.])') {
+              throw "Referência legada detectada em $sourcePath"
+            }
           }
           if ($updater -notmatch "SM AutoLab Updater\.exe" -or $updater -notmatch "SM\.AutoLab Updater\.exe" -or $updater -notmatch "SM\.AutoLab\.Updater\.exe") {
             throw "updater.py não reconhece todas as nomenclaturas obrigatórias."
@@ -121,6 +145,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Falha na compilação sintática dos arquivos Python."
           }
+
+      - name: Validar integração das camadas neutras
+        shell: pwsh
+        run: |
+          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
 
       - name: Recusar sobrescrita de release existente
         shell: pwsh
@@ -157,6 +186,7 @@ jobs:
 
           $version = (Get-Content VERSION -Raw).Trim()
           $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
+          $mainSha256 = (Get-FileHash -Algorithm SHA256 $main).Hash.ToLower()
           $manifest = @{
             channel = "SM-AUTOLAB-RESET-2026-09"
             version = $version
@@ -164,6 +194,7 @@ jobs:
             commit = "${{ github.sha }}"
             main_asset = "SM AutoLab.exe"
             updater_asset = "SM AutoLab Updater.exe"
+            main_sha256 = $mainSha256
           } | ConvertTo-Json -Compress
           Set-Content -Path "SM AutoLab Release Manifest.json" -Value $manifest -Encoding UTF8
 
