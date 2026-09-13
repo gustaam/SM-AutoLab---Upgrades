@@ -18,70 +18,41 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
-
     steps:
       - name: Checkout da tag exata
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.release_tag && format('refs/tags/{0}', github.event.inputs.release_tag) || github.ref }}
           fetch-depth: 1
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-
       - name: Confirmar que a tag corresponde à main atual
         shell: pwsh
         run: |
           git fetch origin main --depth=1
           $mainCommit = (git rev-parse FETCH_HEAD).Trim()
           $tagCommit = (git rev-parse HEAD).Trim()
-          if ($tagCommit -ne $mainCommit) {
-            throw "A tag deve apontar exatamente para o commit atual da main. Tag: $tagCommit; main: $mainCommit"
-          }
-
+          if ($tagCommit -ne $mainCommit) { throw "A tag deve apontar exatamente para o commit atual da main. Tag: $tagCommit; main: $mainCommit" }
       - name: Validar origem, versão e componentes obrigatórios
         shell: pwsh
         run: |
           $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
           $tagVersion = $tag.TrimStart('vV')
           $version = (Get-Content VERSION -Raw).Trim()
-          if ($version -ne $tagVersion) {
-            throw "VERSION ($version) não corresponde à tag ($tag)."
-          }
-          if ($version -notmatch '^\d+\.\d+\.\d+$') {
-            throw "VERSION deve usar o formato X.Y.Z; valor encontrado: $version"
-          }
+          if ($version -ne $tagVersion) { throw "VERSION ($version) não corresponde à tag ($tag)." }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION deve usar o formato X.Y.Z; valor encontrado: $version" }
 
           $required = @(
-            "main.py",
-            "interface.py",
-            "app.py",
-            "automacao.py",
-            "config.py",
-            "planilha.py",
-            "resultados.py",
-            "splash.py",
-            "updater.py",
-            "patch_base.py",
-            "patch_arquivos.py",
-            "patch_ajustes.py",
-            "requirements.txt",
-            "VERSION",
-            "SM AutoLab.ico",
-            "assets"
+            "main.py", "interface.py", "app.py", "automacao.py", "config.py",
+            "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
+            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py",
+            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets"
           )
-          foreach ($path in $required) {
-            if (-not (Test-Path $path)) {
-              throw "Arquivo/recurso obrigatório ausente: $path"
-            }
-          }
-
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py")) {
-            if (Test-Path $legacyPath) {
-              throw "Arquivo legado não deve fazer parte da base atual: $legacyPath"
-            }
+          foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py")) {
+            if (Test-Path $legacyPath) { throw "Arquivo legado/componente separado não deve fazer parte da base atual: $legacyPath" }
           }
 
           $interface = Get-Content interface.py -Raw
@@ -89,125 +60,60 @@ jobs:
           $arquivos = Get-Content patch_arquivos.py -Raw
           $ajustes = Get-Content patch_ajustes.py -Raw
           $base = Get-Content patch_base.py -Raw
-          $updater = Get-Content updater.py -Raw
+          $atualizacao = Get-Content atualizacao.py -Raw
 
-          if ($interface -notmatch "Canvas\(") {
-            throw "interface.py não contém o calendário Canvas esperado."
+          if ($interface -notmatch "Canvas\(") { throw "interface.py não contém o calendário Canvas esperado." }
+          if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
+          if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "interface.py não usa o módulo integrado de atualização." }
+          foreach ($marker in @("_toggle_modo_selecao_arquivos", "_toggle_data_selecionada", "_apagar_datas_selecionadas", "_atualizar_contador_selecao", "_contar_codigos_mes_arquivos")) {
+            if ($arquivos -notlike "*$marker*") { throw "patch_arquivos.py não expõe o componente obrigatório: $marker" }
           }
-          if ($interface -match "tkcalendar") {
-            throw "Dependência tkcalendar detectada."
+          if ($ajustes -notmatch "def\s+aplicar_patch_ajustes\s*\(") { throw "patch_ajustes.py não expõe a camada de ajustes." }
+          foreach ($expected in @("from patch_base import aplicar_patch_base", "from patch_arquivos import aplicar_patch_arquivos", "from patch_ajustes import aplicar_patch_ajustes", "_validar_base_aplicacao", "--sm-autolab-update-helper")) {
+            if ($main -notlike "*$expected*") { throw "main.py não contém a integração obrigatória: $expected" }
           }
+          if ($base -notmatch 'def\s+aplicar_patch_base\s*\(') { throw "patch_base.py não expõe a camada-base neutra." }
+          if ($arquivos -notmatch 'def\s+aplicar_patch_arquivos\s*\(') { throw "patch_arquivos.py não expõe a camada de Arquivos neutra." }
+          if ($atualizacao -notmatch 'def\s+find_update\s*\(' -or $atualizacao -notmatch 'def\s+launch_updater\s*\(') { throw "atualizacao.py não expõe o motor integrado de atualização." }
+          if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater') { throw "Referência ao componente separado de atualização detectada em atualizacao.py." }
 
-          foreach ($marker in @(
-            "_toggle_modo_selecao_arquivos",
-            "_toggle_data_selecionada",
-            "_apagar_datas_selecionadas",
-            "_atualizar_contador_selecao",
-            "_contar_codigos_mes_arquivos"
-          )) {
-            if ($arquivos -notlike "*$marker*") {
-              throw "patch_arquivos.py não expõe o componente obrigatório: $marker"
-            }
-          }
-          if ($ajustes -notmatch "def\s+aplicar_patch_ajustes\s*\(") {
-            throw "patch_ajustes.py não expõe a camada de ajustes."
-          }
-
-          foreach ($expected in @(
-            "from patch_base import aplicar_patch_base",
-            "from patch_arquivos import aplicar_patch_arquivos",
-            "from patch_ajustes import aplicar_patch_ajustes",
-            "_validar_base_aplicacao",
-            "--sm-autolab-updater"
-          )) {
-            if ($main -notlike "*$expected*") {
-              throw "main.py não contém a integração obrigatória: $expected"
-            }
-          }
-
-          if ($base -notmatch 'def\s+aplicar_patch_base\s*\(') {
-            throw "patch_base.py não expõe a camada-base neutra."
-          }
-          if ($arquivos -notmatch 'def\s+aplicar_patch_arquivos\s*\(') {
-            throw "patch_arquivos.py não expõe a camada de Arquivos neutra."
-          }
-          if ($updater -notlike "*SM AutoLab Updater.exe*" -or $updater -notlike "*SM.AutoLab Updater.exe*" -or $updater -notlike "*SM.AutoLab.Updater.exe*") {
-            throw "updater.py não reconhece todas as nomenclaturas obrigatórias."
-          }
-
-          $retiredTokens = @(
-            "patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87",
-            "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93",
-            "v2.94", "v2.95", "v2.96", "v2.97", "v2.98"
-          )
-          $sourceFiles = @(
-            "main.py", "interface.py", "updater.py", "patch_base.py",
-            "patch_arquivos.py", "patch_ajustes.py", "build_windows.bat",
-            "README.md", "INTEGRATION_MANIFEST.txt"
-          )
+          $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97", "v2.98")
+          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
           foreach ($sourcePath in $sourceFiles) {
+            if (-not (Test-Path $sourcePath)) { continue }
             $source = Get-Content $sourcePath -Raw
-            foreach ($token in $retiredTokens) {
-              if ($source.Contains($token)) {
-                throw "Referência de versão/módulo aposentado detectada em ${sourcePath}: $token"
-              }
-            }
+            foreach ($token in $retiredTokens) { if ($source.Contains($token)) { throw "Referência de versão/módulo aposentado detectada em ${sourcePath}: $token" } }
           }
-
       - name: Instalar dependências
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-
       - name: Validar sintaxe Python
         shell: pwsh
         run: |
           python -m compileall -q .
-          if ($LASTEXITCODE -ne 0) {
-            throw "Falha na compilação sintática dos arquivos Python."
-          }
-
+          if ($LASTEXITCODE -ne 0) { throw "Falha na compilação sintática dos arquivos Python." }
       - name: Validar integração das camadas neutras
         shell: pwsh
         run: |
           python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
-
       - name: Build SM AutoLab
         shell: cmd
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
-
-      - name: Build updater de compatibilidade
-        shell: cmd
-        run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab Updater" updater.py
-
-      - name: Validar executáveis e gerar manifesto
+      - name: Validar executável e gerar manifesto
         shell: pwsh
         run: |
           $main = "dist\SM AutoLab.exe"
-          $updater = "dist\SM AutoLab Updater.exe"
           if (-not (Test-Path $main)) { throw "Executável principal não foi gerado." }
-          if (-not (Test-Path $updater)) { throw "Updater não foi gerado." }
           if ((Get-Item $main).Length -lt 1000000) { throw "Executável principal suspeitamente pequeno." }
-          if ((Get-Item $updater).Length -lt 1000000) { throw "Updater suspeitamente pequeno." }
-
           $version = (Get-Content VERSION -Raw).Trim()
           $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
           $mainSha256 = (Get-FileHash -Algorithm SHA256 $main).Hash.ToLower()
-          $manifest = @{
-            channel = "SM-AUTOLAB-RESET-2026-09"
-            version = $version
-            tag = $tag
-            commit = "${{ github.sha }}"
-            main_asset = "SM AutoLab.exe"
-            updater_asset = "SM AutoLab Updater.exe"
-            main_sha256 = $mainSha256
-          } | ConvertTo-Json -Compress
+          $manifest = @{ channel = "SM-AUTOLAB-RESET-2026-09"; version = $version; tag = $tag; commit = "${{ github.sha }}"; main_asset = "SM AutoLab.exe"; main_sha256 = $mainSha256 } | ConvertTo-Json -Compress
           Set-Content -Path "SM AutoLab Release Manifest.json" -Value $manifest -Encoding UTF8
-
       - name: Anexar arquivos à GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -216,5 +122,4 @@ jobs:
           overwrite_files: true
           files: |
             dist/SM AutoLab.exe
-            dist/SM AutoLab Updater.exe
             SM AutoLab Release Manifest.json
