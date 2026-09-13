@@ -7,7 +7,7 @@ Componentes principais:
 - interface.py — interface Fluent 2 e calendário nativo;
 - patch_base.py — camada de compatibilidade da base;
 - patch_arquivos.py — camada de Arquivos/calendário;
-- updater.py — mecanismo de atualização;
+- atualizacao.py — mecanismo integrado de atualização;
 - build_windows.bat — build local validado;
 - .github/workflows/release.yml — pipeline de release.
 
