@@ -1,3 +1,4 @@
+# SM AutoLab v2.99.1 — base atual
 import json
 from datetime import datetime
 from pathlib import Path
@@ -155,5 +156,5 @@ def principal(planilha_path,sheet,aplicativo=None,indice_inicial=0):
         raise
     finally:
         auto.fechar()
-        if aplicativo is not None and getattr(aplicativo, "_automacao_atual", None) is auto:
+        if aplicativo is not None and getattr(aplicativo,"_automacao_atual",None) is auto:
             aplicativo._automacao_atual = None
