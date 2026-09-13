@@ -1,4 +1,3 @@
-# SM AutoLab v2.99.1 — base atual
 import json
 from datetime import datetime
 from pathlib import Path
@@ -145,10 +144,6 @@ def principal(planilha_path,sheet,aplicativo=None,indice_inicial=0):
         if aplicativo: aplicativo.mostrar_erro(str(exc))
         return resultados
     except Exception:
-        # Qualquer falha inesperada (queda de conexão não recuperada,
-        # fechamento do navegador/processo, erro de Selenium etc.) preserva
-        # o último índice confirmado. O código em execução não é marcado
-        # como concluído, portanto será repetido na retomada.
         try:
             salvar_checkpoint(planilha_path, sheet, proximo_indice_seguro)
         except Exception:
@@ -156,5 +151,5 @@ def principal(planilha_path,sheet,aplicativo=None,indice_inicial=0):
         raise
     finally:
         auto.fechar()
-        if aplicativo is not None and getattr(aplicativo,"_automacao_atual",None) is auto:
+        if aplicativo is not None and getattr(aplicativo, "_automacao_atual", None) is auto:
             aplicativo._automacao_atual = None
