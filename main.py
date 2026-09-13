@@ -1,11 +1,11 @@
 import sys
 
 
-# Modo especial usado pelo atualizador integrado: o próprio executável pode
-# iniciar uma cópia temporária como processo auxiliar para substituir a versão
+# Modo auxiliar do atualizador integrado: o próprio executável pode iniciar
+# uma cópia temporária como processo auxiliar para substituir a versão
 # instalada depois que ela for encerrada.
-if "--sm-autolab-updater" in sys.argv:
-    from updater import _cli
+if "--sm-autolab-update-helper" in sys.argv:
+    from atualizacao import _cli
     raise SystemExit(_cli())
 
 from splash import run_splash
