@@ -1,4 +1,3 @@
-# SM AutoLab v2.99.1 — base atual
 from dataclasses import dataclass
 from datetime import datetime
 
