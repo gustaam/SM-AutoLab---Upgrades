@@ -1,3 +1,4 @@
+# SM AutoLab v2.99.1 — base atual
 from time import sleep
 from selenium import webdriver
 from selenium.webdriver.common.by import By
