@@ -50,6 +50,9 @@ jobs:
           if ($version -ne $tagVersion) {
             throw "VERSION ($version) não corresponde à tag ($tag)."
           }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "VERSION deve usar o formato X.Y.Z; valor encontrado: $version"
+          }
 
           $required = @(
             "main.py",
@@ -73,7 +76,8 @@ jobs:
               throw "Arquivo/recurso obrigatório ausente: $path"
             }
           }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py")) {
+
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py")) {
             if (Test-Path $legacyPath) {
               throw "Arquivo legado não deve fazer parte da base atual: $legacyPath"
             }
@@ -91,31 +95,59 @@ jobs:
           if ($interface -match "tkcalendar") {
             throw "Dependência tkcalendar detectada."
           }
+
           foreach ($marker in @(
             "_toggle_modo_selecao_arquivos",
             "_toggle_data_selecionada",
             "_apagar_datas_selecionadas",
-            "_atualizar_contador_selecao"
+            "_atualizar_contador_selecao",
+            "_contar_codigos_mes_arquivos"
           )) {
             if ($arquivos -notlike "*$marker*") {
               throw "patch_arquivos.py não expõe o componente obrigatório: $marker"
             }
           }
-          if ($main -notmatch "from patch_base import aplicar_patch_base") {
-            throw "main.py não usa a camada base neutra."
+
+          foreach ($expected in @(
+            "from patch_base import aplicar_patch_base",
+            "from patch_arquivos import aplicar_patch_arquivos",
+            "_validar_base_aplicacao"
+          )) {
+            if ($main -notlike "*$expected*") {
+              throw "main.py não contém a integração obrigatória: $expected"
+            }
           }
-          if ($main -notmatch "from patch_arquivos import aplicar_patch_arquivos") {
-            throw "main.py não usa a camada de Arquivos neutra."
-          }
-          if ($main -notmatch "_validar_base_aplicacao") {
-            throw "main.py não contém a validação de integridade."
-          }
-          if ($base -notmatch "def\\s+aplicar_patch_base\\s*\\(") {
+
+          if ($base -notmatch 'def\s+aplicar_patch_base\s*\(') {
             throw "patch_base.py não expõe a camada-base neutra."
           }
-          if ($arquivos -notmatch "def\\s+aplicar_patch_arquivos\\s*\\(") {
-            throw "patch_arquivos.py não expõe a camada neutra de Arquivos."
+          if ($arquivos -notmatch 'def\s+aplicar_patch_arquivos\s*\(') {
+            throw "patch_arquivos.py não expõe a camada de Arquivos neutra."
           }
+          if ($updater -notlike "*SM AutoLab Updater.exe*" -or $updater -notlike "*SM.AutoLab Updater.exe*" -or $updater -notlike "*SM.AutoLab.Updater.exe*") {
+            throw "updater.py não reconhece todas as nomenclaturas obrigatórias."
+          }
+
+          # Bloqueia referências explícitas às versões antigas conhecidas,
+          # sem usar regex genérica que possa atingir identificadores legítimos.
+          $retiredTokens = @(
+            "patch_v266.py",
+            "patch_v267.py",
+            "v2.85",
+            "v2.86",
+            "v2.87",
+            "v2.88",
+            "v2.89",
+            "v2.90",
+            "v2.91",
+            "v2.92",
+            "v2.93",
+            "v2.94",
+            "v2.95",
+            "v2.96",
+            "v2.97",
+            "v2.98"
+          )
           $sourceFiles = @(
             "main.py", "interface.py", "updater.py", "patch_base.py",
             "patch_arquivos.py", "build_windows.bat", "README.md",
@@ -123,12 +155,11 @@ jobs:
           )
           foreach ($sourcePath in $sourceFiles) {
             $source = Get-Content $sourcePath -Raw
-            if ($source -match 'patch_v|_v\d+|(?<![\d.])[vV]?2\.(?:64|67|85|93|96|99)(?![\d.])') {
-              throw "Referência legada detectada em $sourcePath"
+            foreach ($token in $retiredTokens) {
+              if ($source.Contains($token)) {
+                throw "Referência de versão/módulo aposentado detectada em $sourcePath: $token"
+              }
             }
-          }
-          if ($updater -notmatch "SM AutoLab Updater\.exe" -or $updater -notmatch "SM\.AutoLab Updater\.exe" -or $updater -notmatch "SM\.AutoLab\.Updater\.exe") {
-            throw "updater.py não reconhece todas as nomenclaturas obrigatórias."
           }
 
       - name: Instalar dependências
@@ -161,7 +192,7 @@ jobs:
           $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
           $response = Invoke-WebRequest -Uri $uri -Headers $headers -Method Get -SkipHttpErrorCheck
           if ($response.StatusCode -eq 200) {
-            throw "A release $tag já existe. O workflow não sobrescreve releases existentes."
+            throw "A release $tag já existe. O workflow não sobrescreve releases existentes. Crie uma nova versão/tag."
           }
 
       - name: Build SM AutoLab
