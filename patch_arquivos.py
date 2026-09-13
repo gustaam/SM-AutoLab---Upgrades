@@ -164,6 +164,7 @@ def _toggle_modo_selecao_arquivos_arquivos(self):
     _ensure_selection_state(self)
     self._arquivos_modo_selecao = not self._arquivos_modo_selecao
     if not self._arquivos_modo_selecao:
+        self._arquivos_datas_selecionadas.clear()
         self._cancelar_animacao_selecao()
     btn = getattr(self, "_arquivos_btn_selecionar", None)
     if btn is not None:
@@ -618,61 +619,31 @@ def _excluir_historico_planilha_arquivos(self, item):
         self._atualizar_contador_arquivos(self._arquivos_mes or datetime.now())
     except Exception:
         pass
-    if self._arquivos_data_selecionada is not None:
-        self._mostrar_planilhas_do_dia(self._arquivos_data_selecionada)
-    else:
-        self._renderizar_calendario_arquivos()
 
 
-def _registrar_historico_planilha_arquivos(self, cells, timestamp=None):
-    if not hasattr(self, "__base_registrar_historico_planilha"):
-        return
-    self.__base_registrar_historico_planilha(cells, timestamp)
-    try:
-        self._atualizar_contador_arquivos(self._arquivos_mes or datetime.now())
-    except Exception:
-        pass
-
-
-def _instalar_metodos_arquivos(app_class):
-    app_class._contar_codigos_mes = _contar_codigos_mes_arquivos
-    app_class._formatar_contador_arquivos = _formatar_contador_arquivos_arquivos
-    app_class._atualizar_contador_arquivos = _atualizar_contador_arquivos_arquivos
-    app_class._atualizar_contador_selecao = _atualizar_contador_selecao_arquivos
-    app_class._cancelar_animacao_selecao = _cancelar_animacao_selecao_arquivos
-    app_class._animar_selecao_data = _animar_selecao_data_arquivos
-    app_class._executar_animacao_selecao = _executar_animacao_selecao_arquivos
-    app_class._toggle_modo_selecao_arquivos = _toggle_modo_selecao_arquivos_arquivos
-    app_class._toggle_data_selecionada = _toggle_data_selecionada_arquivos
-    app_class._apagar_datas_selecionadas = _apagar_datas_selecionadas_arquivos
-    app_class._limpar_historico_planilhas = _limpar_historico_planilhas_arquivos
-    app_class._clique_calendario_arquivos = _clique_calendario_arquivos_arquivos
-    app_class._desenhar_calendario_arquivos = _desenhar_calendario_arquivos_arquivos
-    app_class._renderizar_calendario_arquivos = _renderizar_calendario_arquivos_arquivos
-    app_class._mudar_mes_arquivos = _mudar_mes_arquivos_arquivos
-    app_class._fechar_historico_planilha = _fechar_historico_planilha_arquivos
-    app_class.abrir_historico_planilha = _abrir_historico_planilha_arquivos
-    app_class._excluir_historico_planilha = _excluir_historico_planilha_arquivos
-    app_class._registrar_historico_planilha = _registrar_historico_planilha_arquivos
-
-
-def aplicar_patch_arquivos(app_class):
-    if getattr(app_class, "_patch_arquivos_aplicado", False):
-        return
-    app_class._patch_arquivos_aplicado = True
-    app_class.__base_registrar_historico_planilha = app_class._registrar_historico_planilha
-    original_init = app_class.__init__
-
-    def init_arquivos(self, *args, **kwargs):
-        original_init(self, *args, **kwargs)
-        self._arquivos_modo_selecao = False
-        self._arquivos_datas_selecionadas = set()
-        self._arquivos_animacao_data = None
-        self._arquivos_animacao_frame = 0
-        self._arquivos_animacao_job = None
-        self._arquivos_btn_selecionar = None
-        self._arquivos_btn_apagar_selecionados = None
-        self._arquivos_contador_selecao = None
-
-    app_class.__init__ = init_arquivos
-    _instalar_metodos_arquivos(app_class)
+def aplicar_patch_arquivos(App):
+    """Instala o módulo de calendário, seleção e histórico de Arquivos."""
+    methods = {
+        "_ensure_selection_state": _ensure_selection_state,
+        "_dados_arquivos_por_dia": _dados_arquivos_por_dia,
+        "_contar_codigos_mes_arquivos": _contar_codigos_mes_arquivos,
+        "_formatar_contador_arquivos": _formatar_contador_arquivos_arquivos,
+        "_atualizar_contador_arquivos": _atualizar_contador_arquivos_arquivos,
+        "_atualizar_contador_selecao": _atualizar_contador_selecao_arquivos,
+        "_cancelar_animacao_selecao": _cancelar_animacao_selecao_arquivos,
+        "_animar_selecao_data": _animar_selecao_data_arquivos,
+        "_executar_animacao_selecao": _executar_animacao_selecao_arquivos,
+        "_toggle_modo_selecao_arquivos": _toggle_modo_selecao_arquivos_arquivos,
+        "_toggle_data_selecionada": _toggle_data_selecionada_arquivos,
+        "_apagar_datas_selecionadas": _apagar_datas_selecionadas_arquivos,
+        "_limpar_historico_planilhas": _limpar_historico_planilhas_arquivos,
+        "_clique_calendario_arquivos": _clique_calendario_arquivos_arquivos,
+        "_desenhar_calendario_arquivos": _desenhar_calendario_arquivos_arquivos,
+        "_renderizar_calendario_arquivos": _renderizar_calendario_arquivos_arquivos,
+        "_mudar_mes_arquivos": _mudar_mes_arquivos_arquivos,
+        "_fechar_historico_planilha": _fechar_historico_planilha_arquivos,
+        "_abrir_historico_planilha": _abrir_historico_planilha_arquivos,
+        "_excluir_historico_planilha": _excluir_historico_planilha_arquivos,
+    }
+    for name, func in methods.items():
+        setattr(App, name, func)
