@@ -128,8 +128,6 @@ jobs:
             throw "updater.py não reconhece todas as nomenclaturas obrigatórias."
           }
 
-          # Bloqueia referências explícitas às versões antigas conhecidas,
-          # sem usar regex genérica que possa atingir identificadores legítimos.
           $retiredTokens = @(
             "patch_v266.py",
             "patch_v267.py",
@@ -157,7 +155,7 @@ jobs:
             $source = Get-Content $sourcePath -Raw
             foreach ($token in $retiredTokens) {
               if ($source.Contains($token)) {
-                throw "Referência de versão/módulo aposentado detectada em $sourcePath: $token"
+                throw "Referência de versão/módulo aposentado detectada em ${sourcePath}: $token"
               }
             }
           }
