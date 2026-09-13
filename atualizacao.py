@@ -19,7 +19,7 @@ except Exception:
 
 REPO = "gustaam/SM-AutoLab---Upgrades"
 API_RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
-USER_AGENT = "SM-AutoLab-Updater"
+USER_AGENT = "SM-AutoLab"
 UPDATE_CHANNEL = "SM-AUTOLAB-RESET-2026-09"
 MANIFEST_ASSET_NAMES = {
     "release-manifest.json",
@@ -70,16 +70,6 @@ def _release_asset_by_name(assets: list[dict], expected_name: str) -> dict | Non
     )
 
 
-def _is_main_asset(asset: dict) -> bool:
-    name = str(asset.get("name", "")).strip().lower()
-    return name.endswith(".exe") and "updater" not in name
-
-
-def _is_updater_asset(asset: dict) -> bool:
-    name = str(asset.get("name", "")).strip().lower()
-    return name.endswith(".exe") and "updater" in name
-
-
 def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
     assets = release.get("assets") or []
     manifest_asset = next((a for a in assets if _is_manifest_asset(a)), None)
@@ -102,10 +92,10 @@ def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
     if not release_version or manifest_version != release_version or manifest_tag != release_version:
         return None
     main_asset = _release_asset_by_name(assets, str(manifest.get("main_asset", "")))
-    updater_asset = _release_asset_by_name(assets, str(manifest.get("updater_asset", "")))
-    if main_asset is None or updater_asset is None:
+    if main_asset is None:
         return None
-    if not _is_main_asset(main_asset) or not _is_updater_asset(updater_asset):
+    main_name = str(main_asset.get("name", "")).strip().lower()
+    if not main_name.endswith(".exe") or "updater" in main_name:
         return None
     return manifest
 
@@ -187,7 +177,7 @@ def _spawn_integrated_helper(target: Path, update: dict) -> tuple[bool, str]:
         subprocess.Popen(
             [
                 str(helper),
-                "--sm-autolab-updater",
+                "--sm-autolab-update-helper",
                 "--target", str(target),
                 "--url", str(update["download_url"]),
                 "--sha256", str(update.get("sha256") or ""),
@@ -208,41 +198,9 @@ def launch_updater(update: dict) -> tuple[bool, str]:
     target = Path(sys.executable).resolve()
     if not update.get("download_url"):
         return False, "A release encontrada não possui um executável correspondente à versão."
-
-    # O executável principal já contém o updater. Uma cópia temporária atua
-    # como auxiliar, permitindo substituir o arquivo original após o fechamento.
     if getattr(sys, "frozen", False) and target.suffix.lower() == ".exe":
         return _spawn_integrated_helper(target, update)
-
-    # Compatibilidade com execução por Python e instalações antigas.
-    app_dir = target.parent
-    updater_names = (
-        "SM AutoLab Updater.exe",
-        "SM.AutoLab Updater.exe",
-        "SM.AutoLab.Updater.exe",
-        "SM_AutoLab_Updater.exe",
-    )
-    updater_exe = next((app_dir / name for name in updater_names if (app_dir / name).exists()), None)
-    if updater_exe is None:
-        candidate = app_dir / "updater.py"
-        updater_exe = candidate if candidate.exists() else None
-    if updater_exe is None:
-        return False, "O componente SM AutoLab Updater não foi encontrado."
-
-    command = [
-        str(updater_exe),
-        "--target", str(target),
-        "--url", str(update["download_url"]),
-        "--sha256", str(update.get("sha256") or ""),
-        "--restart",
-    ]
-    try:
-        if updater_exe.suffix.lower() == ".py":
-            command = [sys.executable] + command
-        subprocess.Popen(command, close_fds=True)
-        return True, ""
-    except OSError as exc:
-        return False, str(exc)
+    return False, "A atualização automática integrada só está disponível no executável do SM AutoLab."
 
 
 def _schedule_cleanup(path: Path) -> None:
@@ -261,8 +219,9 @@ def _schedule_cleanup(path: Path) -> None:
 
 def _cli() -> int:
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sm-autolab-updater", action="store_true")
+    parser.add_argument("--sm-autolab-update-helper", action="store_true")
     parser.add_argument("--target")
     parser.add_argument("--url")
     parser.add_argument("--sha256", default="")
@@ -271,7 +230,7 @@ def _cli() -> int:
     args = parser.parse_args()
 
     if not args.target or not args.url:
-        print("SM AutoLab Updater pronto.")
+        print("SM AutoLab pronto.")
         return 0
 
     target = Path(args.target).resolve()

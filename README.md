@@ -16,13 +16,13 @@ Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a decla
 - animação/estado visual de seleção;
 - contador de células selecionadas;
 - exclusão somente das datas selecionadas;
-- botão `Limpar todo histórico` para limpar tudo;
+- botão `Limpar histórico` para limpar tudo;
 - contador de códigos calculado somente a partir do histórico existente.
 
 ## Estrutura de manutenção
 
-`main.py` usa módulos com nomes neutros: `patch_base.py` e `patch_arquivos.py`. Assim, a versão do aplicativo não fica vinculada ao nome de uma implementação histórica. Os componentes internos permanecem encapsulados nesses módulos e a inicialização valida a presença das funcionalidades essenciais antes de abrir a aplicação.
+`main.py` usa módulos com nomes neutros: `patch_base.py`, `patch_arquivos.py` e `atualizacao.py`. Assim, a versão do aplicativo não fica vinculada ao nome de uma implementação histórica. Os componentes internos permanecem encapsulados nesses módulos e a inicialização valida a presença das funcionalidades essenciais antes de abrir a aplicação.
 
 ## Build e releases
 
-Antes de qualquer release, a validação da `main` confere a estrutura atual, os componentes obrigatórios, a ausência de referências legadas, a sintaxe e a integração das camadas. O workflow de release exige que a tag aponte exatamente para a `main` validada, compara a tag com `VERSION`, gera o aplicativo e o updater e recusa sobrescrever uma release existente. O updater aceita as três nomenclaturas históricas do executável updater e só considera releases da linha-base atual com manifesto válido e versão superior à instalada.
+Antes de qualquer release, a validação da `main` confere a estrutura atual, os componentes obrigatórios, a ausência de referências legadas, a sintaxe e a integração das camadas. O workflow de release exige que a tag aponte exatamente para a `main` validada, compara a tag com `VERSION`, gera somente o aplicativo principal e seu manifesto. A atualização automática é integrada ao próprio executável e verifica o manifesto, a versão superior e o SHA-256 antes de substituir a instalação.

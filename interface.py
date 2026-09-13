@@ -1,5 +1,5 @@
 from pathlib import Path
-from updater import find_update, launch_updater
+from atualizacao import find_update, launch_updater
 import json
 import calendar as pycalendar
 import tkinter as tk

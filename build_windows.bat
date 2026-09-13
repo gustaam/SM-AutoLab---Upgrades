@@ -18,9 +18,6 @@ if not defined APP_VERSION (
 echo Versao detectada: v!APP_VERSION!
 echo.
 
-REM ----------------------------------------------------------
-REM VALIDACAO DE CONSISTENCIA DO CODIGO-FONTE
-REM ----------------------------------------------------------
 echo Verificando codigo-fonte da versao v!APP_VERSION!...
 %SystemRoot%\System32\findstr.exe /c:"def _renderizar_calendario_arquivos" interface.py >nul
 if errorlevel 1 (
@@ -40,6 +37,10 @@ if errorlevel 1 (
 %SystemRoot%\System32\findstr.exe /c:"tkcalendar" interface.py >nul
 if not errorlevel 1 (
     echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
+    goto :erro
+)
+if not exist "atualizacao.py" (
+    echo ERRO: atualizacao.py nao encontrado.
     goto :erro
 )
 if not exist "patch_base.py" (
@@ -84,7 +85,7 @@ if errorlevel 1 (
     echo ERRO: main.py nao esta usando a camada de ajustes atual.
     goto :erro
 )
-%SystemRoot%\System32\findstr.exe /c:"--sm-autolab-updater" main.py >nul
+%SystemRoot%\System32\findstr.exe /c:"--sm-autolab-update-helper" main.py >nul
 if errorlevel 1 (
     echo ERRO: main.py nao contem o modo do atualizador integrado.
     goto :erro
@@ -92,7 +93,6 @@ if errorlevel 1 (
 echo Validacao do codigo-fonte: OK
 echo.
 
-REM Remover caches Python locais para evitar referencias obsoletas.
 for /d /r %%D in (__pycache__) do if exist "%%D" rmdir /s /q "%%D" >nul 2>nul
 
 set "PYTHON="
@@ -150,19 +150,8 @@ if not exist "dist\SM AutoLab.exe" (
 )
 
 echo.
-echo Gerando SM AutoLab Updater de compatibilidade...
-%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab Updater" updater.py
-if errorlevel 1 goto :erro
-
-if not exist "dist\SM AutoLab Updater.exe" (
-    echo ERRO: updater de compatibilidade nao foi gerado.
-    goto :erro
-)
-
-echo.
 echo BUILD CONCLUIDO:
 echo dist\SM AutoLab.exe
-echo dist\SM AutoLab Updater.exe
 echo.
 pause
 exit /b 0
