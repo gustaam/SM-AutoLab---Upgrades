@@ -38,15 +38,15 @@ jobs:
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py",
             "planilha.py", "resultados.py", "splash.py", "updater.py",
-            "patch_base.py", "patch_arquivos.py", "requirements.txt", "VERSION",
-            "SM AutoLab.ico", "assets"
+            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py",
+            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets"
           )
           foreach ($path in $required) {
             if (-not (Test-Path $path)) {
               throw "Arquivo/recurso obrigatório ausente: $path"
             }
           }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py")) {
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py")) {
             if (Test-Path $legacyPath) {
               throw "Arquivo legado não deve fazer parte da base atual: $legacyPath"
             }
@@ -56,12 +56,15 @@ jobs:
           $interface = Get-Content interface.py -Raw
           $base = Get-Content patch_base.py -Raw
           $arquivos = Get-Content patch_arquivos.py -Raw
+          $ajustes = Get-Content patch_ajustes.py -Raw
           $updater = Get-Content updater.py -Raw
 
           foreach ($expected in @(
             "from patch_base import aplicar_patch_base",
             "from patch_arquivos import aplicar_patch_arquivos",
-            "_validar_base_aplicacao"
+            "from patch_ajustes import aplicar_patch_ajustes",
+            "_validar_base_aplicacao",
+            "--sm-autolab-updater"
           )) {
             if ($main -notlike "*$expected*") {
               throw "main.py não contém a integração obrigatória: $expected"
@@ -79,6 +82,9 @@ jobs:
           if ($arquivos -notmatch "def\s+aplicar_patch_arquivos\s*\(") {
             throw "patch_arquivos.py não expõe a camada neutra de Arquivos."
           }
+          if ($ajustes -notmatch "def\s+aplicar_patch_ajustes\s*\(") {
+            throw "patch_ajustes.py não expõe a camada de ajustes."
+          }
           foreach ($marker in @(
             "_toggle_modo_selecao_arquivos",
             "_toggle_data_selecionada",
@@ -95,13 +101,20 @@ jobs:
 
           $sourceFiles = @(
             "main.py", "interface.py", "updater.py", "patch_base.py",
-            "patch_arquivos.py", "build_windows.bat", "README.md",
-            "INTEGRATION_MANIFEST.txt"
+            "patch_arquivos.py", "patch_ajustes.py", "build_windows.bat",
+            "README.md", "INTEGRATION_MANIFEST.txt"
+          )
+          $retiredTokens = @(
+            "patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87",
+            "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93",
+            "v2.94", "v2.95", "v2.96", "v2.97", "v2.98"
           )
           foreach ($sourcePath in $sourceFiles) {
             $source = Get-Content $sourcePath -Raw
-            if ($source -match 'patch_v|_v\d+|(?<![\d.])[vV]?2\.(?:64|67|85|93|96|99)(?![\d.])') {
-              throw "Referência legada detectada em $sourcePath"
+            foreach ($token in $retiredTokens) {
+              if ($source.Contains($token)) {
+                throw "Referência de versão/módulo aposentado detectada em ${sourcePath}: $token"
+              }
             }
           }
 
@@ -118,4 +131,4 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Falha na compilação sintática dos arquivos Python."
           }
-          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); _validar_base_aplicacao(); print('Integracao da main: OK')"
+          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); _validar_base_aplicacao(); print('Integracao da main: OK')"
