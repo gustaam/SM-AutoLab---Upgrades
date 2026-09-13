@@ -138,9 +138,10 @@ def find_update(timeout: int = 8) -> dict | None:
     for release in fetch_releases(timeout):
         if release.get("draft") or release.get("prerelease"):
             continue
-        if f"<!-- {UPDATE_CHANNEL} -->" not in str(release.get("body") or ""):
-            continue
 
+        # A release is considered valid based on its manifest and assets,
+        # not on a comment hidden in the release notes. This keeps the updater
+        # compatible with future releases even when their notes are rewritten.
         assets = release.get("assets") or []
         if not any(_is_manifest_asset(asset) for asset in assets):
             continue
