@@ -20,8 +20,6 @@ echo.
 
 REM ----------------------------------------------------------
 REM VALIDACAO DE CONSISTENCIA DO CODIGO-FONTE
-REM A build deve usar a estrutura atual da base, sem depender de
-REM numeracao historica nos nomes dos modulos de inicializacao.
 REM ----------------------------------------------------------
 echo Verificando codigo-fonte da versao v!APP_VERSION!...
 %SystemRoot%\System32\findstr.exe /c:"def _renderizar_calendario_arquivos" interface.py >nul
@@ -52,6 +50,10 @@ if not exist "patch_arquivos.py" (
     echo ERRO: patch_arquivos.py nao encontrado.
     goto :erro
 )
+if not exist "patch_ajustes.py" (
+    echo ERRO: patch_ajustes.py nao encontrado.
+    goto :erro
+)
 %SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_base" patch_base.py >nul
 if errorlevel 1 (
     echo ERRO: patch_base.py nao expoe a camada base neutra.
@@ -62,6 +64,11 @@ if errorlevel 1 (
     echo ERRO: patch_arquivos.py nao expoe a camada de Arquivos neutra.
     goto :erro
 )
+%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_ajustes" patch_ajustes.py >nul
+if errorlevel 1 (
+    echo ERRO: patch_ajustes.py nao expoe a camada de ajustes.
+    goto :erro
+)
 %SystemRoot%\System32\findstr.exe /c:"from patch_base import aplicar_patch_base" main.py >nul
 if errorlevel 1 (
     echo ERRO: main.py nao esta usando a camada base atual.
@@ -70,6 +77,16 @@ if errorlevel 1 (
 %SystemRoot%\System32\findstr.exe /c:"from patch_arquivos import aplicar_patch_arquivos" main.py >nul
 if errorlevel 1 (
     echo ERRO: main.py nao esta usando a camada de Arquivos atual.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"from patch_ajustes import aplicar_patch_ajustes" main.py >nul
+if errorlevel 1 (
+    echo ERRO: main.py nao esta usando a camada de ajustes atual.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"--sm-autolab-updater" main.py >nul
+if errorlevel 1 (
+    echo ERRO: main.py nao contem o modo do atualizador integrado.
     goto :erro
 )
 echo Validacao do codigo-fonte: OK
@@ -116,7 +133,7 @@ if errorlevel 1 (
     goto :erro
 )
 
-%PYTHON% -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
+%PYTHON% -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
 if errorlevel 1 (
     echo ERRO: falha na integracao das camadas da base.
     goto :erro
@@ -133,12 +150,12 @@ if not exist "dist\SM AutoLab.exe" (
 )
 
 echo.
-echo Gerando SM AutoLab Updater...
+echo Gerando SM AutoLab Updater de compatibilidade...
 %PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab Updater" updater.py
 if errorlevel 1 goto :erro
 
 if not exist "dist\SM AutoLab Updater.exe" (
-    echo ERRO: updater nao foi gerado.
+    echo ERRO: updater de compatibilidade nao foi gerado.
     goto :erro
 )
 
