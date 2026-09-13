@@ -2,6 +2,7 @@ from splash import run_splash
 from interface import App
 from patch_base import aplicar_patch_base
 from patch_arquivos import aplicar_patch_arquivos
+from patch_ajustes import aplicar_patch_ajustes
 
 
 _REQUIRED_BASE_METHODS = (
@@ -26,11 +27,11 @@ def _validar_base_aplicacao():
 
 
 if __name__ == "__main__":
-    # Ordem fixa da inicializacao: camada base, depois Arquivos/calendario.
-    # Os nomes dos modulos sao neutros para que a numeracao da versao nunca
-    # determine quais funcionalidades entram em um release.
+    # Ordem fixa: base, Arquivos/calendario e ajustes finais.
+    # A main continua sendo a fonte de verdade para qualquer release.
     aplicar_patch_base(App)
     aplicar_patch_arquivos(App)
+    aplicar_patch_ajustes(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
