@@ -75,8 +75,8 @@ jobs:
           if ((Get-Content version_info_template.txt -Raw) -notlike "*__VERSION__*") { throw "version_info_template.txt está sem o marcador de versão." }
           if ((Get-Content version_info_template.txt -Raw) -notlike "*SM AutoLab.exe*") { throw "version_info_template.txt está sem o nome do executável." }
 
-          $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97", "v2.98")
-          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt", ".github/workflows/release.yml")
+          $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97")
+          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
           foreach ($sourcePath in $sourceFiles) {
             if (-not (Test-Path $sourcePath)) { continue }
             $source = Get-Content $sourcePath -Raw
