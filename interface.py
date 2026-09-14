@@ -842,7 +842,7 @@ class App:
             dados = {
                 "SITE_URL": "https://franchising.feegow.com/pre-v8.1/extranet/?P=Login&Licenca=15003",
                 "PORTAL_USUARIO": "labsantamaria@taguatinga",
-                "PORTAL_SENHA": "acesso123",
+                "PORTAL_SENHA": "Acesso123@",
             }
 
         popup = ctk.CTkToplevel(self.app)
