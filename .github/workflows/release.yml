@@ -48,7 +48,7 @@ jobs:
             "main.py", "interface.py", "app.py", "automacao.py", "config.py",
             "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
             "patch_base.py", "patch_arquivos.py", "patch_ajustes.py",
-            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets"
+            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
           foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py")) {
@@ -89,7 +89,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller==6.22.2
       - name: Validar sintaxe Python
         shell: pwsh
         run: |
@@ -99,10 +99,37 @@ jobs:
         shell: pwsh
         run: |
           python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
+      - name: Preparar metadados do executável
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $parts = $version.Split('.')
+          if ($parts.Count -ne 3) { throw "VERSION inválida: $version" }
+          $metadata = Get-Content "version_info_template.txt" -Raw
+          $metadata = $metadata.Replace("__MAJOR__", $parts[0]).Replace("__MINOR__", $parts[1]).Replace("__PATCH__", $parts[2]).Replace("__VERSION__", $version)
+          Set-Content -Path "version_info.txt" -Value $metadata -Encoding UTF8
       - name: Build SM AutoLab
         shell: cmd
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+      - name: Verificar executável com Microsoft Defender
+        shell: pwsh
+        run: |
+          $main = (Resolve-Path "dist\SM AutoLab.exe").Path
+          try {
+            Start-MpScan -ScanPath $main -ScanType CustomScan -ErrorAction Stop
+          } catch {
+            throw "Não foi possível iniciar a verificação do Microsoft Defender: $($_.Exception.Message)"
+          }
+          Start-Sleep -Seconds 10
+          $detections = Get-MpThreatDetection | Where-Object {
+            $_.Resources -match [regex]::Escape($main) -or $_.Resources -match "SM AutoLab\.exe"
+          }
+          if ($detections) {
+            $names = ($detections | ForEach-Object { $_.ThreatName } | Sort-Object -Unique) -join ", "
+            throw "Microsoft Defender detectou ameaça no executável gerado: $names"
+          }
+          Write-Host "Microsoft Defender: nenhuma detecção associada ao executável."
       - name: Validar executável e gerar manifesto
         shell: pwsh
         run: |
