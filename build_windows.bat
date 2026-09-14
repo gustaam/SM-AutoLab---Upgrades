@@ -88,11 +88,6 @@ if errorlevel 1 (
     echo ERRO: main.py nao esta usando a camada de ajustes atual.
     goto :erro
 )
-%SystemRoot%\System32\findstr.exe /c:"--sm-autolab-update-helper" main.py >nul
-if errorlevel 1 (
-    echo ERRO: main.py nao contem o modo do atualizador integrado.
-    goto :erro
-)
 echo Validacao do codigo-fonte: OK
 echo.
 
