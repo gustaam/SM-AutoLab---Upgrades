@@ -34,7 +34,7 @@ jobs:
             "main.py", "interface.py", "app.py", "automacao.py", "config.py",
             "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
             "patch_base.py", "patch_arquivos.py", "patch_ajustes.py",
-            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets"
+            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
           foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py")) {
@@ -47,6 +47,7 @@ jobs:
           $arquivos = Get-Content patch_arquivos.py -Raw
           $ajustes = Get-Content patch_ajustes.py -Raw
           $atualizacao = Get-Content atualizacao.py -Raw
+          $releaseWorkflow = Get-Content .github/workflows/release.yml -Raw
 
           foreach ($expected in @(
             "from patch_base import aplicar_patch_base",
@@ -63,11 +64,18 @@ jobs:
           foreach ($marker in @("_toggle_modo_selecao_arquivos", "_toggle_data_selecionada", "_apagar_datas_selecionadas", "_atualizar_contador_selecao")) {
             if ($arquivos -notlike "*$marker*") { throw "patch_arquivos.py não expõe o componente obrigatório: $marker" }
           }
+          if ($arquivos -notlike "*_contar_codigos_mes_arquivos*") { throw "patch_arquivos.py não expõe o contador mensal obrigatório." }
           if ($atualizacao -notmatch "def\s+find_update\s*\(" -or $atualizacao -notmatch "def\s+launch_updater\s*\(") { throw "atualizacao.py não expõe o motor integrado de atualização." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater') { throw "Referência ao componente separado de atualização detectada em atualizacao.py." }
 
+          foreach ($expectedBuild in @("pyinstaller==6.22.2", "--noupx", "--version-file \"version_info.txt\"", "Start-MpScan -ScanPath")) {
+            if ($releaseWorkflow -notlike "*$expectedBuild*") { throw "release.yml não contém a proteção obrigatória do build: $expectedBuild" }
+          }
+          if ((Get-Content version_info_template.txt -Raw) -notlike "*__VERSION__*") { throw "version_info_template.txt está sem o marcador de versão." }
+          if ((Get-Content version_info_template.txt -Raw) -notlike "*SM AutoLab.exe*") { throw "version_info_template.txt está sem o nome do executável." }
+
           $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97", "v2.98")
-          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
+          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt", ".github/workflows/release.yml")
           foreach ($sourcePath in $sourceFiles) {
             if (-not (Test-Path $sourcePath)) { continue }
             $source = Get-Content $sourcePath -Raw
