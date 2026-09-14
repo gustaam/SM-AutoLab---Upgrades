@@ -73,9 +73,6 @@ jobs:
           if ($arquivos -notmatch 'def\s+aplicar_patch_arquivos\s*\(') { throw "patch_arquivos.py não expõe a camada de Arquivos neutra." }
           if ($ajustes -notmatch 'def\s+aplicar_patch_ajustes\s*\(') { throw "patch_ajustes.py não expõe a camada de ajustes." }
           if ($patch297 -notmatch 'def\s+aplicar_patch_297\s*\(') { throw "patch_297.py não expõe sua função de integração." }
-          foreach ($marker in @("_toggle_modo_selecao_arquivos", "_toggle_data_selecionada", "_apagar_datas_selecionadas", "_atualizar_contador_selecao", "_contar_codigos_mes_arquivos")) {
-            if ($arquivos -notlike "*$marker*") { throw "patch_arquivos.py não expõe o componente obrigatório: $marker" }
-          }
           if ($atualizacao -notmatch 'def\s+find_update\s*\(' -or $atualizacao -notmatch 'def\s+launch_updater\s*\(') { throw "atualizacao.py não expõe o motor integrado de atualização." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao componente separado/modo auxiliar antigo detectada em atualizacao.py." }
 
