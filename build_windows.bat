@@ -17,8 +17,7 @@ if not defined APP_VERSION (
 
 echo Versao detectada: v!APP_VERSION!
 echo.
-
-echo Verificando codigo-fonte da versao v!APP_VERSION!...
+echo Verificando codigo-fonte da versao atual...
 %SystemRoot%\System32\findstr.exe /c:"def _renderizar_calendario_arquivos" interface.py >nul
 if errorlevel 1 (
     echo ERRO: interface.py nao contem o calendario de Arquivos.
@@ -55,6 +54,10 @@ if not exist "patch_ajustes.py" (
     echo ERRO: patch_ajustes.py nao encontrado.
     goto :erro
 )
+if not exist "version_info_template.txt" (
+    echo ERRO: version_info_template.txt nao encontrado.
+    goto :erro
+)
 %SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_base" patch_base.py >nul
 if errorlevel 1 (
     echo ERRO: patch_base.py nao expoe a camada base neutra.
@@ -83,11 +86,6 @@ if errorlevel 1 (
 %SystemRoot%\System32\findstr.exe /c:"from patch_ajustes import aplicar_patch_ajustes" main.py >nul
 if errorlevel 1 (
     echo ERRO: main.py nao esta usando a camada de ajustes atual.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"--sm-autolab-update-helper" main.py >nul
-if errorlevel 1 (
-    echo ERRO: main.py nao contem o modo do atualizador integrado.
     goto :erro
 )
 echo Validacao do codigo-fonte: OK
@@ -120,12 +118,13 @@ if errorlevel 1 goto :erro
 if errorlevel 1 goto :erro
 %PYTHON% -m pip install -r requirements.txt
 if errorlevel 1 goto :erro
-%PYTHON% -m pip install --upgrade pyinstaller
+%PYTHON% -m pip install pyinstaller==6.22.2
 if errorlevel 1 goto :erro
 
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if exist "*.spec" del /q "*.spec"
+if exist "version_info.txt" del /q "version_info.txt"
 
 %PYTHON% -m compileall -q .
 if errorlevel 1 (
@@ -139,9 +138,17 @@ if errorlevel 1 (
     goto :erro
 )
 
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$v=(Get-Content VERSION -Raw).Trim(); $p=$v.Split('.'); if($p.Count -ne 3){throw 'VERSION invalida'}; $t=Get-Content version_info_template.txt -Raw; $t=$t.Replace('__MAJOR__',$p[0]).Replace('__MINOR__',$p[1]).Replace('__PATCH__',$p[2]).Replace('__VERSION__',$v); Set-Content version_info.txt $t -Encoding UTF8"
+if errorlevel 1 goto :erro
+
+if not exist "version_info.txt" (
+    echo ERRO: nao foi possivel gerar os metadados do executavel.
+    goto :erro
+)
+
 echo.
 echo Gerando SM AutoLab v!APP_VERSION!...
-%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 if errorlevel 1 goto :erro
 
 if not exist "dist\SM AutoLab.exe" (
