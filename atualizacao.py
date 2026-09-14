@@ -3,11 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
 import subprocess
-import sys
 import tempfile
-import time
 import urllib.request
 from pathlib import Path
 
@@ -38,7 +35,7 @@ def _version_tuple(value: str) -> tuple[int, int, int]:
 
 
 def current_version(base: Path | None = None) -> str:
-    base = base or Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    base = base or Path(getattr(__import__("sys"), "_MEIPASS", Path(__file__).resolve().parent))
     try:
         value = (base / "VERSION").read_text(encoding="utf-8").strip()
         if value:
@@ -166,106 +163,89 @@ def download_file(url: str, destination: Path, expected_sha256: str = "") -> Non
         raise RuntimeError("A verificação SHA-256 da atualização falhou.")
 
 
-def _spawn_integrated_helper(target: Path, update: dict) -> tuple[bool, str]:
-    helper_dir = Path(tempfile.mkdtemp(prefix="sm_autolab_integrated_update_"))
-    helper = helper_dir / target.name
+def _escape_cmd_path(value: str) -> str:
+    """Escapa caracteres especiais para uso em arquivo .cmd sem expansão de variáveis."""
+    return (
+        str(value)
+        .replace("^", "^^")
+        .replace("&", "^&")
+        .replace("|", "^|")
+        .replace("<", "^<")
+        .replace(">", "^>")
+        .replace("%", "%%")
+        .replace("!", "^^!")
+    )
+
+
+def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, str]:
+    script_dir = downloaded.parent
+    script = script_dir / "apply_update.cmd"
+    target_cmd = _escape_cmd_path(str(target))
+    downloaded_cmd = _escape_cmd_path(str(downloaded))
+    script_text = f"""@echo off
+setlocal DisableDelayedExpansion
+:wait_replace
+move /Y "{downloaded_cmd}" "{target_cmd}" >nul 2>&1
+if exist "{downloaded_cmd}" (
+    timeout /t 1 /nobreak >nul
+    goto wait_replace
+)
+start "" "{target_cmd}"
+cd /d "%TEMP%" >nul 2>&1
+rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
+"""
     try:
-        shutil.copy2(target, helper)
+        script.write_text(script_text, encoding="utf-8", newline="\r\n")
         flags = 0
         if os.name == "nt":
-            flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
         subprocess.Popen(
-            [
-                str(helper),
-                "--sm-autolab-update-helper",
-                "--target", str(target),
-                "--url", str(update["download_url"]),
-                "--sha256", str(update.get("sha256") or ""),
-                "--restart",
-                "--cleanup-dir", str(helper_dir),
-            ],
-            cwd=str(helper_dir),
+            ["cmd.exe", "/d", "/c", str(script)],
+            cwd=str(script_dir),
             close_fds=True,
             creationflags=flags,
         )
         return True, ""
     except OSError as exc:
-        shutil.rmtree(helper_dir, ignore_errors=True)
         return False, str(exc)
 
 
 def launch_updater(update: dict) -> tuple[bool, str]:
-    target = Path(sys.executable).resolve()
+    if os.name != "nt":
+        return False, "A atualização automática integrada só está disponível no Windows."
     if not update.get("download_url"):
         return False, "A release encontrada não possui um executável correspondente à versão."
-    if getattr(sys, "frozen", False) and target.suffix.lower() == ".exe":
-        return _spawn_integrated_helper(target, update)
-    return False, "A atualização automática integrada só está disponível no executável do SM AutoLab."
 
+    target = Path(__import__("sys").executable).resolve()
+    if target.suffix.lower() != ".exe" or not getattr(__import__("sys"), "frozen", False):
+        return False, "A atualização automática integrada só está disponível no executável do SM AutoLab."
 
-def _schedule_cleanup(path: Path) -> None:
-    if os.name != "nt":
-        return
-    try:
-        command = f'ping 127.0.0.1 -n 3 >nul & rmdir /s /q "{path}"'
-        subprocess.Popen(
-            ["cmd", "/c", command],
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            close_fds=True,
-        )
-    except OSError:
-        pass
-
-
-def _cli() -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--sm-autolab-update-helper", action="store_true")
-    parser.add_argument("--target")
-    parser.add_argument("--url")
-    parser.add_argument("--sha256", default="")
-    parser.add_argument("--restart", action="store_true")
-    parser.add_argument("--cleanup-dir")
-    args = parser.parse_args()
-
-    if not args.target or not args.url:
-        print("SM AutoLab pronto.")
-        return 0
-
-    target = Path(args.target).resolve()
-    cleanup_dir = Path(args.cleanup_dir).resolve() if args.cleanup_dir else None
     temp_dir = Path(tempfile.mkdtemp(prefix="sm_autolab_update_"))
-    temp_file = temp_dir / target.name
-
-    deadline = time.time() + 60
-    while time.time() < deadline:
-        try:
-            test = target.with_suffix(target.suffix + ".update_test")
-            with test.open("wb"):
-                pass
-            test.unlink()
-            break
-        except OSError:
-            time.sleep(0.25)
-    else:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        return 2
-
+    downloaded = temp_dir / target.name
     try:
-        download_file(args.url, temp_file, args.sha256)
-        os.replace(temp_file, target)
-        if args.restart:
-            subprocess.Popen([str(target)], close_fds=True)
-        return 0
+        download_file(str(update["download_url"]), downloaded, str(update.get("sha256") or ""))
+        ok, error = _schedule_replace_after_exit(target, downloaded)
+        if not ok:
+            raise RuntimeError(error or "Não foi possível preparar a substituição da atualização.")
+        return True, ""
     except Exception as exc:
-        print(f"Atualização falhou: {exc}")
-        return 3
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        if cleanup_dir:
-            _schedule_cleanup(cleanup_dir)
+        try:
+            if downloaded.exists():
+                downloaded.unlink()
+        except OSError:
+            pass
+        try:
+            script = temp_dir / "apply_update.cmd"
+            if script.exists():
+                script.unlink()
+        except OSError:
+            pass
+        try:
+            temp_dir.rmdir()
+        except OSError:
+            pass
+        return False, str(exc)
 
 
 if __name__ == "__main__":
-    raise SystemExit(_cli())
+    print("SM AutoLab pronto.")
