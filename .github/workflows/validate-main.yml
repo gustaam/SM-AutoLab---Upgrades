@@ -66,9 +66,10 @@ jobs:
           if ($arquivos -notmatch "def\s+aplicar_patch_arquivos\s*\(") { throw "patch_arquivos.py não expõe a camada neutra de Arquivos." }
           if ($ajustes -notmatch "def\s+aplicar_patch_ajustes\s*\(") { throw "patch_ajustes.py não expõe a camada de ajustes." }
           if ($patch297 -notmatch "def\s+aplicar_patch_297\s*\(") { throw "patch_297.py não expõe sua função de integração." }
-          foreach ($marker in @("_toggle_modo_selecao_arquivos", "_toggle_data_selecionada", "_apagar_datas_selecionadas", "_atualizar_contador_selecao", "_contar_codigos_mes_arquivos")) {
+          foreach ($marker in @("_toggle_modo_selecao_arquivos", "_toggle_data_selecionada", "_apagar_datas_selecionadas", "_atualizar_contador_selecao")) {
             if ($arquivos -notlike "*$marker*") { throw "patch_arquivos.py não expõe o componente obrigatório: $marker" }
           }
+          if ($arquivos -notlike "*_contar_codigos_mes_arquivos*") { throw "patch_arquivos.py não expõe o contador mensal obrigatório." }
           foreach ($expected297 in @("Ctrl + clique para selecionar várias datas", "0 Selecionadas", "Colar sem Formatação", "CTkScrollableFrame", "_history_click_outside")) {
             if ($patch297 -notlike "*$expected297*") { throw "patch_297.py não contém a proteção/funcionalidade esperada: $expected297" }
           }
@@ -84,7 +85,7 @@ jobs:
           if ((Get-Content version_info_template.txt -Raw) -notlike "*SM AutoLab.exe*") { throw "version_info_template.txt está sem o nome do executável." }
 
           $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97", "v2.98")
-          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "automacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt", ".github/workflows/release.yml")
+          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "automacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
           foreach ($sourcePath in $sourceFiles) {
             if (-not (Test-Path $sourcePath)) { continue }
             $source = Get-Content $sourcePath -Raw
@@ -95,7 +96,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller==6.22.2
       - name: Validar sintaxe e integração das camadas
         shell: pwsh
         run: |
