@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import tempfile
 import urllib.request
@@ -23,6 +24,12 @@ MANIFEST_ASSET_NAMES = {
     "sm autolab release manifest.json",
     "sm.autolab.release.manifest.json",
 }
+
+
+def _normalize_asset_name(value: str) -> str:
+    """Normaliza nomes para aceitar diferenças de separador e capitalização."""
+    text = str(value or "").strip().lower()
+    return re.sub(r"[\s._-]+", "", text)
 
 
 def _version_tuple(value: str) -> tuple[int, int, int]:
@@ -56,13 +63,20 @@ def fetch_releases(timeout: int = 8) -> list[dict]:
 
 
 def _is_manifest_asset(asset: dict) -> bool:
-    return str(asset.get("name", "")).strip().lower() in MANIFEST_ASSET_NAMES
+    name = _normalize_asset_name(str(asset.get("name", "")))
+    return name in {_normalize_asset_name(item) for item in MANIFEST_ASSET_NAMES}
 
 
 def _release_asset_by_name(assets: list[dict], expected_name: str) -> dict | None:
-    expected = str(expected_name).strip().lower()
+    expected = _normalize_asset_name(expected_name)
+    if not expected:
+        return None
     return next(
-        (asset for asset in assets if str(asset.get("name", "")).strip().lower() == expected),
+        (
+            asset
+            for asset in assets
+            if _normalize_asset_name(str(asset.get("name", ""))) == expected
+        ),
         None,
     )
 
@@ -92,7 +106,7 @@ def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
     if main_asset is None:
         return None
     main_name = str(main_asset.get("name", "")).strip().lower()
-    if not main_name.endswith(".exe") or "updater" in main_name:
+    if not main_name.endswith(".exe") or "updater" in _normalize_asset_name(main_name):
         return None
     return manifest
 
