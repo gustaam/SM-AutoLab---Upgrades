@@ -3,6 +3,7 @@ from interface import App
 from patch_base import aplicar_patch_base
 from patch_arquivos import aplicar_patch_arquivos
 from patch_ajustes import aplicar_patch_ajustes
+from patch_297 import aplicar_patch_297
 
 
 _REQUIRED_BASE_METHODS = (
@@ -30,6 +31,7 @@ if __name__ == "__main__":
     aplicar_patch_base(App)
     aplicar_patch_arquivos(App)
     aplicar_patch_ajustes(App)
+    aplicar_patch_297(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
