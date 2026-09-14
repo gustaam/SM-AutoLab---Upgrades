@@ -10,6 +10,15 @@ from config import *
 # As configurações do portal podem ser alteradas pela interface.
 # Recarregamos antes de iniciar ou recuperar o navegador.
 
+
+def _recarregar_configuracao_runtime():
+    dados = carregar_configuracoes()
+    globals()["SITE_URL"] = dados["SITE_URL"]
+    globals()["PORTAL_USUARIO"] = dados["PORTAL_USUARIO"]
+    globals()["PORTAL_SENHA"] = dados["PORTAL_SENHA"]
+    return dados
+
+
 class AutomacaoError(Exception):
     def __init__(self, mensagem, tipo="erro_site", recuperado=False):
         super().__init__(mensagem); self.tipo=tipo; self.recuperado=recuperado
@@ -20,7 +29,7 @@ class Automacao:
     def _status(self,t):
         if self.status_callback: self.status_callback(t)
     def iniciar_navegador(self):
-        carregar_configuracoes()
+        _recarregar_configuracao_runtime()
         self._status("Abrindo o Feegow...")
         self.driver=webdriver.Chrome()
         self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
@@ -76,7 +85,7 @@ class Automacao:
         try: _=self.driver.current_url; return True
         except Exception: return False
     def _reiniciar_navegador(self):
-        carregar_configuracoes()
+        _recarregar_configuracao_runtime()
         self._status("Recuperando o navegador e entrando novamente...")
         self.fechar()
         self.driver=webdriver.Chrome(); self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT); self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao(); self._status("Navegador recuperado. Continuando..."); return True
