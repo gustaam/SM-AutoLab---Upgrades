@@ -4,6 +4,7 @@ from patch_base import aplicar_patch_base
 from patch_arquivos import aplicar_patch_arquivos
 from patch_ajustes import aplicar_patch_ajustes
 from patch_297 import aplicar_patch_297
+from patch_298 import aplicar_patch_298
 
 
 _REQUIRED_BASE_METHODS = (
@@ -25,6 +26,8 @@ def _validar_base_aplicacao():
             "A base do SM AutoLab esta incompleta. Componentes ausentes: "
             + ", ".join(faltantes)
         )
+    if not getattr(App, "_patch_298_aplicado", False):
+        raise RuntimeError("A camada atual de correções não foi aplicada.")
 
 
 if __name__ == "__main__":
@@ -32,6 +35,7 @@ if __name__ == "__main__":
     aplicar_patch_arquivos(App)
     aplicar_patch_ajustes(App)
     aplicar_patch_297(App)
+    aplicar_patch_298(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
