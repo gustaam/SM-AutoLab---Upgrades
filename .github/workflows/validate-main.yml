@@ -53,8 +53,9 @@ jobs:
             "from patch_base import aplicar_patch_base",
             "from patch_arquivos import aplicar_patch_arquivos",
             "from patch_ajustes import aplicar_patch_ajustes",
-            "_validar_base_aplicacao", "--sm-autolab-update-helper"
+            "_validar_base_aplicacao"
           )) { if ($main -notlike "*$expected*") { throw "main.py não contém a integração obrigatória: $expected" } }
+          if ($main -match "--sm-autolab-update-helper") { throw "Modo auxiliar do executável ainda presente em main.py." }
           if ($interface -notmatch "Canvas\(") { throw "interface.py não contém o calendário Canvas esperado." }
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "interface.py não usa o módulo integrado de atualização." }
@@ -66,7 +67,7 @@ jobs:
           }
           if ($arquivos -notlike "*_contar_codigos_mes_arquivos*") { throw "patch_arquivos.py não expõe o contador mensal obrigatório." }
           if ($atualizacao -notmatch "def\s+find_update\s*\(" -or $atualizacao -notmatch "def\s+launch_updater\s*\(") { throw "atualizacao.py não expõe o motor integrado de atualização." }
-          if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater') { throw "Referência ao componente separado de atualização detectada em atualizacao.py." }
+          if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao componente separado/modo auxiliar antigo detectada em atualizacao.py." }
 
           foreach ($expectedBuild in @("pyinstaller==6.22.2", "--noupx", "--version-file \"version_info.txt\"", "Start-MpScan -ScanPath")) {
             if ($releaseWorkflow -notlike "*$expectedBuild*") { throw "release.yml não contém a proteção obrigatória do build: $expectedBuild" }
