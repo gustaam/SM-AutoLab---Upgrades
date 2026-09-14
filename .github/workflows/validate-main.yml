@@ -69,7 +69,7 @@ jobs:
           if ($atualizacao -notmatch "def\s+find_update\s*\(" -or $atualizacao -notmatch "def\s+launch_updater\s*\(") { throw "atualizacao.py não expõe o motor integrado de atualização." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao componente separado/modo auxiliar antigo detectada em atualizacao.py." }
 
-          foreach ($expectedBuild in @("pyinstaller==6.22.2", "--noupx", "--version-file \"version_info.txt\"", "Start-MpScan -ScanPath")) {
+          foreach ($expectedBuild in @("pyinstaller==6.22.2", "--noupx", "--version-file", "Start-MpScan -ScanPath")) {
             if ($releaseWorkflow -notlike "*$expectedBuild*") { throw "release.yml não contém a proteção obrigatória do build: $expectedBuild" }
           }
           if ((Get-Content version_info_template.txt -Raw) -notlike "*__VERSION__*") { throw "version_info_template.txt está sem o marcador de versão." }
