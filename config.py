@@ -4,7 +4,7 @@ import json
 # Defaults
 DEFAULT_SITE_URL = "https://franchising.feegow.com/pre-v8.1/extranet/?P=Login&Licenca=15003"
 DEFAULT_PORTAL_USUARIO = "labsantamaria@taguatinga"
-DEFAULT_PORTAL_SENHA = "acesso123"
+DEFAULT_PORTAL_SENHA = "Acesso123@"
 
 SITE_URL = DEFAULT_SITE_URL
 PORTAL_USUARIO = DEFAULT_PORTAL_USUARIO
