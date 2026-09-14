@@ -144,7 +144,7 @@ jobs:
           $version = (Get-Content VERSION -Raw).Trim()
           $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
           $mainSha256 = (Get-FileHash -Algorithm SHA256 $main).Hash.ToLower()
-          $manifest = @{ channel = "SM-AUTOLAB-RESET-2026-09"; version = $version; tag = $tag; commit = "${{ github.sha }}"; main_asset = "SM AutoLab.exe"; main_sha256 = $mainSha256 } | ConvertTo-Json -Compress
+          $manifest = @{ channel = "SM-AUTOLAB-RESET-2026-09"; version = $version; tag = $tag; commit = "${{ github.sha }}"; main_asset = "SM.AutoLab.exe"; main_sha256 = $mainSha256 } | ConvertTo-Json -Compress
           Set-Content -Path "SM AutoLab Release Manifest.json" -Value $manifest -Encoding UTF8
       - name: Anexar arquivos à GitHub Release
         uses: softprops/action-gh-release@v2
