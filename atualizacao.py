@@ -32,13 +32,13 @@ def _normalize_asset_name(value: str) -> str:
     return re.sub(r"[\s._-]+", "", text)
 
 
-def _version_tuple(value: str) -> tuple[int, int, int]:
+def _version_tuple(value: str) -> tuple[int, int, int, int]:
     value = str(value).strip().lstrip("vV")
     parts: list[int] = []
-    for piece in value.split(".")[:3]:
+    for piece in value.split(".")[:4]:
         digits = "".join(ch for ch in piece if ch.isdigit())
         parts.append(int(digits or 0))
-    return tuple((parts + [0, 0, 0])[:3])
+    return tuple((parts + [0, 0, 0, 0])[:4])
 
 
 def current_version(base: Path | None = None) -> str:
@@ -114,7 +114,7 @@ def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
 def find_update(timeout: int = 8) -> dict | None:
     current = current_version()
     current_tuple = _version_tuple(current)
-    compatible: list[tuple[dict, tuple[int, int, int], dict]] = []
+    compatible: list[tuple[dict, tuple[int, int, int, int], dict]] = []
     try:
         releases = fetch_releases(timeout)
     except Exception:
