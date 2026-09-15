@@ -4,9 +4,13 @@ Este arquivo documenta a composição funcional da base atual. A versão vigente
 
 Componentes principais:
 - main.py — ponto de entrada e validação de integridade;
-- interface.py — interface Fluent 2 e calendário nativo;
+- interface.py — interface Fluent 2, calendário nativo e interação da planilha;
 - patch_base.py — camada de compatibilidade da base;
 - patch_arquivos.py — camada de Arquivos/calendário;
+- patch_297.py — correções de interface e menu de contexto;
+- patch_298.py — Histórico de erros e Arquivos ilimitados;
+- patch_299.py — estabilidade das pastas, hover e desseleção externa;
+- patch_2991.py — seleção/edição estilo planilha, contador de códigos e ajustes do calendário/Histórico;
 - atualizacao.py — mecanismo integrado de atualização;
 - build_windows.bat — build local validado;
 - .github/workflows/release.yml — pipeline de release.
