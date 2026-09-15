@@ -44,35 +44,14 @@ jobs:
           $version = (Get-Content VERSION -Raw).Trim()
           if ($version -ne $tagVersion) { throw "VERSION ($version) não corresponde à tag ($tag)." }
           if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw "VERSION deve usar o formato X.Y.Z ou X.Y.Z.B; valor encontrado: $version" }
-
-          $required = @(
-            "main.py", "interface.py", "app.py", "automacao.py", "config.py",
-            "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py",
-            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
-          )
+          $required = @("main.py", "interface.py", "app.py", "automacao.py", "config.py", "planilha.py", "resultados.py", "splash.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt")
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py")) {
-            if (Test-Path $legacyPath) { throw "Arquivo legado/componente separado não deve fazer parte da base atual: $legacyPath" }
-          }
-
-          $interface = Get-Content interface.py -Raw
-          $main = Get-Content main.py -Raw
-          $arquivos = Get-Content patch_arquivos.py -Raw
-          $ajustes = Get-Content patch_ajustes.py -Raw
-          $base = Get-Content patch_base.py -Raw
-          $patch297 = Get-Content patch_297.py -Raw
-          $patch298 = Get-Content patch_298.py -Raw
-          $patch299 = Get-Content patch_299.py -Raw
-          $patch2991 = Get-Content patch_2991.py -Raw
-          $atualizacao = Get-Content atualizacao.py -Raw
-
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py")) { if (Test-Path $legacyPath) { throw "Arquivo legado/componente separado não deve fazer parte da base atual: $legacyPath" } }
+          $interface = Get-Content interface.py -Raw; $main = Get-Content main.py -Raw; $arquivos = Get-Content patch_arquivos.py -Raw; $ajustes = Get-Content patch_ajustes.py -Raw; $base = Get-Content patch_base.py -Raw; $patch297 = Get-Content patch_297.py -Raw; $patch298 = Get-Content patch_298.py -Raw; $patch299 = Get-Content patch_299.py -Raw; $patch2991 = Get-Content patch_2991.py -Raw; $patch29910 = Get-Content patch_29910.py -Raw; $atualizacao = Get-Content atualizacao.py -Raw
           if ($interface -notmatch "Canvas\(") { throw "interface.py não contém o calendário Canvas esperado." }
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "interface.py não usa o módulo integrado de atualização." }
-          foreach ($expected in @("from patch_base import aplicar_patch_base", "from patch_arquivos import aplicar_patch_arquivos", "from patch_ajustes import aplicar_patch_ajustes", "from patch_297 import aplicar_patch_297", "from patch_298 import aplicar_patch_298", "from patch_299 import aplicar_patch_299", "from patch_2991 import aplicar_patch_2991", "_validar_base_aplicacao")) {
-            if ($main -notlike "*$expected*") { throw "main.py não contém a integração obrigatória: $expected" }
-          }
+          foreach ($expected in @("from patch_base import aplicar_patch_base", "from patch_arquivos import aplicar_patch_arquivos", "from patch_ajustes import aplicar_patch_ajustes", "from patch_297 import aplicar_patch_297", "from patch_298 import aplicar_patch_298", "from patch_299 import aplicar_patch_299", "from patch_2991 import aplicar_patch_2991", "from patch_29910 import aplicar_patch_29910", "_validar_base_aplicacao")) { if ($main -notlike "*$expected*") { throw "main.py não contém a integração obrigatória: $expected" } }
           if ($base -notmatch 'def\s+aplicar_patch_base\s*\(') { throw "patch_base.py não expõe a camada-base neutra." }
           if ($arquivos -notmatch 'def\s+aplicar_patch_arquivos\s*\(') { throw "patch_arquivos.py não expõe a camada de Arquivos neutra." }
           if ($ajustes -notmatch 'def\s+aplicar_patch_ajustes\s*\(') { throw "patch_ajustes.py não expõe a camada de ajustes." }
@@ -80,23 +59,15 @@ jobs:
           if ($patch298 -notmatch 'def\s+aplicar_patch_298\s*\(') { throw "patch_298.py não expõe sua função de integração." }
           if ($patch299 -notmatch 'def\s+aplicar_patch_299\s*\(') { throw "patch_299.py não expõe sua função de integração." }
           if ($patch2991 -notmatch 'def\s+aplicar_patch_2991\s*\(') { throw "patch_2991.py não expõe sua função de integração." }
+          if ($patch29910 -notmatch 'def\s+aplicar_patch_29910\s*\(') { throw "patch_29910.py não expõe sua função de integração." }
+          if ($patch29910 -notlike "*SM-AUTOLAB-ARQUIVOS-CONTADOR-SELECAO*" -or $patch29910 -notlike "*_atualizar_contador_selecao_29910*") { throw "patch_29910.py não contém a correção esperada do contador de seleção." }
           if ($atualizacao -notmatch 'def\s+find_update\s*\(' -or $atualizacao -notmatch 'def\s+launch_updater\s*\(') { throw "atualizacao.py não expõe o motor integrado de atualização." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao componente separado/modo auxiliar antigo detectada em atualizacao.py." }
-
-          foreach ($expected299 in @("PATCH_299_MARKER", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299", "bind_all")) {
-            if ($patch299 -notlike "*$expected299*") { throw "patch_299.py não contém a correção esperada: $expected299" }
-          }
-          foreach ($expected2991 in @("PATCH_2991_MARKER", "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991", "_formatar_selecao_2991", "_count_saved_passwords", "firstweekday")) {
-            if ($patch2991 -notlike "*$expected2991*") { throw "patch_2991.py não contém a correção esperada: $expected2991" }
-          }
-
+          foreach ($expected299 in @("PATCH_299_MARKER", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299", "bind_all")) { if ($patch299 -notlike "*$expected299*") { throw "patch_299.py não contém a correção esperada: $expected299" } }
+          foreach ($expected2991 in @("PATCH_2991_MARKER", "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991", "_formatar_selecao_2991", "_count_saved_passwords", "firstweekday")) { if ($patch2991 -notlike "*$expected2991*") { throw "patch_2991.py não contém a correção esperada: $expected2991" } }
           $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97", "v2.98")
-          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
-          foreach ($sourcePath in $sourceFiles) {
-            if (-not (Test-Path $sourcePath)) { continue }
-            $source = Get-Content $sourcePath -Raw
-            foreach ($token in $retiredTokens) { if ($source.Contains($token)) { throw "Referência de versão/módulo aposentado detectada em ${sourcePath}: $token" } }
-          }
+          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
+          foreach ($sourcePath in $sourceFiles) { if (-not (Test-Path $sourcePath)) { continue }; $source = Get-Content $sourcePath -Raw; foreach ($token in $retiredTokens) { if ($source.Contains($token)) { throw "Referência de versão/módulo aposentado detectada em ${sourcePath}: $token" } } }
       - name: Instalar dependências
         shell: pwsh
         run: |
@@ -113,7 +84,7 @@ jobs:
       - name: Validar integração das camadas neutras
         shell: pwsh
         run: |
-          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from patch_297 import aplicar_patch_297; from patch_298 import aplicar_patch_298; from patch_299 import aplicar_patch_299; from patch_2991 import aplicar_patch_2991; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); aplicar_patch_297(App); aplicar_patch_298(App); aplicar_patch_299(App); aplicar_patch_2991(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
+          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from patch_297 import aplicar_patch_297; from patch_298 import aplicar_patch_298; from patch_299 import aplicar_patch_299; from patch_2991 import aplicar_patch_2991; from patch_29910 import aplicar_patch_29910; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); aplicar_patch_297(App); aplicar_patch_298(App); aplicar_patch_299(App); aplicar_patch_2991(App); aplicar_patch_29910(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
       - name: Preparar metadados do executável
         shell: pwsh
         run: |
@@ -132,19 +103,10 @@ jobs:
         shell: pwsh
         run: |
           $main = (Resolve-Path "dist\SM AutoLab.exe").Path
-          try {
-            Start-MpScan -ScanPath $main -ScanType CustomScan -ErrorAction Stop
-          } catch {
-            throw "Não foi possível iniciar a verificação do Microsoft Defender: $($_.Exception.Message)"
-          }
+          try { Start-MpScan -ScanPath $main -ScanType CustomScan -ErrorAction Stop } catch { throw "Não foi possível iniciar a verificação do Microsoft Defender: $($_.Exception.Message)" }
           Start-Sleep -Seconds 10
-          $detections = Get-MpThreatDetection | Where-Object {
-            $_.Resources -match [regex]::Escape($main) -or $_.Resources -match "SM AutoLab\.exe"
-          }
-          if ($detections) {
-            $names = ($detections | ForEach-Object { $_.ThreatName } | Sort-Object -Unique) -join ", "
-            throw "Microsoft Defender detectou ameaça no executável gerado: $names"
-          }
+          $detections = Get-MpThreatDetection | Where-Object { $_.Resources -match [regex]::Escape($main) -or $_.Resources -match "SM AutoLab\.exe" }
+          if ($detections) { $names = ($detections | ForEach-Object { $_.ThreatName } | Sort-Object -Unique) -join ", "; throw "Microsoft Defender detectou ameaça no executável gerado: $names" }
           Write-Host "Microsoft Defender: nenhuma detecção associada ao executável."
       - name: Validar executável e gerar manifesto
         shell: pwsh
@@ -172,34 +134,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
-          $headers = @{
-            Accept = "application/vnd.github+json"
-            Authorization = "Bearer $env:GITHUB_TOKEN"
-            "X-GitHub-Api-Version" = "2022-11-28"
-          }
+          $headers = @{ Accept = "application/vnd.github+json"; Authorization = "Bearer $env:GITHUB_TOKEN"; "X-GitHub-Api-Version" = "2022-11-28" }
           $apiRoot = "https://api.github.com/repos/${{ github.repository }}"
           $release = Invoke-RestMethod -Uri "$apiRoot/releases/tags/$tag" -Headers $headers
           $tagCommit = (Invoke-RestMethod -Uri "$apiRoot/commits/$tag" -Headers $headers).sha
-
-          function Normalize-AssetName([string]$value) {
-            return (($value ?? "").Trim().ToLower() -replace '[\s._-]+', '')
-          }
-
+          function Normalize-AssetName([string]$value) { return (($value ?? "").Trim().ToLower() -replace '[\s._-]+', '') }
           $assets = @($release.assets)
           $exe = $assets | Where-Object { (Normalize-AssetName $_.name) -eq (Normalize-AssetName 'SM AutoLab.exe') } | Select-Object -First 1
           $manifestAsset = $assets | Where-Object { (Normalize-AssetName $_.name) -eq (Normalize-AssetName 'SM AutoLab Release Manifest.json') } | Select-Object -First 1
           if (-not $exe) { throw "O executável não foi encontrado na release publicada." }
           if (-not $manifestAsset) { throw "O manifesto não foi encontrado na release publicada." }
-
           $assetDigest = [string]$exe.digest
           if ($assetDigest.ToLower().StartsWith('sha256:')) { $assetDigest = $assetDigest.Substring(7) }
           if (-not $assetDigest) { throw "A API do GitHub não forneceu o SHA-256 do executável publicado." }
-
           $manifestResponse = Invoke-WebRequest -Uri $manifestAsset.browser_download_url -Headers $headers -UseBasicParsing
           $publishedManifest = $manifestResponse.Content | ConvertFrom-Json
           if ($publishedManifest.channel -ne 'SM-AUTOLAB-RESET-2026-09') { throw "Canal inválido no manifesto publicado." }
           if ([string]$publishedManifest.version -ne [string]$release.tag_name.TrimStart('v','V')) { throw "Versão do manifesto não corresponde à release publicada." }
           if ([string]$publishedManifest.tag -ne [string]$release.tag_name) { throw "Tag do manifesto não corresponde à release publicada." }
           if ([string]$publishedManifest.commit -ne [string]$tagCommit) { throw "Commit do manifesto não corresponde ao commit da tag publicada." }
-          if ([string]$publishedManifest.main_sha256).ToLower() -ne $assetDigest.ToLower() { throw "SHA-256 do manifesto não corresponde ao executável efetivamente publicado." }
+          if (([string]$publishedManifest.main_sha256).ToLower() -ne $assetDigest.ToLower()) { throw "SHA-256 do manifesto não corresponde ao executável efetivamente publicado." }
           Write-Host "Release publicada verificada: tag, commit, manifesto, executável e SHA-256 estão coerentes."
