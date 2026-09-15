@@ -4,11 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+      - "v*.*.*.*"
       - "v*.*"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Tag exata da release (ex.: vX.Y.Z)"
+        description: "Tag exata da release (ex.: vX.Y.Z ou vX.Y.Z.B)"
         required: true
         type: string
 
@@ -42,12 +43,12 @@ jobs:
           $tagVersion = $tag.TrimStart('vV')
           $version = (Get-Content VERSION -Raw).Trim()
           if ($version -ne $tagVersion) { throw "VERSION ($version) não corresponde à tag ($tag)." }
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION deve usar o formato X.Y.Z; valor encontrado: $version" }
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw "VERSION deve usar o formato X.Y.Z ou X.Y.Z.B; valor encontrado: $version" }
 
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py",
             "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py",
+            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py",
             "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
@@ -63,12 +64,13 @@ jobs:
           $patch297 = Get-Content patch_297.py -Raw
           $patch298 = Get-Content patch_298.py -Raw
           $patch299 = Get-Content patch_299.py -Raw
+          $patch2991 = Get-Content patch_2991.py -Raw
           $atualizacao = Get-Content atualizacao.py -Raw
 
           if ($interface -notmatch "Canvas\(") { throw "interface.py não contém o calendário Canvas esperado." }
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "interface.py não usa o módulo integrado de atualização." }
-          foreach ($expected in @("from patch_base import aplicar_patch_base", "from patch_arquivos import aplicar_patch_arquivos", "from patch_ajustes import aplicar_patch_ajustes", "from patch_297 import aplicar_patch_297", "from patch_298 import aplicar_patch_298", "from patch_299 import aplicar_patch_299", "_validar_base_aplicacao")) {
+          foreach ($expected in @("from patch_base import aplicar_patch_base", "from patch_arquivos import aplicar_patch_arquivos", "from patch_ajustes import aplicar_patch_ajustes", "from patch_297 import aplicar_patch_297", "from patch_298 import aplicar_patch_298", "from patch_299 import aplicar_patch_299", "from patch_2991 import aplicar_patch_2991", "_validar_base_aplicacao")) {
             if ($main -notlike "*$expected*") { throw "main.py não contém a integração obrigatória: $expected" }
           }
           if ($base -notmatch 'def\s+aplicar_patch_base\s*\(') { throw "patch_base.py não expõe a camada-base neutra." }
@@ -77,15 +79,19 @@ jobs:
           if ($patch297 -notmatch 'def\s+aplicar_patch_297\s*\(') { throw "patch_297.py não expõe sua função de integração." }
           if ($patch298 -notmatch 'def\s+aplicar_patch_298\s*\(') { throw "patch_298.py não expõe sua função de integração." }
           if ($patch299 -notmatch 'def\s+aplicar_patch_299\s*\(') { throw "patch_299.py não expõe sua função de integração." }
+          if ($patch2991 -notmatch 'def\s+aplicar_patch_2991\s*\(') { throw "patch_2991.py não expõe sua função de integração." }
           if ($atualizacao -notmatch 'def\s+find_update\s*\(' -or $atualizacao -notmatch 'def\s+launch_updater\s*\(') { throw "atualizacao.py não expõe o motor integrado de atualização." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao componente separado/modo auxiliar antigo detectada em atualizacao.py." }
 
           foreach ($expected299 in @("PATCH_299_MARKER", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299", "bind_all")) {
             if ($patch299 -notlike "*$expected299*") { throw "patch_299.py não contém a correção esperada: $expected299" }
           }
+          foreach ($expected2991 in @("PATCH_2991_MARKER", "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991", "_formatar_selecao_2991", "_count_saved_passwords", "firstweekday")) {
+            if ($patch2991 -notlike "*$expected2991*") { throw "patch_2991.py não contém a correção esperada: $expected2991" }
+          }
 
           $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97", "v2.98")
-          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
+          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
           foreach ($sourcePath in $sourceFiles) {
             if (-not (Test-Path $sourcePath)) { continue }
             $source = Get-Content $sourcePath -Raw
@@ -105,15 +111,16 @@ jobs:
       - name: Validar integração das camadas neutras
         shell: pwsh
         run: |
-          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from patch_297 import aplicar_patch_297; from patch_298 import aplicar_patch_298; from patch_299 import aplicar_patch_299; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); aplicar_patch_297(App); aplicar_patch_298(App); aplicar_patch_299(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
+          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from patch_297 import aplicar_patch_297; from patch_298 import aplicar_patch_298; from patch_299 import aplicar_patch_299; from patch_2991 import aplicar_patch_2991; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); aplicar_patch_297(App); aplicar_patch_298(App); aplicar_patch_299(App); aplicar_patch_2991(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
       - name: Preparar metadados do executável
         shell: pwsh
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
           $parts = $version.Split('.')
-          if ($parts.Count -ne 3) { throw "VERSION inválida: $version" }
+          if ($parts.Count -lt 3 -or $parts.Count -gt 4) { throw "VERSION inválida: $version" }
           $metadata = Get-Content "version_info_template.txt" -Raw
-          $metadata = $metadata.Replace("__MAJOR__", $parts[0]).Replace("__MINOR__", $parts[1]).Replace("__PATCH__", $parts[2]).Replace("__VERSION__", $version)
+          $build = if ($parts.Count -eq 4) { $parts[3] } else { "0" }
+          $metadata = $metadata.Replace("__MAJOR__", $parts[0]).Replace("__MINOR__", $parts[1]).Replace("__PATCH__", $parts[2]).Replace("__BUILD__", $build).Replace("__VERSION__", $version)
           Set-Content -Path "version_info.txt" -Value $metadata -Encoding UTF8
       - name: Build SM AutoLab
         shell: cmd

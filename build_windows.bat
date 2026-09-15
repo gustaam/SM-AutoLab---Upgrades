@@ -28,65 +28,30 @@ if errorlevel 1 (
     echo ERRO: interface.py nao contem o calendario nativo Canvas.
     goto :erro
 )
-%SystemRoot%\System32\findstr.exe /c:"ARQUIVOS_DIAS = 60" interface.py >nul
-if errorlevel 1 (
-    echo ERRO: interface.py nao esta configurado para 60 dias.
-    goto :erro
-)
 %SystemRoot%\System32\findstr.exe /c:"tkcalendar" interface.py >nul
 if not errorlevel 1 (
     echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
     goto :erro
 )
-if not exist "atualizacao.py" (
-    echo ERRO: atualizacao.py nao encontrado.
-    goto :erro
+for %%F in (atualizacao.py patch_base.py patch_arquivos.py patch_ajustes.py patch_297.py patch_298.py patch_299.py patch_2991.py version_info_template.txt) do (
+    if not exist "%%F" (
+        echo ERRO: %%F nao encontrado.
+        goto :erro
+    )
 )
-if not exist "patch_base.py" (
-    echo ERRO: patch_base.py nao encontrado.
-    goto :erro
+for %%M in ("def aplicar_patch_base" "def aplicar_patch_arquivos" "def aplicar_patch_ajustes" "def aplicar_patch_297" "def aplicar_patch_298" "def aplicar_patch_299" "def aplicar_patch_2991") do (
+    findstr.exe /c:"%%~M" patch_base.py patch_arquivos.py patch_ajustes.py patch_297.py patch_298.py patch_299.py patch_2991.py >nul
+    if errorlevel 1 (
+        echo ERRO: camada obrigatoria ausente: %%~M
+        goto :erro
+    )
 )
-if not exist "patch_arquivos.py" (
-    echo ERRO: patch_arquivos.py nao encontrado.
-    goto :erro
-)
-if not exist "patch_ajustes.py" (
-    echo ERRO: patch_ajustes.py nao encontrado.
-    goto :erro
-)
-if not exist "version_info_template.txt" (
-    echo ERRO: version_info_template.txt nao encontrado.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_base" patch_base.py >nul
-if errorlevel 1 (
-    echo ERRO: patch_base.py nao expoe a camada base neutra.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_arquivos" patch_arquivos.py >nul
-if errorlevel 1 (
-    echo ERRO: patch_arquivos.py nao expoe a camada de Arquivos neutra.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_ajustes" patch_ajustes.py >nul
-if errorlevel 1 (
-    echo ERRO: patch_ajustes.py nao expoe a camada de ajustes.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"from patch_base import aplicar_patch_base" main.py >nul
-if errorlevel 1 (
-    echo ERRO: main.py nao esta usando a camada base atual.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"from patch_arquivos import aplicar_patch_arquivos" main.py >nul
-if errorlevel 1 (
-    echo ERRO: main.py nao esta usando a camada de Arquivos atual.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"from patch_ajustes import aplicar_patch_ajustes" main.py >nul
-if errorlevel 1 (
-    echo ERRO: main.py nao esta usando a camada de ajustes atual.
-    goto :erro
+for %%M in ("from patch_base import aplicar_patch_base" "from patch_arquivos import aplicar_patch_arquivos" "from patch_ajustes import aplicar_patch_ajustes" "from patch_297 import aplicar_patch_297" "from patch_298 import aplicar_patch_298" "from patch_299 import aplicar_patch_299" "from patch_2991 import aplicar_patch_2991") do (
+    findstr.exe /c:"%%~M" main.py >nul
+    if errorlevel 1 (
+        echo ERRO: main.py nao esta usando a camada atual: %%~M
+        goto :erro
+    )
 )
 echo Validacao do codigo-fonte: OK
 echo.
@@ -132,13 +97,13 @@ if errorlevel 1 (
     goto :erro
 )
 
-%PYTHON% -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
+%PYTHON% -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from patch_297 import aplicar_patch_297; from patch_298 import aplicar_patch_298; from patch_299 import aplicar_patch_299; from patch_2991 import aplicar_patch_2991; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); aplicar_patch_297(App); aplicar_patch_298(App); aplicar_patch_299(App); aplicar_patch_2991(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
 if errorlevel 1 (
     echo ERRO: falha na integracao das camadas da base.
     goto :erro
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$v=(Get-Content VERSION -Raw).Trim(); $p=$v.Split('.'); if($p.Count -ne 3){throw 'VERSION invalida'}; $t=Get-Content version_info_template.txt -Raw; $t=$t.Replace('__MAJOR__',$p[0]).Replace('__MINOR__',$p[1]).Replace('__PATCH__',$p[2]).Replace('__VERSION__',$v); Set-Content version_info.txt $t -Encoding UTF8"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$v=(Get-Content VERSION -Raw).Trim(); $p=$v.Split('.'); if($p.Count -lt 3 -or $p.Count -gt 4){throw 'VERSION invalida'}; $t=Get-Content version_info_template.txt -Raw; $b=if($p.Count -eq 4){$p[3]}else{'0'}; $t=$t.Replace('__MAJOR__',$p[0]).Replace('__MINOR__',$p[1]).Replace('__PATCH__',$p[2]).Replace('__BUILD__',$b).Replace('__VERSION__',$v); Set-Content version_info.txt $t -Encoding UTF8"
 if errorlevel 1 goto :erro
 
 if not exist "version_info.txt" (
