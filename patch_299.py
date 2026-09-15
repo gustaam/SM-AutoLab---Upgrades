@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import tkinter as tk
-
 import customtkinter as ctk
 
 
@@ -9,34 +7,45 @@ PATCH_299_MARKER = "SM-AUTOLAB-SELECTION-STABILITY-FIX"
 
 
 def _iter_descendants(widget):
+    """Percorre um widget e seus filhos de forma segura."""
     if widget is None:
         return
     yield widget
     try:
         children = widget.winfo_children()
     except Exception:
-        children = []
+        children = ()
     for child in children:
         yield from _iter_descendants(child)
 
 
-def _is_descendant(widget, ancestor):
+def _widget_inside(widget, ancestor):
+    """Retorna True quando widget é o próprio ancestor ou um filho dele.
+
+    Usa o caminho Tk do widget em vez de nametowidget(), evitando exceções
+    em árvores de widgets CustomTkinter e tornando o teste barato para o
+    clique global.
+    """
     if widget is None or ancestor is None:
         return False
-    current = widget
-    while current is not None:
-        if current is ancestor:
-            return True
-        try:
-            current = current.nametowidget(current.winfo_parent())
-        except Exception:
-            return False
-    return False
+    try:
+        widget_path = str(widget)
+        ancestor_path = str(ancestor)
+    except Exception:
+        return False
+    return widget_path == ancestor_path or widget_path.startswith(ancestor_path + ".")
+
+
+def _widget_exists(widget):
+    try:
+        return bool(widget is not None and widget.winfo_exists())
+    except Exception:
+        return False
 
 
 def _history_clear_selection_299(self):
     previous = getattr(self, "_hist_selected_tile", None)
-    if previous is not None:
+    if previous is not None and _widget_exists(previous):
         try:
             previous.configure(
                 border_color=self.BORDER,
@@ -52,7 +61,7 @@ def _history_select_tile_299(self, tile):
     previous = getattr(self, "_hist_selected_tile", None)
     if previous is tile:
         return
-    if previous is not None:
+    if previous is not None and _widget_exists(previous):
         try:
             previous.configure(
                 border_color=self.BORDER,
@@ -62,44 +71,59 @@ def _history_select_tile_299(self, tile):
         except Exception:
             pass
     self._hist_selected_tile = tile
-    try:
-        tile.configure(
-            border_color=self.ACCENT,
-            border_width=1,
-            fg_color=("#EAF4FF", "#1B3C53"),
-        )
-    except Exception:
-        pass
+    if _widget_exists(tile):
+        try:
+            tile.configure(
+                border_color=self.ACCENT,
+                border_width=1,
+                fg_color=("#EAF4FF", "#1B3C53"),
+            )
+        except Exception:
+            pass
+
+
+def _history_open_once_299(self, event=None, execucao=None, tile=None):
+    """Abre uma pasta somente pelo clique, sem callbacks acumulados."""
+    if tile is not None:
+        _history_select_tile_299(self, tile)
+    if execucao is not None:
+        self._abrir_detalhe_historico(execucao)
+    return "break"
 
 
 def _history_rebind_open_299(self):
-    """Rebinds history folders without accumulating callbacks on every redraw."""
+    """Instala apenas o clique nas pastas; hover não participa da seleção."""
+    tiles = set()
     for tile in tuple(getattr(self, "_hist_tiles", set())):
+        if not _widget_exists(tile):
+            continue
+        tiles.add(tile)
         execucao = getattr(tile, "_sm_execucao", None)
         if execucao is None:
             continue
 
         def abrir(event=None, item=execucao, f=tile):
-            _history_select_tile_299(self, f)
-            self._abrir_detalhe_historico(item)
-            return "break"
+            return _history_open_once_299(self, event, item, f)
 
         for widget in _iter_descendants(tile):
             try:
-                # Important: no add="+". Repeated history redraws must not
-                # stack identical callbacks and make a second click execute
-                # the same action many times.
-                widget.bind("<Enter>", lambda _event: None)
-                widget.bind("<Leave>", lambda _event: None)
+                # Remove callbacks antigos do patch-298. Em especial, Enter/
+                # Leave não podem alterar a aparência/seleção da pasta.
+                widget.unbind("<Enter>")
+                widget.unbind("<Leave>")
+                widget.unbind("<Button-1>")
                 widget.bind("<Button-1>", abrir)
             except Exception:
                 pass
+
+    # Não manter referências a pastas destruídas após uma atualização da tela.
+    self._hist_tiles = tiles
 
 
 def _history_click_outside_299(self, event=None):
     widget = getattr(event, "widget", None) if event is not None else None
     for tile in tuple(getattr(self, "_hist_tiles", set())):
-        if _is_descendant(widget, tile):
+        if _widget_inside(widget, tile):
             return
     _history_clear_selection_299(self)
 
@@ -107,19 +131,45 @@ def _history_click_outside_299(self, event=None):
 def _restaurar_historico_299(self, *args, **kwargs):
     result = self._patch299_original_restaurar_historico(*args, **kwargs)
     _history_rebind_open_299(self)
-    lista = getattr(self, "historico_lista", None)
-    if lista is not None:
-        # A single stable binding on the history container handles clicks
-        # outside any folder. The folder bindings above handle clicks inside.
-        try:
-            lista.bind("<Button-1>", lambda event: _history_click_outside_299(self, event))
-        except Exception:
-            pass
     return result
 
 
+def _limpar_selecao_arquivos_299(self):
+    selected_dates = getattr(self, "_arquivos_datas_selecionadas", None)
+    if not selected_dates:
+        return
+    try:
+        selected_dates.clear()
+        if hasattr(self, "_formatar_contador_selecao"):
+            self._formatar_contador_selecao()
+        if hasattr(self, "_cancelar_animacao_selecao"):
+            self._cancelar_animacao_selecao()
+        if hasattr(self, "_desenhar_calendario_arquivos"):
+            self._desenhar_calendario_arquivos()
+    except Exception:
+        pass
+
+
+def _limpar_selecao_planilha_299(self):
+    active = getattr(self, "_planilha_celula_ativa", None)
+    if not active:
+        return
+    self._planilha_celula_ativa = None
+    for border in list(getattr(self, "_planilha_borda_widgets", []) or []):
+        try:
+            border.destroy()
+        except Exception:
+            pass
+    self._planilha_borda_widgets = []
+
+
 def _instalar_deselecao_global_299(self):
-    """Deselects the active item when left-clicking outside its own widget."""
+    """Aplica comportamento semelhante ao Windows para cliques externos.
+
+    Histórico: clique fora da pasta selecionada desmarca a pasta.
+    Arquivos: clique fora do calendário limpa a seleção Ctrl+clique.
+    Planilha: clique fora da área da planilha limpa a célula ativa.
+    """
     if getattr(self, "_patch299_global_binding", False):
         return
     self._patch299_global_binding = True
@@ -127,45 +177,25 @@ def _instalar_deselecao_global_299(self):
     def on_click(event=None):
         widget = getattr(event, "widget", None) if event is not None else None
 
-        # Histórico: folder selection is cleared outside the selected folder.
-        for tile in tuple(getattr(self, "_hist_tiles", set())):
-            if _is_descendant(widget, tile):
-                break
-        else:
+        # Histórico.
+        selected_tile = getattr(self, "_hist_selected_tile", None)
+        if selected_tile is not None and not _widget_inside(widget, selected_tile):
             _history_clear_selection_299(self)
 
-        # Arquivos: Ctrl+click multi-selection remains intact when clicking
-        # inside a selected calendar cell. Clicking elsewhere clears it.
+        # Arquivos. O redesenho é adiado para depois do evento de mouse para
+        # não destruir/recriar o Canvas enquanto o Tk ainda está despachando
+        # o mesmo Button-1.
         selected_dates = getattr(self, "_arquivos_datas_selecionadas", None)
-        canvas = getattr(self, "_arquivos_calendar_canvas", None)
-        if selected_dates and canvas is not None:
-            if not _is_descendant(widget, canvas):
-                try:
-                    selected_dates.clear()
-                    self._formatar_contador_selecao()
-                    self._cancelar_animacao_selecao()
-                    self._desenhar_calendario_arquivos()
-                except Exception:
-                    pass
+        calendar_canvas = getattr(self, "_arquivos_calendar_canvas", None)
+        if selected_dates and calendar_canvas is not None and not _widget_inside(widget, calendar_canvas):
+            self.app.after_idle(lambda: _limpar_selecao_arquivos_299(self))
 
-        # Planilha: clear the active cell unless the click is inside the
-        # currently active cell/editor or the spreadsheet itself is handling
-        # a new cell click.
+        # Planilha. Clique dentro do Treeview mantém a seleção para que o
+        # próprio handler possa escolher outra célula; somente fora limpa.
         active = getattr(self, "_planilha_celula_ativa", None)
         tree = getattr(self, "_planilha_tree", None)
-        if active and tree is not None:
-            if not _is_descendant(widget, tree):
-                try:
-                    self._planilha_celula_ativa = None
-                    if hasattr(self, "_planilha_borda_widgets"):
-                        for border in list(self._planilha_borda_widgets):
-                            try:
-                                border.destroy()
-                            except Exception:
-                                pass
-                        self._planilha_borda_widgets = []
-                except Exception:
-                    pass
+        if active and tree is not None and not _widget_inside(widget, tree):
+            _limpar_selecao_planilha_299(self)
 
     try:
         self.app.bind_all("<Button-1>", on_click, add="+")
@@ -187,7 +217,7 @@ def aplicar_patch_299(App):
     App._patch299_original_config_app = App.config_app
     App.config_app = _config_app_299
 
-    # Replace the patch-298 rebinder that accumulated callbacks with each
-    # history refresh and also restore the intended no-hover interaction.
+    # O patch 298 cria os callbacks iniciais. O patch 299 os substitui por
+    # handlers estáveis, sem hover e sem acumulação após redesenhos.
     App._history_rebind_open = _history_rebind_open_299
     App._restaurar_historico_na_tela = _restaurar_historico_299
