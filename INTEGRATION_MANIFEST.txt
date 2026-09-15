@@ -11,6 +11,7 @@ Componentes principais:
 - patch_298.py — Histórico de erros e Arquivos ilimitados;
 - patch_299.py — estabilidade das pastas, hover e desseleção externa;
 - patch_2991.py — seleção/edição estilo planilha, contador de códigos e ajustes do calendário/Histórico;
+- patch_29910.py — sincronização robusta do contador de datas selecionadas em Arquivos;
 - atualizacao.py — mecanismo integrado de atualização;
 - build_windows.bat — build local validado;
 - .github/workflows/release.yml — pipeline de release.
