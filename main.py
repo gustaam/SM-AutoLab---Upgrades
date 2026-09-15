@@ -7,6 +7,7 @@ from patch_297 import aplicar_patch_297
 from patch_298 import aplicar_patch_298
 from patch_299 import aplicar_patch_299
 from patch_2991 import aplicar_patch_2991
+from patch_29910 import aplicar_patch_29910
 
 
 _REQUIRED_BASE_METHODS = (
@@ -44,6 +45,7 @@ if __name__ == "__main__":
     aplicar_patch_298(App)
     aplicar_patch_299(App)
     aplicar_patch_2991(App)
+    aplicar_patch_29910(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
