@@ -5,6 +5,7 @@ from patch_arquivos import aplicar_patch_arquivos
 from patch_ajustes import aplicar_patch_ajustes
 from patch_297 import aplicar_patch_297
 from patch_298 import aplicar_patch_298
+from patch_299 import aplicar_patch_299
 
 
 _REQUIRED_BASE_METHODS = (
@@ -28,6 +29,8 @@ def _validar_base_aplicacao():
         )
     if not getattr(App, "_patch_298_aplicado", False):
         raise RuntimeError("A camada atual de correções não foi aplicada.")
+    if not getattr(App, "_patch_299_aplicado", False):
+        raise RuntimeError("A camada de estabilidade e seleção não foi aplicada.")
 
 
 if __name__ == "__main__":
@@ -36,6 +39,7 @@ if __name__ == "__main__":
     aplicar_patch_ajustes(App)
     aplicar_patch_297(App)
     aplicar_patch_298(App)
+    aplicar_patch_299(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
