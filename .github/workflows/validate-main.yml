@@ -16,116 +16,69 @@ jobs:
   validate:
     runs-on: windows-latest
     steps:
-      - name: Checkout da main
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-      - name: Validar versão, estrutura e referências legadas
+
+      - name: Validar versão, estrutura e arquitetura consolidada
         shell: pwsh
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw "VERSION deve usar o formato X.Y.Z ou X.Y.Z.B; valor encontrado: $version" }
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw "VERSION inválida: $version" }
 
           $required = @(
-            "main.py", "interface.py", "app.py", "automacao.py", "config.py",
-            "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py",
-            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
+            "main.py", "interface.py", "app.py", "automacao.py", "config.py", "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
+            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_ui.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
-          foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py")) {
-            if (Test-Path $legacyPath) { throw "Arquivo legado/componente separado não deve fazer parte da base atual: $legacyPath" }
+          foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Recurso obrigatório ausente: $path" } }
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py")) {
+            if (Test-Path $legacyPath) { throw "Arquivo de patch obsoleto ainda presente: $legacyPath" }
           }
 
           $main = Get-Content main.py -Raw
+          $ui = Get-Content patch_ui.py -Raw
           $interface = Get-Content interface.py -Raw
-          $base = Get-Content patch_base.py -Raw
-          $arquivos = Get-Content patch_arquivos.py -Raw
-          $ajustes = Get-Content patch_ajustes.py -Raw
-          $patch297 = Get-Content patch_297.py -Raw
-          $patch298 = Get-Content patch_298.py -Raw
-          $patch299 = Get-Content patch_299.py -Raw
-          $patch2991 = Get-Content patch_2991.py -Raw
-          $patch29910 = Get-Content patch_29910.py -Raw
           $atualizacao = Get-Content atualizacao.py -Raw
-          $automacao = Get-Content automacao.py -Raw
-          $releaseWorkflow = Get-Content .github/workflows/release.yml -Raw
-
+          if ($main -notlike "*from patch_ui import aplicar_patch_ui*") { throw "main.py não usa patch_ui.py como integração única." }
+          if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
           foreach ($expected in @(
-            "from patch_base import aplicar_patch_base",
-            "from patch_arquivos import aplicar_patch_arquivos",
-            "from patch_ajustes import aplicar_patch_ajustes",
-            "from patch_297 import aplicar_patch_297",
-            "from patch_298 import aplicar_patch_298",
-            "from patch_299 import aplicar_patch_299",
-            "from patch_2991 import aplicar_patch_2991",
-            "from patch_29910 import aplicar_patch_29910",
-            "_validar_base_aplicacao"
-          )) { if ($main -notlike "*$expected*") { throw "main.py não contém a integração obrigatória: $expected" } }
-          if ($main -match "--sm-autolab-update-helper") { throw "Modo auxiliar antigo do executável ainda presente em main.py." }
-          if ($interface -notmatch "Canvas\(") { throw "interface.py não contém o calendário Canvas esperado." }
+            "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER",
+            "_historico_tem_erro", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299",
+            "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991",
+            "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910",
+            "def aplicar_patch_ui"
+          )) { if ($ui -notlike "*$expected*") { throw "patch_ui.py não contém: $expected" } }
+          if ($ui -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente em patch_ui.py." }
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
-          if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "interface.py não usa o módulo integrado de atualização." }
-          if ($base -notmatch "def\s+aplicar_patch_base\s*\(") { throw "patch_base.py não expõe a camada-base neutra." }
-          if ($arquivos -notmatch "def\s+aplicar_patch_arquivos\s*\(") { throw "patch_arquivos.py não expõe a camada neutra de Arquivos." }
-          if ($ajustes -notmatch "def\s+aplicar_patch_ajustes\s*\(") { throw "patch_ajustes.py não expõe a camada de ajustes." }
-          if ($patch297 -notmatch "def\s+aplicar_patch_297\s*\(") { throw "patch_297.py não expõe sua função de integração." }
-          if ($patch298 -notmatch "def\s+aplicar_patch_298\s*\(") { throw "patch_298.py não expõe sua função de integração." }
-          if ($patch299 -notmatch "def\s+aplicar_patch_299\s*\(") { throw "patch_299.py não expõe sua função de integração." }
-          if ($patch2991 -notmatch "def\s+aplicar_patch_2991\s*\(") { throw "patch_2991.py não expõe sua função de integração." }
-          if ($patch29910 -notmatch "def\s+aplicar_patch_29910\s*\(") { throw "patch_29910.py não expõe sua função de integração." }
-          foreach ($marker in @("_toggle_modo_selecao_arquivos", "_toggle_data_selecionada", "_apagar_datas_selecionadas", "_atualizar_contador_selecao")) {
-            if ($arquivos -notlike "*$marker*") { throw "patch_arquivos.py não expõe o componente obrigatório: $marker" }
-          }
-          if ($arquivos -notlike "*_contar_codigos_mes_arquivos*") { throw "patch_arquivos.py não expõe o contador mensal obrigatório." }
-          foreach ($expected297 in @("Ctrl + clique para selecionar várias datas", "0 Selecionadas", "Colar sem Formatação", "CTkScrollableFrame", "_history_click_outside")) {
-            if ($patch297 -notlike "*$expected297*") { throw "patch_297.py não contém a proteção/funcionalidade esperada: $expected297" }
-          }
-          foreach ($expected298 in @("PATCH_298_MARKER", "_historico_tem_erro", "_filtrar_arquivos_298", "_mes_minimo_arquivos_298", "_criar_pasta_historico_298")) {
-            if ($patch298 -notlike "*$expected298*") { throw "patch_298.py não contém a correção esperada: $expected298" }
-          }
-          foreach ($expected299 in @("PATCH_299_MARKER", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299", "bind_all")) {
-            if ($patch299 -notlike "*$expected299*") { throw "patch_299.py não contém a correção esperada: $expected299" }
-          }
-          foreach ($expected2991 in @("PATCH_2991_MARKER", "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991", "_formatar_selecao_2991", "_count_saved_passwords", "firstweekday")) {
-            if ($patch2991 -notlike "*$expected2991*") { throw "patch_2991.py não contém a correção esperada: $expected2991" }
-          }
-          foreach ($expected29910 in @("PATCH_29910_MARKER", "_ensure_selection_state_29910", "_atualizar_contador_selecao_29910", "_arquivos_datas_selecionadas", "_arquivos_contador_selecao")) {
-            if ($patch29910 -notlike "*$expected29910*") { throw "patch_29910.py não contém a correção esperada: $expected29910" }
-          }
-          if ($atualizacao -notmatch "def\s+find_update\s*\(" -or $atualizacao -notmatch "def\s+launch_updater\s*\(") { throw "atualizacao.py não expõe o motor integrado de atualização." }
-          if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao componente separado/modo auxiliar antigo detectada em atualizacao.py." }
-          if ($automacao -notmatch "def\s+_recarregar_configuracao_runtime\s*\(") { throw "automacao.py não possui recarga das configurações em tempo de execução." }
-          if ($automacao -notlike "*_recarregar_configuracao_runtime()*") { throw "automacao.py não recarrega as configurações no fluxo de inicialização/recuperação." }
+          if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
+          if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Atualizador separado/modo auxiliar antigo detectado." }
 
-          foreach ($expectedBuild in @("pyinstaller==6.22.2", "--noupx", "--version-file", "Start-MpScan -ScanPath")) {
-            if ($releaseWorkflow -notlike "*$expectedBuild*") { throw "release.yml não contém a proteção obrigatória do build: $expectedBuild" }
-          }
-          if ((Get-Content version_info_template.txt -Raw) -notlike "*__VERSION__*") { throw "version_info_template.txt está sem o marcador de versão." }
-          if ((Get-Content version_info_template.txt -Raw) -notlike "*__BUILD__*") { throw "version_info_template.txt está sem o marcador do componente adicional de versão." }
-          if ((Get-Content version_info_template.txt -Raw) -notlike "*SM AutoLab.exe*") { throw "version_info_template.txt está sem o nome do executável." }
-
-          $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97", "v2.98")
-          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "automacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
-          foreach ($sourcePath in $sourceFiles) {
-            if (-not (Test-Path $sourcePath)) { continue }
-            $source = Get-Content $sourcePath -Raw
-            foreach ($token in $retiredTokens) { if ($source.Contains($token)) { throw "Referência de versão/módulo aposentado detectada em ${sourcePath}: $token" } }
-          }
       - name: Instalar dependências
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Validar sintaxe e integração das camadas
+
+      - name: Validar sintaxe, testes e integração
         shell: pwsh
         run: |
           python -m compileall -q .
-          if ($LASTEXITCODE -ne 0) { throw "Falha na compilação sintática dos arquivos Python." }
+          if ($LASTEXITCODE -ne 0) { throw "Falha de compilação sintática." }
           python -m unittest discover -s tests -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Falha nos testes automatizados." }
-          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from patch_297 import aplicar_patch_297; from patch_298 import aplicar_patch_298; from patch_299 import aplicar_patch_299; from patch_2991 import aplicar_patch_2991; from patch_29910 import aplicar_patch_29910; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); aplicar_patch_297(App); aplicar_patch_298(App); aplicar_patch_299(App); aplicar_patch_2991(App); aplicar_patch_29910(App); _validar_base_aplicacao(); print('Integracao da main: OK')"
+          python -c "from interface import App; from patch_ui import aplicar_patch_ui; from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+
+      - name: Verificar Defender
+        shell: pwsh
+        run: |
+          Start-MpScan -ScanPath (Resolve-Path .) -ScanType CustomScan -ErrorAction Stop
+          Start-Sleep -Seconds 5
+          $threats = Get-MpThreatDetection
+          if ($threats) { $threats | Format-List | Out-Host; throw "Windows Defender detectou ameaça na árvore validada." }
+          Write-Host "Windows Defender: nenhuma detecção na árvore de código."

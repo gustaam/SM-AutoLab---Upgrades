@@ -1,17 +1,16 @@
-SM AutoLab — Base estável
+SM AutoLab — mapa de integração atual
 
-Este arquivo documenta a composição funcional da base atual. A versão vigente é definida exclusivamente por VERSION; hashes históricos não são usados para decidir qual código entra em um release.
+patch_base.py
+Camada-base neutra do aplicativo.
 
-Componentes principais:
-- main.py — ponto de entrada e validação de integridade;
-- interface.py — interface Fluent 2, calendário nativo e interação da planilha;
-- patch_base.py — camada de compatibilidade da base;
-- patch_arquivos.py — camada de Arquivos/calendário;
-- patch_ajustes.py — ajustes gerais da interface;
-- patch_ui.py — ponto único de integração das correções versionadas da interface, incluindo Histórico, Arquivos, seleção de planilha, contador de códigos e sincronização das datas selecionadas;
-- patch_297.py, patch_298.py, patch_299.py, patch_2991.py e patch_29910.py — implementações internas das correções atualmente consolidadas pelo ponto único patch_ui.py;
-- atualizacao.py — mecanismo integrado de atualização;
-- build_windows.bat — build local validado;
-- .github/workflows/release.yml — pipeline de release.
+patch_arquivos.py
+Camada neutra de Arquivos/calendário e estado de seleção.
 
-A entrada da aplicação utiliza exclusivamente patch_ui.py para aplicar as correções versionadas. A numeração dos arquivos de implementação não determina a versão da aplicação. Releases devem sempre ser gerados a partir da referência exata que contém o VERSION correspondente à tag.
+patch_ajustes.py
+Ajustes gerais de interface e comportamento.
+
+patch_ui.py
+Ponto único de integração das correções de interface. Consolida fisicamente as camadas históricas da interface, preservando sua ordem de aplicação.
+
+atualizacao.py
+Motor integrado de atualização do próprio executável.

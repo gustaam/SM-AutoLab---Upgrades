@@ -26,3 +26,8 @@ Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a decla
 ## Build e releases
 
 Antes de qualquer release, a validação da `main` confere a estrutura atual, os componentes obrigatórios, a ausência de referências legadas, a sintaxe e a integração das camadas. O workflow de release exige que a tag aponte exatamente para a `main` validada, compara a tag com `VERSION`, gera somente o aplicativo principal e seu manifesto. A atualização automática é integrada ao próprio executável e verifica o manifesto, a versão superior e o SHA-256 antes de substituir a instalação.
+
+
+## Arquitetura consolidada
+
+As correções de interface ficam concentradas em `patch_ui.py`. `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` permanecem separados por serem camadas-base/neutras.
