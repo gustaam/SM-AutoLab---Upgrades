@@ -7,13 +7,11 @@ Componentes principais:
 - interface.py — interface Fluent 2, calendário nativo e interação da planilha;
 - patch_base.py — camada de compatibilidade da base;
 - patch_arquivos.py — camada de Arquivos/calendário;
-- patch_297.py — correções de interface e menu de contexto;
-- patch_298.py — Histórico de erros e Arquivos ilimitados;
-- patch_299.py — estabilidade das pastas, hover e desseleção externa;
-- patch_2991.py — seleção/edição estilo planilha, contador de códigos e ajustes do calendário/Histórico;
-- patch_29910.py — sincronização robusta do contador de datas selecionadas em Arquivos;
+- patch_ajustes.py — ajustes gerais da interface;
+- patch_ui.py — ponto único de integração das correções versionadas da interface, incluindo Histórico, Arquivos, seleção de planilha, contador de códigos e sincronização das datas selecionadas;
+- patch_297.py, patch_298.py, patch_299.py, patch_2991.py e patch_29910.py — implementações internas das correções atualmente consolidadas pelo ponto único patch_ui.py;
 - atualizacao.py — mecanismo integrado de atualização;
 - build_windows.bat — build local validado;
 - .github/workflows/release.yml — pipeline de release.
 
-A numeração dos arquivos de implementação não deve determinar a versão da aplicação. Releases devem sempre ser gerados a partir da referência exata que contém o VERSION correspondente à tag.
+A entrada da aplicação utiliza exclusivamente patch_ui.py para aplicar as correções versionadas. A numeração dos arquivos de implementação não determina a versão da aplicação. Releases devem sempre ser gerados a partir da referência exata que contém o VERSION correspondente à tag.
