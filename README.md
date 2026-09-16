@@ -7,11 +7,11 @@ Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a decla
 ## Arquivos e histórico
 
 - calendário mensal interativo;
-- navegação entre meses dentro da janela de retenção;
+- navegação entre meses conforme o histórico disponível;
 - clique em uma data para listar somente as planilhas salvas naquele dia;
 - botão `← Voltar` para retornar ao calendário;
 - destaque visual para dias com planilhas;
-- retenção de até 60 dias;
+- histórico ilimitado;
 - seleção múltipla de datas;
 - animação/estado visual de seleção;
 - contador de células selecionadas;
@@ -21,7 +21,7 @@ Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a decla
 
 ## Estrutura de manutenção
 
-`main.py` usa `patch.py` como ponto único de entrada das correções consolidadas de interface. As camadas-base `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` permanecem separadas nesta etapa para preservar a ordem de aplicação e reduzir o risco de regressão durante a reorganização. O aplicativo valida a presença das funcionalidades essenciais antes de abrir.
+`main.py` usa `patch.py` como ponto único de entrada das correções. `patch.py` incorpora fisicamente, em namespaces isolados, as antigas camadas `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py`, preservando a ordem histórica de aplicação e evitando alterações de resolução de nomes entre componentes. O aplicativo valida a presença das funcionalidades essenciais antes de abrir.
 
 ## Build e releases
 
@@ -29,4 +29,4 @@ Antes de qualquer release, a validação da `main` confere a estrutura atual, os
 
 ## Arquitetura consolidada
 
-As correções de interface históricas estão reunidas em `patch.py`, que mantém `aplicar_patch_ui` como único ponto chamado por `main.py`. Os módulos auxiliares de base permanecem como dependências internas nesta etapa e não são chamados diretamente pelo ponto de entrada principal.
+Todas as correções de interface históricas estão reunidas em `patch.py`, que mantém `aplicar_patch_ui` como único ponto chamado por `main.py`. Os antigos módulos `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` não fazem mais parte da árvore final; seus conteúdos são preservados internamente em namespaces próprios dentro de `patch.py`.

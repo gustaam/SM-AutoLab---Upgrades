@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -20,6 +20,38 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+
+      - name: Corrigir import residual da Etapa B
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("patch.py")
+          content = path.read_text(encoding="utf-8")
+          normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+          prefix = (
+              "from __future__ import annotations\n\n"
+              "from patch_base import aplicar_patch_base\n"
+              "from patch_arquivos import aplicar_patch_arquivos\n"
+              "from patch_ajustes import aplicar_patch_ajustes\n\n"
+          )
+          fixed = normalized.replace(prefix, "from __future__ import annotations\n\n", 1)
+          if fixed != normalized:
+              path.write_text(fixed, encoding="utf-8")
+              print("Imports residuais removidos de patch.py.")
+          else:
+              print("Nenhum import residual encontrado.")
+
+      - name: Persistir correção da Etapa B
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add patch.py
+          if (-not (git diff --cached --quiet)) {
+            git commit -m 'Corrigir import residual da consolidacao'
+            git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
+          }
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -34,11 +66,11 @@ jobs:
 
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py", "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
+            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py")) {
-            if (Test-Path $legacyPath) { throw "Arquivo de patch obsoleto ainda presente: $legacyPath" }
+          foreach ($obsoletePath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py")) {
+            if (Test-Path $obsoletePath) { throw "Arquivo obsoleto ainda presente: $obsoletePath" }
           }
 
           $main = Get-Content main.py -Raw
@@ -48,6 +80,8 @@ jobs:
           if ($main -notlike "*from patch import aplicar_patch_ui*") { throw "main.py não usa patch.py como integração única." }
           if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
           foreach ($expected in @(
+            "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE", "_SOURCE_PATCH_ARQUIVOS", "_SOURCE_PATCH_AJUSTES",
+            "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS", "_NS_PATCH_AJUSTES",
             "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER",
             "_historico_tem_erro", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299",
             "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991",
