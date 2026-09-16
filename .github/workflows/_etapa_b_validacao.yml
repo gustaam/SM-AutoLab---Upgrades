@@ -39,10 +39,41 @@ jobs:
           foreach ($expected in @("ARQUIVOS_COMPONENT_MARKER","AJUSTES_COMPONENT_MARKER","_SOURCE_PATCH_BASE","_SOURCE_PATCH_ARQUIVOS","_SOURCE_PATCH_AJUSTES","_NS_PATCH_BASE","_NS_PATCH_ARQUIVOS","_NS_PATCH_AJUSTES","PATCH_297_MARKER","PATCH_298_MARKER","PATCH_299_MARKER","PATCH_2991_MARKER","PATCH_29910_MARKER","def aplicar_patch_ui")) { if ($patch -notlike "*$expected*") { throw "patch.py não contém: $expected" } }
           if ($patch -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente." }
 
-      - name: Verificar equivalência byte a byte dos módulos incorporados
+      - name: Verificar equivalência dos módulos incorporados sem importar patch
         shell: pwsh
         run: |
-          python -c "import patch, subprocess, sys; root='.'; expected=[('patch_base.py',patch._SOURCE_PATCH_BASE),('patch_arquivos.py',patch._SOURCE_PATCH_ARQUIVOS),('patch_ajustes.py',patch._SOURCE_PATCH_AJUSTES)]; [sys.exit('Divergência em '+name) for name,actual in expected if actual != subprocess.check_output(['git','show','45e5075e4b6e04f61505f4eb8928678a95d70f0e:'+name], text=True, encoding='utf-8')]; print('Equivalencia exata dos 3 componentes: OK')"
+          @"
+          from pathlib import Path
+          import ast
+          import subprocess
+          import sys
+
+          patch_path = Path('patch.py')
+          tree = ast.parse(patch_path.read_text(encoding='utf-8'), filename='patch.py')
+          assignments = {}
+          for node in tree.body:
+              if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                  name = node.targets[0].id
+                  if name in {'_SOURCE_PATCH_BASE', '_SOURCE_PATCH_ARQUIVOS', '_SOURCE_PATCH_AJUSTES'}:
+                      assignments[name] = node.value
+          names = {
+              '_SOURCE_PATCH_BASE': 'patch_base.py',
+              '_SOURCE_PATCH_ARQUIVOS': 'patch_arquivos.py',
+              '_SOURCE_PATCH_AJUSTES': 'patch_ajustes.py',
+          }
+          if set(assignments) != set(names):
+              raise SystemExit('Nem todas as fontes consolidadas foram encontradas em patch.py')
+          namespace = {}
+          for name, node in assignments.items():
+              namespace[name] = ast.literal_eval(node)
+          for name, path in names.items():
+              original = subprocess.check_output([
+                  'git', 'show', '45e5075e4b6e04f61505f4eb8928678a95d70f0e:' + path
+              ]).decode('utf-8')
+              if namespace[name] != original:
+                  raise SystemExit('Divergência em ' + path)
+          print('Equivalência exata dos 3 componentes: OK')
+          "@ | python
 
       - name: Instalar dependências
         shell: pwsh
