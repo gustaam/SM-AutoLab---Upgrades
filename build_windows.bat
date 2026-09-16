@@ -33,25 +33,21 @@ if not errorlevel 1 (
     echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
     goto :erro
 )
-for %%F in (atualizacao.py patch_base.py patch_arquivos.py patch_ajustes.py patch_297.py patch_298.py patch_299.py patch_2991.py version_info_template.txt) do (
+for %%F in (main.py interface.py app.py automacao.py config.py planilha.py resultados.py splash.py atualizacao.py patch.py VERSION version_info_template.txt) do (
     if not exist "%%F" (
         echo ERRO: %%F nao encontrado.
         goto :erro
     )
 )
-for %%M in ("def aplicar_patch_base" "def aplicar_patch_arquivos" "def aplicar_patch_ajustes" "def aplicar_patch_297" "def aplicar_patch_298" "def aplicar_patch_299" "def aplicar_patch_2991") do (
-    findstr.exe /c:"%%~M" patch_base.py patch_arquivos.py patch_ajustes.py patch_297.py patch_298.py patch_299.py patch_2991.py >nul
-    if errorlevel 1 (
-        echo ERRO: camada obrigatoria ausente: %%~M
-        goto :erro
-    )
+%SystemRoot%\System32\findstr.exe /c:"from patch import aplicar_patch_ui" main.py >nul
+if errorlevel 1 (
+    echo ERRO: main.py nao usa a entrada consolidada patch.py.
+    goto :erro
 )
-for %%M in ("from patch_base import aplicar_patch_base" "from patch_arquivos import aplicar_patch_arquivos" "from patch_ajustes import aplicar_patch_ajustes" "from patch_297 import aplicar_patch_297" "from patch_298 import aplicar_patch_298" "from patch_299 import aplicar_patch_299" "from patch_2991 import aplicar_patch_2991") do (
-    findstr.exe /c:"%%~M" main.py >nul
-    if errorlevel 1 (
-        echo ERRO: main.py nao esta usando a camada atual: %%~M
-        goto :erro
-    )
+%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_ui" patch.py >nul
+if errorlevel 1 (
+    echo ERRO: patch.py nao expoe aplicar_patch_ui.
+    goto :erro
 )
 echo Validacao do codigo-fonte: OK
 echo.
@@ -97,7 +93,13 @@ if errorlevel 1 (
     goto :erro
 )
 
-%PYTHON% -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from patch_297 import aplicar_patch_297; from patch_298 import aplicar_patch_298; from patch_299 import aplicar_patch_299; from patch_2991 import aplicar_patch_2991; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); aplicar_patch_297(App); aplicar_patch_298(App); aplicar_patch_299(App); aplicar_patch_2991(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
+%PYTHON% -m unittest discover -s tests -p "test_*.py" -v
+if errorlevel 1 (
+    echo ERRO: falha nos testes automatizados.
+    goto :erro
+)
+
+%PYTHON% -c "from interface import App; from patch import aplicar_patch_ui; from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao(); print('Integracao da base: OK')"
 if errorlevel 1 (
     echo ERRO: falha na integracao das camadas da base.
     goto :erro
