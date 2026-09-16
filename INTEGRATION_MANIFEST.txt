@@ -1,16 +1,16 @@
 SM AutoLab — mapa de integração atual
 
+patch.py
+Ponto único de entrada das correções consolidadas de interface. Mantém a ordem de aplicação das camadas históricas e é o único módulo de patches importado por main.py.
+
 patch_base.py
-Camada-base neutra do aplicativo.
+Camada-base neutra do aplicativo, usada internamente pelo ponto de entrada consolidado.
 
 patch_arquivos.py
-Camada neutra de Arquivos/calendário e estado de seleção.
+Camada neutra de Arquivos/calendário e estado de seleção, usada internamente pelo ponto de entrada consolidado.
 
 patch_ajustes.py
-Ajustes gerais de interface e comportamento.
-
-patch_ui.py
-Ponto único de integração das correções de interface. Consolida fisicamente as camadas históricas da interface, preservando sua ordem de aplicação.
+Ajustes gerais de interface e comportamento, usados internamente pelo ponto de entrada consolidado.
 
 atualizacao.py
 Motor integrado de atualização do próprio executável.
