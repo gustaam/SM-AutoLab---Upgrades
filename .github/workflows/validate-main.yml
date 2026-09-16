@@ -34,11 +34,11 @@ jobs:
 
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py", "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
+            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py")) {
-            if (Test-Path $legacyPath) { throw "Arquivo de patch obsoleto ainda presente: $legacyPath" }
+          foreach ($obsoletePath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py")) {
+            if (Test-Path $obsoletePath) { throw "Arquivo obsoleto ainda presente: $obsoletePath" }
           }
 
           $main = Get-Content main.py -Raw
@@ -48,6 +48,8 @@ jobs:
           if ($main -notlike "*from patch import aplicar_patch_ui*") { throw "main.py não usa patch.py como integração única." }
           if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
           foreach ($expected in @(
+            "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE", "_SOURCE_PATCH_ARQUIVOS", "_SOURCE_PATCH_AJUSTES",
+            "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS", "_NS_PATCH_AJUSTES",
             "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER",
             "_historico_tem_erro", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299",
             "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991",
