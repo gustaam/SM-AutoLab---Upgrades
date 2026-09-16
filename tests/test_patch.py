@@ -19,6 +19,24 @@ class TestPatch(unittest.TestCase):
         ):
             self.assertIn(marker, patch)
 
+    def test_ponto_de_entrada_atualizado(self):
+        root = Path(__file__).resolve().parents[1]
+        main = (root / "main.py").read_text(encoding="utf-8")
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+        atualizacao = (root / "atualizacao.py").read_text(encoding="utf-8")
+        build = (root / "build_windows.bat").read_text(encoding="utf-8")
+        self.assertIn("from patch import aplicar_patch_ui", main)
+        for content in (main, interface, atualizacao, build):
+            self.assertNotIn("from patch_base import", content)
+            self.assertNotIn("from patch_arquivos import", content)
+            self.assertNotIn("from patch_ajustes import", content)
+        self.assertIn("from patch import aplicar_patch_ui", build)
+
+    def test_artifacts_temporarios_da_etapa_b_nao_existirem(self):
+        root = Path(__file__).resolve().parents[1]
+        self.assertFalse((root / ".etapa-b-trigger").exists())
+        self.assertFalse((root / ".github" / "workflows" / "_fix_patch_b_import.yml").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
