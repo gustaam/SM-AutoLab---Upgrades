@@ -1,6 +1,6 @@
 from splash import run_splash
 from interface import App
-from patch_ui import aplicar_patch_ui
+from patch import aplicar_patch_ui
 
 _REQUIRED_BASE_METHODS = (
     "abrir_historico_planilha",
