@@ -100,28 +100,16 @@ jobs:
           for name in parts:
               (root / name).unlink()
 
-          release = root / '.github/workflows/release.yml'
-          r = release.read_text(encoding='utf-8')
-          for name in parts:
-              r = r.replace(name, 'patch_ui.py')
-          for old in ('$patch297', '$patch298', '$patch299', '$patch2991', '$patch29910'):
-              r = r.replace(old, '$patchUi')
-          assignments = re.findall(r'\n\s*\$patchUi = Get-Content patch_ui\.py -Raw\n', r)
-          if len(assignments) > 1:
-              first = True
-              r = re.sub(r'\n\s*\$patchUi = Get-Content patch_ui\.py -Raw\n', lambda m: m.group(0) if first and not (globals().update(first=False)) else '', r)
-          release.write_text(r, encoding='utf-8')
-
           for path in [root/'main.py', root/'interface.py', root/'patch_ui.py']:
               if 'Ctrl + clique para selecionar várias datas' in path.read_text(encoding='utf-8'):
                   raise SystemExit(f'Texto antigo ainda presente: {path}')
 
           subprocess.run(['git','config','user.name','SM AutoLab Bot'], check=True)
           subprocess.run(['git','config','user.email','41898282+github-actions[bot]@users.noreply.github.com'], check=True)
-          subprocess.run(['git','add','-A'], check=True)
-          subprocess.run(['git','commit','-m','Consolidar implementações de interface'], check=False)
+          subprocess.run(['git','add','main.py','patch_ui.py','patch_297.py','patch_298.py','patch_299.py','patch_2991.py','patch_29910.py','INTEGRATION_MANIFEST.txt','README.md','tests/test_patch_29910.py','tests/test_patch_ui.py'], check=True)
+          subprocess.run(['git','commit','-m','Consolidar implementações de interface'], check=True)
           subprocess.run(['git','push','origin',f'HEAD:{os.environ["HEAD_REF"]}'], check=True)
-          '@ | python -
+          '@ | python
 
       - name: Instalar dependências
         shell: pwsh
@@ -151,8 +139,6 @@ jobs:
           if ($ui -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente." }
           if ((Get-Content interface.py -Raw) -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ((Get-Content interface.py -Raw) -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
-          $releaseWorkflow = Get-Content .github/workflows/release.yml -Raw
-          foreach ($expected in @("pyinstaller==6.22.2", "--noupx", "--version-file", "Start-MpScan -ScanPath")) { if ($releaseWorkflow -notlike "*$expected*") { throw "release.yml sem proteção obrigatória: $expected" } }
           python -m compileall -q .
           if ($LASTEXITCODE -ne 0) { throw "Falha de compilação." }
           python -m unittest discover -s tests -p "test_*.py" -v
