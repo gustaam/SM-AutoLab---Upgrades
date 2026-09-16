@@ -34,18 +34,18 @@ jobs:
 
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py", "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_ui.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
+            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py")) {
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py")) {
             if (Test-Path $legacyPath) { throw "Arquivo de patch obsoleto ainda presente: $legacyPath" }
           }
 
           $main = Get-Content main.py -Raw
-          $ui = Get-Content patch_ui.py -Raw
+          $patch = Get-Content patch.py -Raw
           $interface = Get-Content interface.py -Raw
           $atualizacao = Get-Content atualizacao.py -Raw
-          if ($main -notlike "*from patch_ui import aplicar_patch_ui*") { throw "main.py não usa patch_ui.py como integração única." }
+          if ($main -notlike "*from patch import aplicar_patch_ui*") { throw "main.py não usa patch.py como integração única." }
           if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
           foreach ($expected in @(
             "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER",
@@ -53,8 +53,8 @@ jobs:
             "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991",
             "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910",
             "def aplicar_patch_ui"
-          )) { if ($ui -notlike "*$expected*") { throw "patch_ui.py não contém: $expected" } }
-          if ($ui -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente em patch_ui.py." }
+          )) { if ($patch -notlike "*$expected*") { throw "patch.py não contém: $expected" } }
+          if ($patch -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente em patch.py." }
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Atualizador separado/modo auxiliar antigo detectado." }
@@ -72,7 +72,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Falha de compilação sintática." }
           python -m unittest discover -s tests -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Falha nos testes automatizados." }
-          python -c "from interface import App; from patch_ui import aplicar_patch_ui; from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+          python -c "from interface import App; from patch import aplicar_patch_ui; from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
 
       - name: Verificar Defender
         shell: pwsh
