@@ -90,7 +90,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Falha na compilação sintática." }
           python -m unittest discover -s tests -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Falha nos testes automatizados." }
-          python -c "from interface import App; from patch import aplicar_patch_ui; from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+          python -c "from interface import App; from patch import aplicar_patch_ui; from main import _corrigir_historico_ilimitado, _validar_base_aplicacao; aplicar_patch_ui(App); _corrigir_historico_ilimitado(); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
 
       - name: Preparar metadados do executável
         shell: pwsh
