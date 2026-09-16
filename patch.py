@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from patch_base import aplicar_patch_base
-from patch_arquivos import aplicar_patch_arquivos
-from patch_ajustes import aplicar_patch_ajustes
-
 def _load_patch_namespace(name, source):
     namespace = {"__name__": name, "__file__": name}
     exec(compile(source, name, "exec"), namespace)
