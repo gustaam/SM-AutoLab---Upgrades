@@ -1,0 +1,104 @@
+name: Etapa B - consolidacao automatica
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  consolidar:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - name: Checkout branch do PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Consolidar modulos restantes em patch.py
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          root = Path.cwd()
+          patch = root / 'patch.py'
+          base = root / 'patch_base.py'
+          arquivos = root / 'patch_arquivos.py'
+          ajustes = root / 'patch_ajustes.py'
+
+          if not (base.exists() and arquivos.exists() and ajustes.exists()):
+              print('Etapa B ja consolidada ou arquivos de origem ausentes; nada a fazer.')
+              raise SystemExit(0)
+
+          patch_text = patch.read_text(encoding='utf-8')
+          sources = {
+              'base': base.read_text(encoding='utf-8'),
+              'arquivos': arquivos.read_text(encoding='utf-8'),
+              'ajustes': ajustes.read_text(encoding='utf-8'),
+          }
+
+          patch_text = re.sub(
+              r'^from patch_base import aplicar_patch_base\nfrom patch_arquivos import aplicar_patch_arquivos\nfrom patch_ajustes import aplicar_patch_ajustes\n\n',
+              '',
+              patch_text,
+              count=1,
+          )
+
+          if '_SOURCE_PATCH_BASE' not in patch_text:
+              marker = '\n_SOURCE_PATCH_297 = '
+              idx = patch_text.find(marker)
+              if idx < 0:
+                  raise RuntimeError('Nao foi encontrado o ponto de insercao dos patches legados em patch.py')
+              bloco = (
+                  '\n# Componentes originalmente separados: mantidos em namespaces isolados para preservar exatamente a ordem e a resolucao de nomes.\n'
+                  '_SOURCE_PATCH_BASE = ' + repr(sources['base']) + '\n'
+                  '_NS_PATCH_BASE = _load_patch_namespace("patch_base.py", _SOURCE_PATCH_BASE)\n'
+                  '_SOURCE_PATCH_ARQUIVOS = ' + repr(sources['arquivos']) + '\n'
+                  '_NS_PATCH_ARQUIVOS = _load_patch_namespace("patch_arquivos.py", _SOURCE_PATCH_ARQUIVOS)\n'
+                  '_SOURCE_PATCH_AJUSTES = ' + repr(sources['ajustes']) + '\n'
+                  '_NS_PATCH_AJUSTES = _load_patch_namespace("patch_ajustes.py", _SOURCE_PATCH_AJUSTES)\n'
+              )
+              patch_text = patch_text[:idx] + bloco + patch_text[idx:]
+
+          start = patch_text.find('\ndef aplicar_patch_ui(App):')
+          if start < 0:
+              raise RuntimeError('Funcao aplicar_patch_ui nao encontrada em patch.py')
+
+          novo_final = '''\ndef aplicar_patch_ui(App):\n    \"\"\"Aplica, em uma unica entrada, todas as correcoes consolidadas da interface.\"\"\"\n    if getattr(App, \"_patch_ui_aplicado\", False):\n        return\n\n    _NS_PATCH_BASE[\"aplicar_patch_base\"](App)\n    _NS_PATCH_ARQUIVOS[\"aplicar_patch_arquivos\"](App)\n    _NS_PATCH_AJUSTES[\"aplicar_patch_ajustes\"](App)\n    _NS_PATCH_297[\"aplicar_patch_297\"](App)\n    _NS_PATCH_298[\"aplicar_patch_298\"](App)\n    _NS_PATCH_299[\"aplicar_patch_299\"](App)\n    _NS_PATCH_2991[\"aplicar_patch_2991\"](App)\n    _NS_PATCH_29910[\"aplicar_patch_29910\"](App)\n    App._patch_ui_aplicado = True\n\n\n# Exports usados pelos testes e pela camada de validacao.\n_atualizar_contador_selecao_29910 = _NS_PATCH_29910[\"_atualizar_contador_selecao_29910\"]\n_ensure_selection_state_29910 = _NS_PATCH_29910[\"_ensure_selection_state_29910\"]\n'''
+          patch_text = patch_text[:start] + novo_final
+
+          patch.write_text(patch_text, encoding='utf-8')
+
+          for path in (base, arquivos, ajustes):
+              path.unlink()
+
+          print('Consolidacao fisica concluida.')
+
+      - name: Validar estrutura consolidada
+        shell: pwsh
+        run: |
+          if (Test-Path patch_base.py) { throw 'patch_base.py ainda existe' }
+          if (Test-Path patch_arquivos.py) { throw 'patch_arquivos.py ainda existe' }
+          if (Test-Path patch_ajustes.py) { throw 'patch_ajustes.py ainda existe' }
+          if (-not (Test-Path patch.py)) { throw 'patch.py ausente' }
+          Select-String -Path patch.py -Pattern '_SOURCE_PATCH_BASE','_SOURCE_PATCH_ARQUIVOS','_SOURCE_PATCH_AJUSTES','_NS_PATCH_BASE','_NS_PATCH_ARQUIVOS','_NS_PATCH_AJUSTES' -SimpleMatch -Quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Marcadores da consolidacao nao encontrados' }
+
+      - name: Commitar consolidacao
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add patch.py patch_base.py patch_arquivos.py patch_ajustes.py
+          if (-not (git diff --cached --quiet)) {
+            git commit -m 'Consolidar componentes restantes em patch'
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          } else {
+            Write-Host 'Nenhuma alteracao para commitar.'
+          }
