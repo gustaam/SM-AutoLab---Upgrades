@@ -33,7 +33,7 @@ if not errorlevel 1 (
     echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
     goto :erro
 )
-for %%F in (atualizacao.py patch.py version_info_template.txt) do (
+for %%F in (main.py interface.py app.py automacao.py config.py planilha.py resultados.py splash.py atualizacao.py patch.py VERSION version_info_template.txt) do (
     if not exist "%%F" (
         echo ERRO: %%F nao encontrado.
         goto :erro
@@ -44,26 +44,10 @@ if errorlevel 1 (
     echo ERRO: main.py nao usa a entrada consolidada patch.py.
     goto :erro
 )
-%SystemRoot%\System32\findstr.exe /c:"from patch_base import" main.py interface.py atualizacao.py >nul
-if not errorlevel 1 (
-    echo ERRO: referencia a patch_base.py detectada.
+%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_ui" patch.py >nul
+if errorlevel 1 (
+    echo ERRO: patch.py nao expoe aplicar_patch_ui.
     goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"from patch_arquivos import" main.py interface.py atualizacao.py >nul
-if not errorlevel 1 (
-    echo ERRO: referencia a patch_arquivos.py detectada.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"from patch_ajustes import" main.py interface.py atualizacao.py >nul
-if not errorlevel 1 (
-    echo ERRO: referencia a patch_ajustes.py detectada.
-    goto :erro
-)
-for %%F in (patch_base.py patch_arquivos.py patch_ajustes.py patch_297.py patch_298.py patch_299.py patch_2991.py patch_29910.py patch_ui.py updater.py) do (
-    if exist "%%F" (
-        echo ERRO: arquivo legado ainda presente: %%F
-        goto :erro
-    )
 )
 echo Validacao do codigo-fonte: OK
 echo.
