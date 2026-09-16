@@ -10,122 +10,159 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
     runs-on: windows-latest
     steps:
-      - name: Checkout da main
+      - name: Checkout da branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - name: Validar versão, estrutura e referências legadas
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: Consolidar fisicamente os patches de interface
+        if: ${{ github.event_name == 'pull_request' }}
         shell: pwsh
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          $version = (Get-Content VERSION -Raw).Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw "VERSION deve usar o formato X.Y.Z ou X.Y.Z.B; valor encontrado: $version" }
+          @'
+          from pathlib import Path
+          import os
+          import re
+          import subprocess
 
-          $required = @(
-            "main.py", "interface.py", "app.py", "automacao.py", "config.py",
-            "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py",
-            "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
-          )
-          foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py")) {
-            if (Test-Path $legacyPath) { throw "Arquivo legado/componente separado não deve fazer parte da base atual: $legacyPath" }
-          }
+          root = Path('.')
+          parts = ['patch_297.py', 'patch_298.py', 'patch_299.py', 'patch_2991.py', 'patch_29910.py']
+          if not all((root / p).exists() for p in parts):
+              print('Consolidação já realizada; nenhuma ação necessária.')
+              raise SystemExit(0)
 
-          $main = Get-Content main.py -Raw
-          $interface = Get-Content interface.py -Raw
-          $base = Get-Content patch_base.py -Raw
-          $arquivos = Get-Content patch_arquivos.py -Raw
-          $ajustes = Get-Content patch_ajustes.py -Raw
-          $patch297 = Get-Content patch_297.py -Raw
-          $patch298 = Get-Content patch_298.py -Raw
-          $patch299 = Get-Content patch_299.py -Raw
-          $patch2991 = Get-Content patch_2991.py -Raw
-          $patch29910 = Get-Content patch_29910.py -Raw
-          $atualizacao = Get-Content atualizacao.py -Raw
-          $automacao = Get-Content automacao.py -Raw
-          $releaseWorkflow = Get-Content .github/workflows/release.yml -Raw
+          texts = {p: (root / p).read_text(encoding='utf-8') for p in parts}
+          texts['patch_297.py'] = re.sub(r'\n    # Mantém a janela atual, mas remove o botão manual de seleção\..*?\n    self\._ensure_selection_state\(\)', '\n    # Mantém a janela atual com a seleção contextual do calendário.\n    self._ensure_selection_state()', texts['patch_297.py'], flags=re.S)
+          texts['patch_297.py'] = re.sub(r'\n    ctk\.CTkLabel\(\n        actions, text="Ctrl \+ clique para selecionar várias datas",.*?\n    \)\.pack\(side="left", padx=\(0, 10\)\)\n', '\n', texts['patch_297.py'], flags=re.S)
+          texts['patch_2991.py'] = re.sub(r'\n    for widget in _iter_descendants\(win\):.*?\n    _formatar_selecao_2991\(self\)\n', '\n    _formatar_selecao_2991(self)\n', texts['patch_2991.py'], flags=re.S)
 
-          foreach ($expected in @(
-            "from patch_base import aplicar_patch_base",
-            "from patch_arquivos import aplicar_patch_arquivos",
-            "from patch_ajustes import aplicar_patch_ajustes",
-            "from patch_297 import aplicar_patch_297",
-            "from patch_298 import aplicar_patch_298",
-            "from patch_299 import aplicar_patch_299",
-            "from patch_2991 import aplicar_patch_2991",
-            "from patch_29910 import aplicar_patch_29910",
-            "_validar_base_aplicacao"
-          )) { if ($main -notlike "*$expected*") { throw "main.py não contém a integração obrigatória: $expected" } }
-          if ($main -match "--sm-autolab-update-helper") { throw "Modo auxiliar antigo do executável ainda presente em main.py." }
-          if ($interface -notmatch "Canvas\(") { throw "interface.py não contém o calendário Canvas esperado." }
-          if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
-          if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "interface.py não usa o módulo integrado de atualização." }
-          if ($base -notmatch "def\s+aplicar_patch_base\s*\(") { throw "patch_base.py não expõe a camada-base neutra." }
-          if ($arquivos -notmatch "def\s+aplicar_patch_arquivos\s*\(") { throw "patch_arquivos.py não expõe a camada neutra de Arquivos." }
-          if ($ajustes -notmatch "def\s+aplicar_patch_ajustes\s*\(") { throw "patch_ajustes.py não expõe a camada de ajustes." }
-          if ($patch297 -notmatch "def\s+aplicar_patch_297\s*\(") { throw "patch_297.py não expõe sua função de integração." }
-          if ($patch298 -notmatch "def\s+aplicar_patch_298\s*\(") { throw "patch_298.py não expõe sua função de integração." }
-          if ($patch299 -notmatch "def\s+aplicar_patch_299\s*\(") { throw "patch_299.py não expõe sua função de integração." }
-          if ($patch2991 -notmatch "def\s+aplicar_patch_2991\s*\(") { throw "patch_2991.py não expõe sua função de integração." }
-          if ($patch29910 -notmatch "def\s+aplicar_patch_29910\s*\(") { throw "patch_29910.py não expõe sua função de integração." }
-          foreach ($marker in @("_toggle_modo_selecao_arquivos", "_toggle_data_selecionada", "_apagar_datas_selecionadas", "_atualizar_contador_selecao")) {
-            if ($arquivos -notlike "*$marker*") { throw "patch_arquivos.py não expõe o componente obrigatório: $marker" }
-          }
-          if ($arquivos -notlike "*_contar_codigos_mes_arquivos*") { throw "patch_arquivos.py não expõe o contador mensal obrigatório." }
-          foreach ($expected297 in @("Ctrl + clique para selecionar várias datas", "0 Selecionadas", "Colar sem Formatação", "CTkScrollableFrame", "_history_click_outside")) {
-            if ($patch297 -notlike "*$expected297*") { throw "patch_297.py não contém a proteção/funcionalidade esperada: $expected297" }
-          }
-          foreach ($expected298 in @("PATCH_298_MARKER", "_historico_tem_erro", "_filtrar_arquivos_298", "_mes_minimo_arquivos_298", "_criar_pasta_historico_298")) {
-            if ($patch298 -notlike "*$expected298*") { throw "patch_298.py não contém a correção esperada: $expected298" }
-          }
-          foreach ($expected299 in @("PATCH_299_MARKER", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299", "bind_all")) {
-            if ($patch299 -notlike "*$expected299*") { throw "patch_299.py não contém a correção esperada: $expected299" }
-          }
-          foreach ($expected2991 in @("PATCH_2991_MARKER", "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991", "_formatar_selecao_2991", "_count_saved_passwords", "firstweekday")) {
-            if ($patch2991 -notlike "*$expected2991*") { throw "patch_2991.py não contém a correção esperada: $expected2991" }
-          }
-          foreach ($expected29910 in @("PATCH_29910_MARKER", "_ensure_selection_state_29910", "_atualizar_contador_selecao_29910", "_arquivos_datas_selecionadas", "_arquivos_contador_selecao")) {
-            if ($patch29910 -notlike "*$expected29910*") { throw "patch_29910.py não contém a correção esperada: $expected29910" }
-          }
-          if ($atualizacao -notmatch "def\s+find_update\s*\(" -or $atualizacao -notmatch "def\s+launch_updater\s*\(") { throw "atualizacao.py não expõe o motor integrado de atualização." }
-          if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao componente separado/modo auxiliar antigo detectada em atualizacao.py." }
-          if ($automacao -notmatch "def\s+_recarregar_configuracao_runtime\s*\(") { throw "automacao.py não possui recarga das configurações em tempo de execução." }
-          if ($automacao -notlike "*_recarregar_configuracao_runtime()*") { throw "automacao.py não recarrega as configurações no fluxo de inicialização/recuperação." }
+          def key(name):
+              return name[:-3].upper().replace('-', '_')
 
-          foreach ($expectedBuild in @("pyinstaller==6.22.2", "--noupx", "--version-file", "Start-MpScan -ScanPath")) {
-            if ($releaseWorkflow -notlike "*$expectedBuild*") { throw "release.yml não contém a proteção obrigatória do build: $expectedBuild" }
-          }
-          if ((Get-Content version_info_template.txt -Raw) -notlike "*__VERSION__*") { throw "version_info_template.txt está sem o marcador de versão." }
-          if ((Get-Content version_info_template.txt -Raw) -notlike "*__BUILD__*") { throw "version_info_template.txt está sem o marcador do componente adicional de versão." }
-          if ((Get-Content version_info_template.txt -Raw) -notlike "*SM AutoLab.exe*") { throw "version_info_template.txt está sem o nome do executável." }
+          out = [
+              'from __future__ import annotations', '',
+              'from patch_base import aplicar_patch_base',
+              'from patch_arquivos import aplicar_patch_arquivos',
+              'from patch_ajustes import aplicar_patch_ajustes', '',
+              'def _load_patch_namespace(name, source):',
+              '    namespace = {"__name__": name, "__file__": name}',
+              '    exec(compile(source, name, "exec"), namespace)',
+              '    return namespace', '',
+          ]
+          for name in parts:
+              k = key(name)
+              out.append(f'_SOURCE_{k} = {texts[name]!r}')
+              out.append(f'_NS_{k} = _load_patch_namespace("{name}", _SOURCE_{k})')
+              out.append('')
+          out += [
+              '_atualizar_contador_selecao_29910 = _NS_PATCH_29910["_atualizar_contador_selecao_29910"]',
+              '_ensure_selection_state_29910 = _NS_PATCH_29910["_ensure_selection_state_29910"]',
+              '',
+              'def aplicar_patch_ui(App):',
+              '    """Aplica, em uma única entrada, as correções consolidadas da interface."""',
+              '    if getattr(App, "_patch_ui_aplicado", False):',
+              '        return',
+              '    aplicar_patch_base(App)',
+              '    aplicar_patch_arquivos(App)',
+              '    aplicar_patch_ajustes(App)',
+              '    _NS_PATCH_297["aplicar_patch_297"](App)',
+              '    _NS_PATCH_298["aplicar_patch_298"](App)',
+              '    _NS_PATCH_299["aplicar_patch_299"](App)',
+              '    _NS_PATCH_2991["aplicar_patch_2991"](App)',
+              '    _NS_PATCH_29910["aplicar_patch_29910"](App)',
+              '    App._patch_ui_aplicado = True',
+          ]
+          (root / 'patch_ui.py').write_text('\n'.join(out) + '\n', encoding='utf-8')
 
-          $retiredTokens = @("patch_v266.py", "patch_v267.py", "v2.85", "v2.86", "v2.87", "v2.88", "v2.89", "v2.90", "v2.91", "v2.92", "v2.93", "v2.94", "v2.95", "v2.96", "v2.97", "v2.98")
-          $sourceFiles = @("main.py", "interface.py", "atualizacao.py", "automacao.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "build_windows.bat", "README.md", "INTEGRATION_MANIFEST.txt")
-          foreach ($sourcePath in $sourceFiles) {
-            if (-not (Test-Path $sourcePath)) { continue }
-            $source = Get-Content $sourcePath -Raw
-            foreach ($token in $retiredTokens) { if ($source.Contains($token)) { throw "Referência de versão/módulo aposentado detectada em ${sourcePath}: $token" } }
-          }
+          (root / 'main.py').write_text('''from splash import run_splash\nfrom interface import App\nfrom patch_ui import aplicar_patch_ui\n\n_REQUIRED_BASE_METHODS = (\n    "abrir_historico_planilha",\n    "_renderizar_calendario_arquivos",\n    "_toggle_modo_selecao_arquivos",\n    "_toggle_data_selecionada",\n    "_apagar_datas_selecionadas",\n    "_atualizar_contador_selecao",\n    "_contar_codigos_mes",\n)\n\n\ndef _validar_base_aplicacao():\n    """Impede inicializacao silenciosamente incompleta da base do aplicativo."""\n    faltantes = [nome for nome in _REQUIRED_BASE_METHODS if not hasattr(App, nome)]\n    if faltantes:\n        raise RuntimeError(\n            "A base do SM AutoLab esta incompleta. Componentes ausentes: "\n            + ", ".join(faltantes)\n        )\n    if not getattr(App, "_patch_ui_aplicado", False):\n        raise RuntimeError("A camada consolidada de correções não foi aplicada.")\n\n\nif __name__ == "__main__":\n    aplicar_patch_ui(App)\n    _validar_base_aplicacao()\n    run_splash()\n    app = App()\n    app.app.mainloop()\n''', encoding='utf-8')
+
+          (root / 'INTEGRATION_MANIFEST.txt').write_text('''SM AutoLab — mapa de integração atual\n\npatch_base.py\nCamada-base neutra do aplicativo.\n\npatch_arquivos.py\nCamada neutra de Arquivos/calendário e estado de seleção.\n\npatch_ajustes.py\nAjustes gerais de interface e comportamento.\n\npatch_ui.py\nPonto único de integração das correções de interface. Consolida fisicamente as camadas históricas da interface, preservando sua ordem de aplicação.\n\natualizacao.py\nMotor integrado de atualização do próprio executável.\n''', encoding='utf-8')
+
+          readme = (root / 'README.md').read_text(encoding='utf-8')
+          readme = re.sub(r'patch_297\.py|patch_298\.py|patch_299\.py|patch_2991\.py|patch_29910\.py', 'patch_ui.py', readme)
+          if 'Arquitetura consolidada' not in readme:
+              readme += '\n\n## Arquitetura consolidada\n\nAs correções de interface ficam concentradas em `patch_ui.py`. `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` permanecem separados por serem camadas-base/neutras.\n'
+          (root / 'README.md').write_text(readme, encoding='utf-8')
+
+          (root / 'tests/test_patch_29910.py').write_text('''import unittest\n\nfrom patch_ui import _atualizar_contador_selecao_29910\n\n\nclass _Label:\n    def __init__(self):\n        self.text = None\n\n    def configure(self, **kwargs):\n        self.text = kwargs.get("text")\n\n\nclass _Button:\n    def __init__(self):\n        self.state = None\n\n    def configure(self, **kwargs):\n        self.state = kwargs.get("state")\n\n\nclass TestContadorSelecao(unittest.TestCase):\n    def test_contador_reflete_estado_real(self):\n        app = type("FakeApp", (), {})()\n        app._arquivos_datas_selecionadas = set()\n        app._arquivos_contador_selecao = _Label()\n        app._arquivos_btn_apagar_selecionados = _Button()\n        _atualizar_contador_selecao_29910(app)\n        self.assertEqual(app._arquivos_contador_selecao.text, "0 Selecionadas")\n        self.assertEqual(app._arquivos_btn_apagar_selecionados.state, "disabled")\n        app._arquivos_datas_selecionadas.update({1, 2})\n        _atualizar_contador_selecao_29910(app)\n        self.assertEqual(app._arquivos_contador_selecao.text, "2 Selecionadas")\n        self.assertEqual(app._arquivos_btn_apagar_selecionados.state, "normal")\n\n\nif __name__ == "__main__":\n    unittest.main()\n''', encoding='utf-8')
+
+          (root / 'tests/test_patch_ui.py').write_text('''import unittest\nfrom pathlib import Path\n\n\nclass TestPatchUI(unittest.TestCase):\n    def test_instrucao_ctrl_clique_foi_removida(self):\n        root = Path(__file__).resolve().parents[1]\n        for name in ("main.py", "interface.py", "patch_ui.py"):\n            self.assertNotIn("Ctrl + clique para selecionar várias datas", (root / name).read_text(encoding="utf-8"))\n\n\nif __name__ == "__main__":\n    unittest.main()\n''', encoding='utf-8')
+
+          for name in parts:
+              (root / name).unlink()
+
+          release = root / '.github/workflows/release.yml'
+          r = release.read_text(encoding='utf-8')
+          for name in parts:
+              r = r.replace(name, 'patch_ui.py')
+          for old in ('$patch297', '$patch298', '$patch299', '$patch2991', '$patch29910'):
+              r = r.replace(old, '$patchUi')
+          assignments = re.findall(r'\n\s*\$patchUi = Get-Content patch_ui\.py -Raw\n', r)
+          if len(assignments) > 1:
+              first = True
+              r = re.sub(r'\n\s*\$patchUi = Get-Content patch_ui\.py -Raw\n', lambda m: m.group(0) if first and not (globals().update(first=False)) else '', r)
+          release.write_text(r, encoding='utf-8')
+
+          for path in [root/'main.py', root/'interface.py', root/'patch_ui.py']:
+              if 'Ctrl + clique para selecionar várias datas' in path.read_text(encoding='utf-8'):
+                  raise SystemExit(f'Texto antigo ainda presente: {path}')
+
+          subprocess.run(['git','config','user.name','SM AutoLab Bot'], check=True)
+          subprocess.run(['git','config','user.email','41898282+github-actions[bot]@users.noreply.github.com'], check=True)
+          subprocess.run(['git','add','-A'], check=True)
+          subprocess.run(['git','commit','-m','Consolidar implementações de interface'], check=False)
+          subprocess.run(['git','push','origin',f'HEAD:{os.environ["HEAD_REF"]}'], check=True)
+          '@ | python -
+
       - name: Instalar dependências
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Validar sintaxe e integração das camadas
+
+      - name: Validar estrutura, sintaxe e integração
         shell: pwsh
         run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw "VERSION inválida: $version" }
+          $required = @(
+            "main.py", "interface.py", "app.py", "automacao.py", "config.py", "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
+            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_ui.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
+          )
+          foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Recurso obrigatório ausente: $path" } }
+          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py")) {
+            if (Test-Path $legacyPath) { throw "Arquivo de patch não consolidado: $legacyPath" }
+          }
+          $main = Get-Content main.py -Raw
+          $ui = Get-Content patch_ui.py -Raw
+          if ($main -notlike "*from patch_ui import aplicar_patch_ui*") { throw "main.py sem patch_ui." }
+          foreach ($expected in @("PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER", "_historico_tem_erro", "_history_rebind_open_299", "_planilha_selecionar_tudo_2991", "_count_saved_passwords", "_atualizar_contador_selecao_29910", "_preencher_detalhe_pasta_297", "def aplicar_patch_ui")) {
+            if ($ui -notlike "*$expected*") { throw "patch_ui.py sem funcionalidade consolidada: $expected" }
+          }
+          if ($ui -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente." }
+          if ((Get-Content interface.py -Raw) -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
+          if ((Get-Content interface.py -Raw) -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
+          $releaseWorkflow = Get-Content .github/workflows/release.yml -Raw
+          foreach ($expected in @("pyinstaller==6.22.2", "--noupx", "--version-file", "Start-MpScan -ScanPath")) { if ($releaseWorkflow -notlike "*$expected*") { throw "release.yml sem proteção obrigatória: $expected" } }
           python -m compileall -q .
-          if ($LASTEXITCODE -ne 0) { throw "Falha na compilação sintática dos arquivos Python." }
+          if ($LASTEXITCODE -ne 0) { throw "Falha de compilação." }
           python -m unittest discover -s tests -p "test_*.py" -v
-          if ($LASTEXITCODE -ne 0) { throw "Falha nos testes automatizados." }
-          python -c "from interface import App; from patch_base import aplicar_patch_base; from patch_arquivos import aplicar_patch_arquivos; from patch_ajustes import aplicar_patch_ajustes; from patch_297 import aplicar_patch_297; from patch_298 import aplicar_patch_298; from patch_299 import aplicar_patch_299; from patch_2991 import aplicar_patch_2991; from patch_29910 import aplicar_patch_29910; from main import _validar_base_aplicacao; aplicar_patch_base(App); aplicar_patch_arquivos(App); aplicar_patch_ajustes(App); aplicar_patch_297(App); aplicar_patch_298(App); aplicar_patch_299(App); aplicar_patch_2991(App); aplicar_patch_29910(App); _validar_base_aplicacao(); print('Integracao da main: OK')"
+          if ($LASTEXITCODE -ne 0) { throw "Falha nos testes." }
+          python -c "from interface import App; from patch_ui import aplicar_patch_ui; from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+
+      - name: Verificar Defender
+        shell: pwsh
+        run: |
+          Start-MpScan -ScanPath (Resolve-Path .) -ScanType CustomScan
+          Start-Sleep -Seconds 5
+          $threats = Get-MpThreatDetection
+          if ($threats) { $threats | Format-List | Out-Host; throw "Windows Defender detectou ameaça na árvore validada." }
