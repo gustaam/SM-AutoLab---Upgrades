@@ -21,13 +21,12 @@ Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a decla
 
 ## Estrutura de manutenção
 
-`main.py` usa módulos com nomes neutros: `patch_base.py`, `patch_arquivos.py` e `atualizacao.py`. Assim, a versão do aplicativo não fica vinculada ao nome de uma implementação histórica. Os componentes internos permanecem encapsulados nesses módulos e a inicialização valida a presença das funcionalidades essenciais antes de abrir a aplicação.
+`main.py` usa `patch.py` como ponto único de entrada das correções consolidadas de interface. As camadas-base `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` permanecem separadas nesta etapa para preservar a ordem de aplicação e reduzir o risco de regressão durante a reorganização. O aplicativo valida a presença das funcionalidades essenciais antes de abrir.
 
 ## Build e releases
 
 Antes de qualquer release, a validação da `main` confere a estrutura atual, os componentes obrigatórios, a ausência de referências legadas, a sintaxe e a integração das camadas. O workflow de release exige que a tag aponte exatamente para a `main` validada, compara a tag com `VERSION`, gera somente o aplicativo principal e seu manifesto. A atualização automática é integrada ao próprio executável e verifica o manifesto, a versão superior e o SHA-256 antes de substituir a instalação.
 
-
 ## Arquitetura consolidada
 
-As correções de interface ficam concentradas em `patch_ui.py`. `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` permanecem separados por serem camadas-base/neutras.
+As correções de interface históricas estão reunidas em `patch.py`, que mantém `aplicar_patch_ui` como único ponto chamado por `main.py`. Os módulos auxiliares de base permanecem como dependências internas nesta etapa e não são chamados diretamente pelo ponto de entrada principal.
