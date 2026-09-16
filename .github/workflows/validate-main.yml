@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -20,6 +20,36 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Corrigir import residual da Etapa B
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          path = Path("patch.py")
+          content = path.read_text(encoding="utf-8")
+          fixed = re.sub(
+              r"^from patch_base import aplicar_patch_base\nfrom patch_arquivos import aplicar_patch_arquivos\nfrom patch_ajustes import aplicar_patch_ajustes\n\n",
+              "",
+              content,
+              count=1,
+          )
+          if fixed != content:
+              path.write_text(fixed, encoding="utf-8")
+              print("Imports residuais removidos de patch.py.")
+          else:
+              print("Nenhum import residual encontrado.")
+
+      - name: Persistir correção da Etapa B
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add patch.py
+          if (-not (git diff --cached --quiet)) {
+            git commit -m 'Corrigir import residual da consolidacao'
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          }
 
       - name: Setup Python
         uses: actions/setup-python@v5
