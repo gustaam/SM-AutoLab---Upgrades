@@ -169,7 +169,7 @@ jobs:
           if ([string]$publishedManifest.version -ne [string]$release.tag_name.TrimStart('v','V')) { throw "Versão do manifesto não corresponde à release." }
           if ([string]$publishedManifest.tag -ne [string]$release.tag_name) { throw "Tag do manifesto não corresponde à release." }
           if ([string]$publishedManifest.commit -ne [string]$commit) { throw "Commit do manifesto não corresponde à tag publicada." }
-          if ([string]$publishedManifest.main_asset -ne [string]$exe.name) { throw "Nome do executável no manifesto diverge do asset publicado." }
+          if ((Normalize-AssetName([string]$publishedManifest.main_asset)) -ne (Normalize-AssetName([string]$exe.name))) { throw "Nome do executável no manifesto diverge do asset publicado." }
           if ([string]$publishedManifest.main_sha256 -ne [string]$assetDigest) { throw "SHA-256 do manifesto diverge do SHA-256 do asset publicado." }
 
           $assetsNormalized = $assets | ForEach-Object { Normalize-AssetName $_.name }
