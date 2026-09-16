@@ -3,11 +3,13 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import main
+from patch import aplicar_patch_ui
 
 
 class HistoricoIlimitadoTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        aplicar_patch_ui(main.App)
         main._corrigir_historico_ilimitado()
 
     def _fake_app(self, saved_at):
