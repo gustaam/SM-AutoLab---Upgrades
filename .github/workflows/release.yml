@@ -50,23 +50,27 @@ jobs:
 
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py", "planilha.py", "resultados.py", "splash.py", "atualizacao.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_ui.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
+            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @("patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py")) {
+          foreach ($legacyPath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py")) {
             if (Test-Path $legacyPath) { throw "Arquivo legado/consolidado ainda presente: $legacyPath" }
           }
 
           $main = Get-Content main.py -Raw
-          $ui = Get-Content patch_ui.py -Raw
+          $patch = Get-Content patch.py -Raw
           $interface = Get-Content interface.py -Raw
           $atualizacao = Get-Content atualizacao.py -Raw
-          if ($main -notlike "*from patch_ui import aplicar_patch_ui*") { throw "main.py não usa o ponto único de integração patch_ui.py." }
+          if ($main -notlike "*from patch import aplicar_patch_ui*") { throw "main.py não usa o ponto único de integração patch.py." }
           if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
-          foreach ($expected in @("PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER", "_historico_tem_erro", "_history_rebind_open_299", "_planilha_selecionar_tudo_2991", "_count_saved_passwords", "_atualizar_contador_selecao_29910", "_preencher_detalhe_pasta_297", "def aplicar_patch_ui")) {
-            if ($ui -notlike "*$expected*") { throw "patch_ui.py não contém a funcionalidade consolidada: $expected" }
-          }
-          if ($ui -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente." }
+          foreach ($expected in @(
+            "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE", "_SOURCE_PATCH_ARQUIVOS", "_SOURCE_PATCH_AJUSTES",
+            "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS", "_NS_PATCH_AJUSTES",
+            "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER",
+            "_historico_tem_erro", "_history_rebind_open_299", "_planilha_selecionar_tudo_2991", "_count_saved_passwords",
+            "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910", "_preencher_detalhe_pasta_297", "def aplicar_patch_ui"
+          )) { if ($patch -notlike "*$expected*") { throw "patch.py não contém a funcionalidade consolidada: $expected" } }
+          if ($patch -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente." }
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
           if ($atualizacao -notmatch 'def\s+find_update\s*\(' -or $atualizacao -notmatch 'def\s+launch_updater\s*\(') { throw "atualizacao.py não expõe o motor integrado." }
@@ -86,7 +90,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Falha na compilação sintática." }
           python -m unittest discover -s tests -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Falha nos testes automatizados." }
-          python -c "from interface import App; from patch_ui import aplicar_patch_ui; from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+          python -c "from interface import App; from patch import aplicar_patch_ui; from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
 
       - name: Preparar metadados do executável
         shell: pwsh
