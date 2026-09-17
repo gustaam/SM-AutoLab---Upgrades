@@ -2,7 +2,12 @@ import unittest
 from datetime import date
 from types import SimpleNamespace
 
-from ui_fixes_29912 import _calendar_click, _ctrl_pressed, _home_counter, _select_history_tile
+import main
+
+_calendar_click = main._calendar_click
+_ctrl_pressed = main._ctrl_pressed
+_home_counter = main._home_counter
+_select_history_tile = main._select_history_tile
 
 
 class FakeLabel:
