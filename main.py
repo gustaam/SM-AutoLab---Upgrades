@@ -540,6 +540,12 @@ def install_ui_29912(App):
             self.app.after_idle(lambda: _home_counter(self))
         except Exception:
             _home_counter(self)
+        try:
+            if not getattr(self, "_ui_29912_global_binding", False):
+                self.app.bind_all("<Button-1>", lambda event: _global_click(self, event), add="+")
+                self._ui_29912_global_binding = True
+        except Exception:
+            pass
         return result
 
     App.config_app = config_wrapper
@@ -581,20 +587,6 @@ def install_ui_29912(App):
         return result
 
     App._renderizar_calendario_arquivos = render_calendar_wrapper
-
-    original_global_config = App.config_app
-
-    def global_config_wrapper(self, *args, **kwargs):
-        result = original_global_config(self, *args, **kwargs)
-        try:
-            if not getattr(self, "_ui_29912_global_binding", False):
-                self.app.bind_all("<Button-1>", lambda event: _global_click(self, event), add="+")
-                self._ui_29912_global_binding = True
-        except Exception:
-            pass
-        return result
-
-    App.config_app = global_config_wrapper
 
 
 _REQUIRED_BASE_METHODS = (
