@@ -33,6 +33,16 @@ As credenciais do Feegow não fazem parte do código-fonte. `config.py` mantém 
 
 Antes de qualquer release, a validação da `main` confere a estrutura atual, os componentes obrigatórios, a ausência de referências legadas, a sintaxe e a integração das camadas. O workflow de release exige que a tag aponte exatamente para a `main` validada, compara a tag com `VERSION`, gera somente o aplicativo principal e seu manifesto. A atualização automática é integrada ao próprio executável e verifica o manifesto, a versão superior e o SHA-256 antes de substituir a instalação.
 
+O `build_windows.bat` é autossuficiente quanto aos metadados de versão do executável: o antigo `version_info_template.txt` foi incorporado diretamente ao processo de build. O arquivo temporário `version_info.txt` continua sendo gerado apenas durante o build e é ignorado pelo Git.
+
 ## Arquitetura consolidada
 
 As correções de interface históricas permanecem reunidas em `patch.py`, que mantém `aplicar_patch_ui` como ponto de integração. As correções finais específicas da UI estão em `main.py`, no mesmo módulo de inicialização, sem um arquivo separado.
+
+### Mapa de integração
+
+`patch.py` é o ponto único de entrada das correções consolidadas de interface. Ele incorpora fisicamente, em namespaces isolados, as antigas camadas de base e mantém a ordem histórica de aplicação. É o único módulo de patches importado por `main.py`.
+
+Os antigos `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` tiveram seus conteúdos preservados integralmente em fontes internas `_SOURCE_PATCH_BASE`, `_SOURCE_PATCH_ARQUIVOS` e `_SOURCE_PATCH_AJUSTES`, executadas nos namespaces `_NS_PATCH_BASE`, `_NS_PATCH_ARQUIVOS` e `_NS_PATCH_AJUSTES`. Isso preserva a resolução de nomes e a sequência de monkey-patches sem manter módulos externos separados.
+
+`atualizacao.py` é o motor integrado de atualização do próprio executável.
