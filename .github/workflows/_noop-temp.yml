@@ -1,7 +1,0 @@
-name: temp
-on: workflow_dispatch
-jobs:
-  temp:
-    runs-on: windows-latest
-    steps:
-      - run: echo temp
