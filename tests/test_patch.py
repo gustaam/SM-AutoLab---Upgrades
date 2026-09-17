@@ -26,6 +26,8 @@ class TestPatch(unittest.TestCase):
         atualizacao = (root / "atualizacao.py").read_text(encoding="utf-8")
         build = (root / "build_windows.bat").read_text(encoding="utf-8")
         self.assertIn("from patch import aplicar_patch_ui", main)
+        self.assertIn("def install_ui_29912", main)
+        self.assertNotIn("from ui_fixes_29912 import", main)
         for content in (main, interface, atualizacao, build):
             self.assertNotIn("from patch_base import", content)
             self.assertNotIn("from patch_arquivos import", content)
@@ -40,24 +42,23 @@ class TestPatch(unittest.TestCase):
     def test_correcoes_ui_pos_release_estao_na_camda_final(self):
         root = Path(__file__).resolve().parents[1]
         main = (root / "main.py").read_text(encoding="utf-8")
-        ui = (root / "ui_fixes_29912.py").read_text(encoding="utf-8")
-        self.assertIn("from ui_fixes_29912 import install as install_ui_29912", main)
+        self.assertFalse((root / "ui_fixes_29912.py").exists())
         for marker in (
             "SM_AUTOLAB_UI_FIXES_29912",
             "_home_counter",
             "_calendar_click",
             "_create_history_tile",
             "_select_history_tile",
-            "def install(App)",
+            "def install_ui_29912",
         ):
-            self.assertIn(marker, ui)
+            self.assertIn(marker, main)
 
     def test_ctrl_click_e_selecao_multipla_estao_previstos(self):
         root = Path(__file__).resolve().parents[1]
-        ui = (root / "ui_fixes_29912.py").read_text(encoding="utf-8")
-        self.assertIn("0x0004", ui)
-        self.assertIn("_arquivos_datas_selecionadas", ui)
-        self.assertIn("_hist_selected_tiles", ui)
+        main = (root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("0x0004", main)
+        self.assertIn("_arquivos_datas_selecionadas", main)
+        self.assertIn("_hist_selected_tiles", main)
 
 
 if __name__ == "__main__":
