@@ -17,55 +17,6 @@ if not defined APP_VERSION (
 
 echo Versao detectada: v!APP_VERSION!
 echo.
-echo Verificando codigo-fonte da versao atual...
-%SystemRoot%\System32\findstr.exe /c:"def _renderizar_calendario_arquivos" interface.py >nul
-if errorlevel 1 (
-    echo ERRO: interface.py nao contem o calendario de Arquivos.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"Canvas(" interface.py >nul
-if errorlevel 1 (
-    echo ERRO: interface.py nao contem o calendario nativo Canvas.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"tkcalendar" interface.py >nul
-if not errorlevel 1 (
-    echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
-    goto :erro
-)
-for %%F in (main.py interface.py app.py automacao.py config.py atualizacao.py patch.py VERSION) do (
-    if not exist "%%F" (
-        echo ERRO: %%F nao encontrado.
-        goto :erro
-    )
-)
-%SystemRoot%\System32\findstr.exe /c:"from patch import aplicar_patch_ui" main.py >nul
-if errorlevel 1 (
-    echo ERRO: main.py nao usa a entrada consolidada patch.py.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_ui" patch.py >nul
-if errorlevel 1 (
-    echo ERRO: patch.py nao expoe aplicar_patch_ui.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"class StartupSplash" main.py >nul
-if errorlevel 1 (
-    echo ERRO: main.py nao contem o splash consolidado.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"class Resultados" app.py >nul
-if errorlevel 1 (
-    echo ERRO: app.py nao contem o modulo consolidado de resultados.
-    goto :erro
-)
-%SystemRoot%\System32\findstr.exe /c:"def carregar_codigos" app.py >nul
-if errorlevel 1 (
-    echo ERRO: app.py nao contem o leitor de planilhas consolidado.
-    goto :erro
-)
-echo Validacao do codigo-fonte: OK
-echo.
 
 for /d /r %%D in (__pycache__) do if exist "%%D" rmdir /s /q "%%D" >nul 2>nul
 
@@ -89,6 +40,13 @@ exit /b 1
 :python_ok
 %PYTHON% --version
 if errorlevel 1 goto :erro
+
+echo.
+echo Validando versao e arquitetura consolidada...
+%PYTHON% scripts\validate_architecture.py
+if errorlevel 1 goto :erro
+echo Validacao de arquitetura: OK
+echo.
 
 %PYTHON% -m pip install --upgrade pip
 if errorlevel 1 goto :erro
