@@ -19,6 +19,26 @@ class VersionComparisonTests(unittest.TestCase):
         self.assertEqual(atualizacao._version_tuple("v"), ())
 
 
+class UpdateEnvironmentTests(unittest.TestCase):
+    def test_sanitize_pyinstaller_environment_removes_internal_state(self):
+        source = {
+            "PATH": "C:\\Windows",
+            "TEMP": "C:\\Temp",
+            "_PYI_PARENT_PROCESS_LEVEL": "1",
+            "_PYI_APPLICATION_HOME_DIR": "C:\\Temp\\_MEI123",
+            "_MEIPASS2": "C:\\Temp\\_MEI123",
+            "_PyI_MixedCase": "legacy",
+        }
+        clean = atualizacao._sanitize_pyinstaller_environment(source)
+
+        self.assertEqual(clean["PATH"], "C:\\Windows")
+        self.assertEqual(clean["TEMP"], "C:\\Temp")
+        self.assertNotIn("_PYI_PARENT_PROCESS_LEVEL", clean)
+        self.assertNotIn("_PYI_APPLICATION_HOME_DIR", clean)
+        self.assertNotIn("_MEIPASS2", clean)
+        self.assertNotIn("_PyI_MixedCase", clean)
+
+
 class UpdateDiscoveryTests(unittest.TestCase):
     def _release(self, tag: str) -> dict:
         return {
