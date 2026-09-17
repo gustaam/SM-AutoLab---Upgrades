@@ -25,6 +25,10 @@ Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a decla
 
 Os módulos pequenos `planilha.py`, `resultados.py`, `splash.py` e `ui_fixes_29912.py` foram incorporados aos módulos principais e removidos da árvore para evitar fragmentação desnecessária.
 
+## Configuração e credenciais
+
+As credenciais do Feegow não fazem parte do código-fonte. `config.py` mantém apenas valores padrão vazios e persiste as configurações fornecidas pelo usuário em `SM AutoLab/feegow_config.json`. A automação interrompe o início ou a recuperação do navegador quando usuário e senha não estiverem configurados.
+
 ## Build e releases
 
 Antes de qualquer release, a validação da `main` confere a estrutura atual, os componentes obrigatórios, a ausência de referências legadas, a sintaxe e a integração das camadas. O workflow de release exige que a tag aponte exatamente para a `main` validada, compara a tag com `VERSION`, gera somente o aplicativo principal e seu manifesto. A atualização automática é integrada ao próprio executável e verifica o manifesto, a versão superior e o SHA-256 antes de substituir a instalação.
