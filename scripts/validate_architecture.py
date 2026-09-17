@@ -9,71 +9,29 @@ ACTION_USE_RE = re.compile(r"^\s*uses:\s*([^\s]+)\s*$", re.MULTILINE)
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 REQUIRED_PATHS = (
-    "main.py",
-    "interface.py",
-    "app.py",
-    "automacao.py",
-    "config.py",
-    "atualizacao.py",
-    "patch.py",
-    "requirements.txt",
-    "VERSION",
-    "SM AutoLab.ico",
-    "assets",
-    "build_windows.bat",
-    "scripts/validate_architecture.py",
-    "tests/test_patch.py",
+    "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
+    "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat",
+    "scripts/validate_architecture.py", "tests/test_patch.py",
 )
 
 OBSOLETE_PATHS = (
-    "version_info_template.txt",
-    "ui_fixes_29912.py",
-    "planilha.py",
-    "resultados.py",
-    "splash.py",
-    "patch_base.py",
-    "patch_arquivos.py",
-    "patch_ajustes.py",
-    "patch_v266.py",
-    "patch_v267.py",
-    "patch_v266_new.py",
-    "updater.py",
-    "patch_297.py",
-    "patch_298.py",
-    "patch_299.py",
-    "patch_2991.py",
-    "patch_29910.py",
-    "patch_ui.py",
-    "tests/test_atualizacao.py",
-    "tests/test_ui_correcoes_29912.py",
-    "tests/test_historico_ilimitado.py",
-    ".etapa-b-trigger",
+    "version_info_template.txt", "ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py",
+    "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py",
+    "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py",
+    "patch_2991.py", "patch_29910.py", "patch_ui.py", "tests/test_atualizacao.py",
+    "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py", ".etapa-b-trigger",
     ".github/workflows/_fix_patch_b_import.yml",
 )
 
 LEGACY_IMPORTS = (
-    "from patch_base import",
-    "from patch_arquivos import",
-    "from patch_ajustes import",
-    "from patch_297 import",
-    "from patch_298 import",
-    "from patch_299 import",
-    "from patch_2991 import",
-    "from patch_29910 import",
-    "from patch_ui import",
-    "from planilha import",
-    "from resultados import",
-    "from splash import",
+    "from patch_base import", "from patch_arquivos import", "from patch_ajustes import", "from patch_297 import",
+    "from patch_298 import", "from patch_299 import", "from patch_2991 import", "from patch_29910 import",
+    "from patch_ui import", "from planilha import", "from resultados import", "from splash import",
     "from ui_fixes_29912 import",
 )
 
 LEGACY_IMPORT_CHECK_PATHS = (
-    "main.py",
-    "interface.py",
-    "app.py",
-    "automacao.py",
-    "atualizacao.py",
-    "build_windows.bat",
+    "main.py", "interface.py", "app.py", "automacao.py", "atualizacao.py", "build_windows.bat",
 )
 
 WORKFLOW_PATHS = (
@@ -82,58 +40,26 @@ WORKFLOW_PATHS = (
 )
 
 PATCH_MARKERS = (
-    "ARQUIVOS_COMPONENT_MARKER",
-    "AJUSTES_COMPONENT_MARKER",
-    "_SOURCE_PATCH_BASE",
-    "_SOURCE_PATCH_ARQUIVOS",
-    "_SOURCE_PATCH_AJUSTES",
-    "_NS_PATCH_BASE",
-    "_NS_PATCH_ARQUIVOS",
-    "_NS_PATCH_AJUSTES",
-    "PATCH_297_MARKER",
-    "PATCH_298_MARKER",
-    "PATCH_299_MARKER",
-    "PATCH_2991_MARKER",
-    "PATCH_29910_MARKER",
-    "_historico_tem_erro",
-    "_history_rebind_open_299",
-    "_history_click_outside_299",
-    "_instalar_deselecao_global_299",
-    "_planilha_selecionar_tudo_2991",
-    "_planilha_copiar_2991",
-    "_planilha_arrastar_selecao_2991",
-    "_planilha_iniciar_digitacao_2991",
-    "_count_saved_passwords",
-    "firstweekday",
-    "_atualizar_contador_selecao_29910",
-    "_ensure_selection_state_29910",
-    "def aplicar_patch_ui",
+    "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE", "_SOURCE_PATCH_ARQUIVOS",
+    "_SOURCE_PATCH_AJUSTES", "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS", "_NS_PATCH_AJUSTES", "PATCH_297_MARKER",
+    "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER", "_historico_tem_erro",
+    "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299",
+    "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991",
+    "_planilha_iniciar_digitacao_2991", "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910",
+    "_ensure_selection_state_29910", "def aplicar_patch_ui",
 )
 
 UI_MARKERS = (
-    "SM_AUTOLAB_UI_FIXES_29912",
-    "_home_counter",
-    "_calendar_click",
-    "_create_history_tile",
-    "_select_history_tile",
-    "def install_ui_29912",
+    "SM_AUTOLAB_UI_FIXES_29912", "_home_counter", "_calendar_click", "_create_history_tile",
+    "_select_history_tile", "def install_ui_29912",
 )
 
 TEST_MARKERS = (
-    "class VersionComparisonTests",
-    "class UpdateEnvironmentTests",
-    "class UpdateDiscoveryTests",
-    "class UIFixes29912Tests",
-    "class HistoricoIlimitadoTests",
-    "test_arquivos_de_teste_auxiliares_foram_consolidados",
+    "class VersionComparisonTests", "class UpdateEnvironmentTests", "class UpdateDiscoveryTests",
+    "class UIFixes29912Tests", "class HistoricoIlimitadoTests", "test_arquivos_de_teste_auxiliares_foram_consolidados",
 )
 
-BUILD_MARKERS = (
-    "VSVersionInfo(",
-    "FixedFileInfo(",
-    "StringFileInfo([",
-    "Set-Content version_info.txt",
-)
+BUILD_MARKERS = ("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")
 
 
 def fail(message: str) -> None:
@@ -167,6 +93,19 @@ def validate_workflow_pins(root: Path) -> None:
                 fail(f"GitHub Action não está fixada em SHA de commit em {relative}: {action_ref}")
 
 
+def validate_workflow_security(root: Path) -> None:
+    release = read_text(root, ".github/workflows/release.yml")
+    if "permissions: {}" not in release:
+        fail("release.yml deve começar com permissões vazias por padrão")
+    if "jobs:\n  release:\n    permissions:\n      contents: write" not in release:
+        fail("release.yml deve conceder contents: write somente ao job de release")
+    if "RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}" not in release:
+        fail("release.yml não centraliza a tag recebida em RELEASE_TAG")
+    for marker in ("$tag = $env:RELEASE_TAG", "if ($version -ne $tagVersion)"):
+        if marker not in release:
+            fail(f"release.yml não usa a entrada de tag de forma segura: {marker}")
+
+
 def validate(root: Path) -> None:
     version = read_text(root, "VERSION").strip()
     if not VERSION_RE.fullmatch(version):
@@ -180,20 +119,10 @@ def validate(root: Path) -> None:
         if (root / relative).exists():
             fail(f"arquivo/artefato obsoleto ainda presente: {relative}")
 
-    contents = {
-        relative: read_text(root, relative)
-        for relative in (
-            "main.py",
-            "interface.py",
-            "app.py",
-            "automacao.py",
-            "atualizacao.py",
-            "patch.py",
-            "config.py",
-            "build_windows.bat",
-            "tests/test_patch.py",
-        )
-    }
+    contents = {relative: read_text(root, relative) for relative in (
+        "main.py", "interface.py", "app.py", "automacao.py", "atualizacao.py", "patch.py", "config.py",
+        "build_windows.bat", "tests/test_patch.py",
+    )}
 
     main = contents["main.py"]
     interface = contents["interface.py"]
@@ -204,22 +133,16 @@ def validate(root: Path) -> None:
     build = contents["build_windows.bat"]
     tests = contents["tests/test_patch.py"]
 
-    require_markers(
-        "main.py",
-        main,
-        (
-            "from patch import aplicar_patch_ui",
-            "def install_ui_29912",
-            "class StartupSplash",
-            "def _corrigir_historico_ilimitado",
-            "def _validar_base_aplicacao",
-        ),
-    )
+    require_markers("main.py", main, (
+        "from patch import aplicar_patch_ui", "def install_ui_29912", "class StartupSplash",
+        "def _corrigir_historico_ilimitado", "def _validar_base_aplicacao",
+    ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
     require_markers("main.py", main, UI_MARKERS)
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
     validate_workflow_pins(root)
+    validate_workflow_security(root)
 
     for legacy_import in LEGACY_IMPORTS:
         for relative in LEGACY_IMPORT_CHECK_PATHS:
@@ -252,11 +175,8 @@ def validate(root: Path) -> None:
         fail("interface.py não contém o calendário nativo Canvas")
 
     build_exclusions = {
-        "tests/test_atualizacao.py",
-        "tests/test_ui_correcoes_29912.py",
-        "tests/test_historico_ilimitado.py",
-        ".etapa-b-trigger",
-        ".github/workflows/_fix_patch_b_import.yml",
+        "tests/test_atualizacao.py", "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py",
+        ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml",
     }
     for relative in OBSOLETE_PATHS:
         if relative not in build_exclusions and relative in build:
