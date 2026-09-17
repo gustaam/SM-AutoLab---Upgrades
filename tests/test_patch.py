@@ -108,6 +108,18 @@ class TestPatch(unittest.TestCase):
             build,
         )
 
+    def test_auxiliares_de_build_e_documentacao_foram_consolidados(self):
+        root = Path(__file__).resolve().parents[1]
+        build = (root / "build_windows.bat").read_text(encoding="utf-8")
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        self.assertFalse((root / "version_info_template.txt").exists())
+        self.assertFalse((root / "INTEGRATION_MANIFEST.txt").exists())
+        self.assertNotIn("version_info_template.txt", build)
+        for marker in ("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt"):
+            self.assertIn(marker, build)
+        for marker in ("Mapa de integração", "_SOURCE_PATCH_BASE", "_SOURCE_PATCH_ARQUIVOS", "_SOURCE_PATCH_AJUSTES"):
+            self.assertIn(marker, readme)
+
 
 if __name__ == "__main__":
     unittest.main()
