@@ -17,7 +17,7 @@ except Exception:
 
 REPO = "gustaam/SM-AutoLab---Upgrades"
 API_RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
-USER_AGENT = "SM-AutoLab"
+USER_AGENT = "SM AutoLab"
 UPDATE_CHANNEL = "SM-AUTOLAB-RESET-2026-09"
 MANIFEST_ASSET_NAMES = {
     "release-manifest.json",
@@ -193,6 +193,23 @@ def _escape_cmd_path(value: str) -> str:
     )
 
 
+def _sanitize_pyinstaller_environment(environ: dict[str, str] | None = None) -> dict[str, str]:
+    """Remove o estado interno herdado do PyInstaller antes de iniciar a nova versão.
+
+    A partir do PyInstaller 6.22.1, uma onefile detecta as variáveis `_PYI_*`
+    herdadas para identificar processos-filhos. O atualizador precisa iniciar
+    a nova instância como um processo independente; caso contrário, a nova
+    versão pode interpretar `cmd.exe` como parte da árvore onefile antiga e
+    exibir a falha de validação de segurança ao iniciar.
+    """
+    source = dict(os.environ if environ is None else environ)
+    return {
+        key: value
+        for key, value in source.items()
+        if not key.upper().startswith("_PYI_") and key.upper() != "_MEIPASS2"
+    }
+
+
 def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, str]:
     script_dir = downloaded.parent
     script = script_dir / "apply_update.cmd"
@@ -215,11 +232,13 @@ rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
         flags = 0
         if os.name == "nt":
             flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+        clean_env = _sanitize_pyinstaller_environment()
         subprocess.Popen(
             ["cmd.exe", "/d", "/c", str(script)],
             cwd=str(script_dir),
             close_fds=True,
             creationflags=flags,
+            env=clean_env,
         )
         return True, ""
     except OSError as exc:
