@@ -21,9 +21,9 @@ Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a decla
 
 ## Estrutura de manutenção
 
-`main.py` concentra a inicialização, o splash e as correções específicas do histórico ilimitado. `patch.py` é o ponto único de entrada das correções consolidadas da interface. `app.py` reúne a orquestração da execução, leitura das planilhas e armazenamento dos resultados, eliminando módulos pequenos separados para essas funções.
+`main.py` concentra a inicialização, o splash, as correções do histórico ilimitado e as correções finais de UI. `patch.py` permanece como ponto único de entrada das correções históricas consolidadas. `app.py` reúne a orquestração da execução, leitura das planilhas e armazenamento dos resultados.
 
-Os componentes `planilha.py`, `resultados.py` e `splash.py` foram incorporados aos módulos principais e removidos da árvore para evitar fragmentação desnecessária. As correções específicas de UI da versão 2.99.12 continuam em `ui_fixes_29912.py` enquanto não forem incorporadas definitivamente à camada consolidada de `patch.py`.
+Os módulos pequenos `planilha.py`, `resultados.py`, `splash.py` e `ui_fixes_29912.py` foram incorporados aos módulos principais e removidos da árvore para evitar fragmentação desnecessária.
 
 ## Build e releases
 
@@ -31,4 +31,4 @@ Antes de qualquer release, a validação da `main` confere a estrutura atual, os
 
 ## Arquitetura consolidada
 
-Todas as correções de interface históricas estão reunidas em `patch.py`, que mantém `aplicar_patch_ui` como ponto único chamado por `main.py`. Os antigos módulos `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` não fazem mais parte da árvore final; seus conteúdos são preservados internamente em namespaces próprios dentro de `patch.py`.
+As correções de interface históricas permanecem reunidas em `patch.py`, que mantém `aplicar_patch_ui` como ponto de integração. As correções finais específicas da UI estão em `main.py`, no mesmo módulo de inicialização, sem um arquivo separado.
