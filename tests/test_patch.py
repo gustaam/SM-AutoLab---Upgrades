@@ -7,6 +7,49 @@ import main
 from patch import aplicar_patch_ui
 
 
+class FakeLabel:
+    def __init__(self):
+        self.configured = []
+        self.packed = True
+        self.packed_options = {}
+
+    def configure(self, **kwargs):
+        self.configured.append(kwargs)
+
+    def winfo_manager(self):
+        return "pack" if self.packed else ""
+
+    def pack(self, **kwargs):
+        self.packed = True
+        self.packed_options = kwargs
+
+    def pack_configure(self, **kwargs):
+        self.packed_options.update(kwargs)
+
+    def pack_forget(self):
+        self.packed = False
+
+
+class FakeTile:
+    def __init__(self, name):
+        self.name = name
+        self.options = {}
+
+    def configure(self, **kwargs):
+        self.options.update(kwargs)
+
+    def __repr__(self):
+        return f"FakeTile({self.name})"
+
+
+class FakeCanvas:
+    def find_overlapping(self, *_args):
+        return (1,)
+
+    def gettags(self, _item_id):
+        return ("dia:2026-09-17",)
+
+
 class TestPatch(unittest.TestCase):
     def test_instrucao_ctrl_clique_foi_removida(self):
         root = Path(__file__).resolve().parents[1]
@@ -117,49 +160,6 @@ class TestPatch(unittest.TestCase):
         root = Path(__file__).resolve().parent
         self.assertFalse((root / "test_ui_correcoes_29912.py").exists())
         self.assertFalse((root / "test_historico_ilimitado.py").exists())
-
-
-class FakeLabel:
-    def __init__(self):
-        self.configured = []
-        self.packed = True
-        self.packed_options = {}
-
-    def configure(self, **kwargs):
-        self.configured.append(kwargs)
-
-    def winfo_manager(self):
-        return "pack" if self.packed else ""
-
-    def pack(self, **kwargs):
-        self.packed = True
-        self.packed_options = kwargs
-
-    def pack_configure(self, **kwargs):
-        self.packed_options.update(kwargs)
-
-    def pack_forget(self):
-        self.packed = False
-
-
-class FakeTile:
-    def __init__(self, name):
-        self.name = name
-        self.options = {}
-
-    def configure(self, **kwargs):
-        self.options.update(kwargs)
-
-    def __repr__(self):
-        return f"FakeTile({self.name})"
-
-
-class FakeCanvas:
-    def find_overlapping(self, *_args):
-        return (1,)
-
-    def gettags(self, _item_id):
-        return ("dia:2026-09-17",)
 
 
 class UIFixes29912Tests(unittest.TestCase):
