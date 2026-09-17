@@ -1,10 +1,10 @@
 from pathlib import Path
 import json
 
-# Defaults
+# O endereço pode permanecer como padrão público; credenciais nunca ficam no código.
 DEFAULT_SITE_URL = "https://franchising.feegow.com/pre-v8.1/extranet/?P=Login&Licenca=15003"
-DEFAULT_PORTAL_USUARIO = "labsantamaria@taguatinga"
-DEFAULT_PORTAL_SENHA = "Acesso123@"
+DEFAULT_PORTAL_USUARIO = ""
+DEFAULT_PORTAL_SENHA = ""
 
 SITE_URL = DEFAULT_SITE_URL
 PORTAL_USUARIO = DEFAULT_PORTAL_USUARIO
@@ -34,7 +34,7 @@ def _caminho_config():
 
 
 def carregar_configuracoes():
-    """Carrega as configurações persistidas e retorna todas as constantes."""
+    """Carrega as configurações persistidas; credenciais não existem no código-fonte."""
     global SITE_URL, PORTAL_USUARIO, PORTAL_SENHA
 
     valores = {
@@ -66,6 +66,7 @@ def carregar_configuracoes():
 
 
 def restaurar_configuracoes():
+    """Restaura o endereço padrão e limpa as credenciais salvas."""
     dados = {
         "SITE_URL": DEFAULT_SITE_URL,
         "PORTAL_USUARIO": DEFAULT_PORTAL_USUARIO,
@@ -83,7 +84,7 @@ def restaurar_configuracoes():
 
 
 def salvar_configuracoes(site_url, usuario, senha):
-    """Salva as credenciais para uso nas próximas execuções."""
+    """Salva as credenciais somente na configuração local do usuário."""
     site_url = str(site_url).strip()
     usuario = str(usuario).strip()
     senha = str(senha)
@@ -109,5 +110,4 @@ def salvar_configuracoes(site_url, usuario, senha):
     )
     temporario.replace(caminho)
 
-    # Atualiza imediatamente esta instância do módulo.
     carregar_configuracoes()
