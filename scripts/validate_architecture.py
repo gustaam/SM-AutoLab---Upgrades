@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
 
@@ -20,6 +19,7 @@ REQUIRED_PATHS = (
     "SM AutoLab.ico",
     "assets",
     "build_windows.bat",
+    "scripts/validate_architecture.py",
     "tests/test_patch.py",
 )
 
@@ -220,8 +220,15 @@ def validate(root: Path) -> None:
     if "Canvas(" not in interface:
         fail("interface.py não contém o calendário nativo Canvas")
 
+    build_exclusions = {
+        "tests/test_atualizacao.py",
+        "tests/test_ui_correcoes_29912.py",
+        "tests/test_historico_ilimitado.py",
+        ".etapa-b-trigger",
+        ".github/workflows/_fix_patch_b_import.yml",
+    }
     for relative in OBSOLETE_PATHS:
-        if relative not in {"tests/test_atualizacao.py", "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py", ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml"} and relative in build:
+        if relative not in build_exclusions and relative in build:
             fail(f"build_windows.bat ainda referencia artefato legado: {relative}")
 
     if "SM AutoLab" not in build:
