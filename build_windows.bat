@@ -33,7 +33,7 @@ if not errorlevel 1 (
     echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
     goto :erro
 )
-for %%F in (main.py interface.py app.py automacao.py config.py planilha.py resultados.py splash.py atualizacao.py patch.py VERSION version_info_template.txt) do (
+for %%F in (main.py interface.py app.py automacao.py config.py atualizacao.py patch.py VERSION version_info_template.txt) do (
     if not exist "%%F" (
         echo ERRO: %%F nao encontrado.
         goto :erro
@@ -47,6 +47,21 @@ if errorlevel 1 (
 %SystemRoot%\System32\findstr.exe /c:"def aplicar_patch_ui" patch.py >nul
 if errorlevel 1 (
     echo ERRO: patch.py nao expoe aplicar_patch_ui.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"class StartupSplash" main.py >nul
+if errorlevel 1 (
+    echo ERRO: main.py nao contem o splash consolidado.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"class Resultados" app.py >nul
+if errorlevel 1 (
+    echo ERRO: app.py nao contem o modulo consolidado de resultados.
+    goto :erro
+)
+%SystemRoot%\System32\findstr.exe /c:"def carregar_codigos" app.py >nul
+if errorlevel 1 (
+    echo ERRO: app.py nao contem o leitor de planilhas consolidado.
     goto :erro
 )
 echo Validacao do codigo-fonte: OK
