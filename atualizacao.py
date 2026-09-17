@@ -89,7 +89,7 @@ def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
     if manifest_asset is None:
         return None
     url = str(manifest_asset.get("browser_download_url") or "")
-    if not url:
+    if not url or not url.lower().startswith("https://github.com/"):
         return None
     try:
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -109,6 +109,14 @@ def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
         return None
     main_name = str(main_asset.get("name", "")).strip().lower()
     if not main_name.endswith(".exe") or "updater" in _normalize_asset_name(main_name):
+        return None
+    asset_digest = str(main_asset.get("digest") or "").strip().lower()
+    if asset_digest.startswith("sha256:"):
+        asset_digest = asset_digest.split(":", 1)[1]
+    manifest_digest = str(manifest.get("main_sha256") or "").strip().lower()
+    if manifest_digest and not re.fullmatch(r"[0-9a-f]{64}", manifest_digest):
+        return None
+    if asset_digest and (not re.fullmatch(r"[0-9a-f]{64}", asset_digest) or manifest_digest != asset_digest):
         return None
     return manifest
 
@@ -206,8 +214,6 @@ def _sanitize_pyinstaller_environment(environ: dict[str, str] | None = None) -> 
 def _prepare_independent_restart_environment(environ: dict[str, str] | None = None) -> dict[str, str]:
     """Prepara o ambiente para que a nova onefile seja tratada como instância independente."""
     env = _sanitize_pyinstaller_environment(environ)
-    # Requisito oficial do PyInstaller para reinício de uma onefile que
-    # sobreviverá ao processo atual (por exemplo, autoatualização).
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     return env
 
