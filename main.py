@@ -3,6 +3,7 @@ from datetime import datetime
 from splash import run_splash
 from interface import App
 from patch import aplicar_patch_ui
+from ui_fixes_29912 import install as install_ui_29912
 
 _REQUIRED_BASE_METHODS = (
     "abrir_historico_planilha",
@@ -190,6 +191,7 @@ def _validar_base_aplicacao():
 if __name__ == "__main__":
     aplicar_patch_ui(App)
     _corrigir_historico_ilimitado()
+    install_ui_29912(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
