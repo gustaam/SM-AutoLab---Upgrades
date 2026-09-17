@@ -122,12 +122,18 @@ def validate_workflow_runtime(root: Path) -> None:
             fail(f"{relative} deve fixar Python em {REQUIRED_PYTHON_VERSION}")
         if f"python -m pip install pip=={REQUIRED_PIP_VERSION}" not in content:
             fail(f"{relative} deve fixar pip em {REQUIRED_PIP_VERSION}")
+        if "python -m pip install -r requirements.txt" not in content:
+            fail(f"{relative} deve instalar requirements.txt usando o mesmo interpretador Python")
 
     build = read_text(root, "build_windows.bat")
     if "pip check" not in build:
         fail("build_windows.bat deve validar a consistência das dependências com pip check")
+    if "python -m pip install -r requirements.txt" not in read_text(root, ".github/workflows/validate-main.yml"):
+        fail("validate-main.yml deve instalar dependências pelo módulo pip do Python configurado")
     if "python -m pip check" not in read_text(root, ".github/workflows/validate-main.yml"):
         fail("validate-main.yml deve validar a consistência das dependências com pip check")
+    if "python -m pip install -r requirements.txt" not in read_text(root, ".github/workflows/release.yml"):
+        fail("release.yml deve instalar dependências pelo módulo pip do Python configurado")
     if "python -m pip check" not in read_text(root, ".github/workflows/release.yml"):
         fail("release.yml deve validar a consistência das dependências com pip check")
     if "sys.version_info[:3] == (3, 14, 7)" not in build:
