@@ -92,6 +92,22 @@ class TestPatch(unittest.TestCase):
         self.assertNotIn("def global_config_wrapper", main)
         self.assertIn('self.app.bind_all("<Button-1>", lambda event: _global_click(self, event), add="+")', main)
 
+    def test_build_manual_usa_mesmo_fluxo_de_integracao_do_ci(self):
+        root = Path(__file__).resolve().parents[1]
+        build = (root / "build_windows.bat").read_text(encoding="utf-8")
+        self.assertIn(
+            "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912",
+            build,
+        )
+        self.assertIn(
+            "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); _validar_base_aplicacao()",
+            build,
+        )
+        self.assertNotIn(
+            "from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao()",
+            build,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
