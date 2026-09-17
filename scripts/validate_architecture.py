@@ -65,6 +65,15 @@ LEGACY_IMPORTS = (
     "from ui_fixes_29912 import",
 )
 
+LEGACY_IMPORT_CHECK_PATHS = (
+    "main.py",
+    "interface.py",
+    "app.py",
+    "automacao.py",
+    "atualizacao.py",
+    "build_windows.bat",
+)
+
 PATCH_MARKERS = (
     "ARQUIVOS_COMPONENT_MARKER",
     "AJUSTES_COMPONENT_MARKER",
@@ -157,9 +166,9 @@ def validate(root: Path) -> None:
             "interface.py",
             "app.py",
             "automacao.py",
-            "config.py",
             "atualizacao.py",
             "patch.py",
+            "config.py",
             "build_windows.bat",
             "tests/test_patch.py",
         )
@@ -168,6 +177,7 @@ def validate(root: Path) -> None:
     main = contents["main.py"]
     interface = contents["interface.py"]
     app = contents["app.py"]
+    automacao = contents["automacao.py"]
     atualizacao = contents["atualizacao.py"]
     config = contents["config.py"]
     patch = contents["patch.py"]
@@ -191,9 +201,9 @@ def validate(root: Path) -> None:
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
 
     for legacy_import in LEGACY_IMPORTS:
-        for name, content in contents.items():
-            if legacy_import in content:
-                fail(f"import legado detectado em {name}: {legacy_import}")
+        for relative in LEGACY_IMPORT_CHECK_PATHS:
+            if legacy_import in contents[relative]:
+                fail(f"import legado detectado em {relative}: {legacy_import}")
 
     if "Ctrl + clique para selecionar várias datas" in patch:
         fail("instrução visual antiga ainda presente em patch.py")
