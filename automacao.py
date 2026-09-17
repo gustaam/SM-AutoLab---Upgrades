@@ -29,7 +29,11 @@ class Automacao:
     def _status(self,t):
         if self.status_callback: self.status_callback(t)
     def iniciar_navegador(self):
-        _recarregar_configuracao_runtime()
+        dados = _recarregar_configuracao_runtime()
+        if not dados["PORTAL_USUARIO"] or not dados["PORTAL_SENHA"]:
+            mensagem = "Configure o usuário e a senha do Feegow em Configurações antes de iniciar."
+            self._status("Configuração necessária")
+            raise AutomacaoError(mensagem, "configuracao")
         self._status("Abrindo o Feegow...")
         self.driver=webdriver.Chrome()
         self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
@@ -85,7 +89,9 @@ class Automacao:
         try: _=self.driver.current_url; return True
         except Exception: return False
     def _reiniciar_navegador(self):
-        _recarregar_configuracao_runtime()
+        dados = _recarregar_configuracao_runtime()
+        if not dados["PORTAL_USUARIO"] or not dados["PORTAL_SENHA"]:
+            raise AutomacaoError("Configure o usuário e a senha do Feegow em Configurações antes de continuar.", "configuracao")
         self._status("Recuperando o navegador e entrando novamente...")
         self.fechar()
         self.driver=webdriver.Chrome(); self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT); self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao(); self._status("Navegador recuperado. Continuando..."); return True
