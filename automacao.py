@@ -5,7 +5,24 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, StaleElementReferenceException, ElementClickInterceptedException
-from config import *
+from config import (
+    ALERT_TIMEOUT,
+    CODE_INPUT_XPATH,
+    CONFIRM_BUTTON_XPATH,
+    ELEMENT_TIMEOUT,
+    INPUT_DELAY,
+    LOGIN_BUTTON_XPATH,
+    LOGIN_PASSWORD_XPATH,
+    LOGIN_TIMEOUT,
+    LOGIN_USER_XPATH,
+    PAGE_LINK_XPATH,
+    PAGE_LOAD_TIMEOUT,
+    PORTAL_SENHA,
+    PORTAL_USUARIO,
+    RECOVERY_TIMEOUT,
+    SITE_URL,
+    carregar_configuracoes,
+)
 
 # As configurações do portal podem ser alteradas pela interface.
 # Recarregamos antes de iniciar ou recuperar o navegador.
@@ -91,7 +108,7 @@ class Automacao:
     def _reiniciar_navegador(self):
         dados = _recarregar_configuracao_runtime()
         if not dados["PORTAL_USUARIO"] or not dados["PORTAL_SENHA"]:
-            raise AutomacaoError("Configure o usuário e a senha do Feegow em Configurações antes de continuar.", "configuracao")
+            raise AutomacaoError("Configure o usuário e a senha do Feegow antes de continuar.", "configuracao")
         self._status("Recuperando o navegador e entrando novamente...")
         self.fechar()
         self.driver=webdriver.Chrome(); self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT); self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao(); self._status("Navegador recuperado. Continuando..."); return True
