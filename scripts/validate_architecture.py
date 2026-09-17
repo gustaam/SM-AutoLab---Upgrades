@@ -5,6 +5,8 @@ from pathlib import Path
 
 
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(\.\d+)?$")
+ACTION_USE_RE = re.compile(r"^\s*uses:\s*([^\s]+)\s*$", re.MULTILINE)
+SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 REQUIRED_PATHS = (
     "main.py",
@@ -72,6 +74,11 @@ LEGACY_IMPORT_CHECK_PATHS = (
     "automacao.py",
     "atualizacao.py",
     "build_windows.bat",
+)
+
+WORKFLOW_PATHS = (
+    ".github/workflows/validate-main.yml",
+    ".github/workflows/release.yml",
 )
 
 PATCH_MARKERS = (
@@ -146,6 +153,20 @@ def require_markers(name: str, content: str, markers: tuple[str, ...]) -> None:
             fail(f"{name} não contém: {marker}")
 
 
+def validate_workflow_pins(root: Path) -> None:
+    for relative in WORKFLOW_PATHS:
+        content = read_text(root, relative)
+        matches = ACTION_USE_RE.findall(content)
+        if not matches:
+            fail(f"{relative} não contém nenhuma GitHub Action para validar")
+        for action_ref in matches:
+            if "@" not in action_ref:
+                fail(f"GitHub Action sem ref em {relative}: {action_ref}")
+            action_name, revision = action_ref.rsplit("@", 1)
+            if not action_name or not SHA_RE.fullmatch(revision):
+                fail(f"GitHub Action não está fixada em SHA de commit em {relative}: {action_ref}")
+
+
 def validate(root: Path) -> None:
     version = read_text(root, "VERSION").strip()
     if not VERSION_RE.fullmatch(version):
@@ -177,7 +198,6 @@ def validate(root: Path) -> None:
     main = contents["main.py"]
     interface = contents["interface.py"]
     app = contents["app.py"]
-    automacao = contents["automacao.py"]
     atualizacao = contents["atualizacao.py"]
     config = contents["config.py"]
     patch = contents["patch.py"]
@@ -199,6 +219,7 @@ def validate(root: Path) -> None:
     require_markers("patch.py", patch, PATCH_MARKERS)
     require_markers("main.py", main, UI_MARKERS)
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
+    validate_workflow_pins(root)
 
     for legacy_import in LEGACY_IMPORTS:
         for relative in LEGACY_IMPORT_CHECK_PATHS:
