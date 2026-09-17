@@ -7,6 +7,8 @@ from pathlib import Path
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(\.\d+)?$")
 ACTION_USE_RE = re.compile(r"^\s*uses:\s*([^\s]+)\s*$", re.MULTILINE)
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+REQUIRED_PYTHON_VERSION = "3.14.7"
+REQUIRED_PIP_VERSION = "26.2.1"
 
 ACTION_RUNTIME_REFS = {
     "actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -113,8 +115,24 @@ def validate_workflow_pins(root: Path) -> None:
                 fail(f"GitHub Action desatualizada em {relative}: {action_ref}")
 
 
+def validate_workflow_runtime(root: Path) -> None:
+    for relative in WORKFLOW_PATHS:
+        content = read_text(root, relative)
+        if f'python-version: "{REQUIRED_PYTHON_VERSION}"' not in content:
+            fail(f"{relative} deve fixar Python em {REQUIRED_PYTHON_VERSION}")
+        if f"python -m pip install pip=={REQUIRED_PIP_VERSION}" not in content:
+            fail(f"{relative} deve fixar pip em {REQUIRED_PIP_VERSION}")
+
+    build = read_text(root, "build_windows.bat")
+    if "sys.version_info[:3] == (3, 14, 7)" not in build:
+        fail("build_windows.bat deve exigir Python 3.14.7")
+    if f"pip install pip=={REQUIRED_PIP_VERSION}" not in build:
+        fail(f"build_windows.bat deve fixar pip em {REQUIRED_PIP_VERSION}")
+
+
 def validate_workflow_security(root: Path) -> None:
     release = read_text(root, ".github/workflows/release.yml")
+    validate_workflow_runtime(root)
     if "permissions: {}" not in release:
         fail("release.yml deve começar com permissões vazias por padrão")
     if "jobs:\n  release:\n    permissions:\n      contents: write" not in release:

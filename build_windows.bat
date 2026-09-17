@@ -40,6 +40,11 @@ exit /b 1
 :python_ok
 %PYTHON% --version
 if errorlevel 1 goto :erro
+%PYTHON% -c "import sys; raise SystemExit(0 if sys.version_info[:3] == (3, 14, 7) else 1)"
+if errorlevel 1 (
+    echo ERRO: este build exige exatamente Python 3.14.7.
+    goto :erro
+)
 
 echo.
 echo Validando versao e arquitetura consolidada...
@@ -48,7 +53,7 @@ if errorlevel 1 goto :erro
 echo Validacao de arquitetura: OK
 echo.
 
-%PYTHON% -m pip install --upgrade pip
+%PYTHON% -m pip install pip==26.2.1
 if errorlevel 1 goto :erro
 %PYTHON% -m pip install -r requirements.txt
 if errorlevel 1 goto :erro
