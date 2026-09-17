@@ -36,7 +36,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install pip==26.2.1
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
           python -m pip check
 
       - name: Validar sintaxe, testes e integração
