@@ -38,6 +38,20 @@ class UpdateEnvironmentTests(unittest.TestCase):
         self.assertNotIn("_MEIPASS2", clean)
         self.assertNotIn("_PyI_MixedCase", clean)
 
+    def test_prepare_independent_restart_sets_pyinstaller_reset(self):
+        source = {
+            "PATH": "C:\\Windows",
+            "_PYI_ARCHIVE_FILE": "C:\\old\\SM.AutoLab.exe",
+            "_PYI_PARENT_PROCESS_LEVEL": "1",
+            "PYINSTALLER_RESET_ENVIRONMENT": "0",
+        }
+        restart_env = atualizacao._prepare_independent_restart_environment(source)
+
+        self.assertEqual(restart_env["PATH"], "C:\\Windows")
+        self.assertEqual(restart_env["PYINSTALLER_RESET_ENVIRONMENT"], "1")
+        self.assertNotIn("_PYI_ARCHIVE_FILE", restart_env)
+        self.assertNotIn("_PYI_PARENT_PROCESS_LEVEL", restart_env)
+
 
 class UpdateDiscoveryTests(unittest.TestCase):
     def _release(self, tag: str) -> dict:
