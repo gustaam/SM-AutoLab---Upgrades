@@ -82,7 +82,7 @@ jobs:
           if ($build -notlike "*SM AutoLab*") { throw "build_windows.bat não contém a rotina de build do SM AutoLab." }
           if ($build -notlike "*from interface import App; from patch import aplicar_patch_ui*") { throw "build_windows.bat não usa a integração consolidada." }
           foreach ($expectedBuild in @("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")) {
-            if ($build -notlike "*$expectedBuild*") { throw "build_windows.bat não contém o metadado de versão embutido: $expectedBuild" }
+            if (-not $build.Contains($expectedBuild)) { throw "build_windows.bat não contém o metadado de versão embutido: $expectedBuild" }
           }
 
       - name: Instalar dependências
