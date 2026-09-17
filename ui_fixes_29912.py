@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ctypes
+import sys
 from datetime import datetime
 
 import customtkinter as ctk
@@ -20,6 +22,8 @@ def _widget_inside(widget, ancestor):
 
 
 def _walk_children(widget):
+    if widget is None:
+        return
     yield widget
     try:
         children = widget.winfo_children()
@@ -29,25 +33,43 @@ def _walk_children(widget):
         yield from _walk_children(child)
 
 
+def _ctrl_pressed(event=None):
+    """Detecta Ctrl de forma consistente, inclusive em widgets Tk/CTk no Windows."""
+    try:
+        state = int(getattr(event, "state", 0) or 0)
+    except Exception:
+        state = 0
+    if state & 0x0004:
+        return True
+
+    if sys.platform.startswith("win"):
+        try:
+            return bool(ctypes.windll.user32.GetAsyncKeyState(0x11) & 0x8000)
+        except Exception:
+            pass
+    return False
+
+
 def _home_counter(self):
+    """Exibe exclusivamente a quantidade de senhas salvas na planilha persistida."""
     label = getattr(self, "arquivos_contador_label", None)
     if label is None:
         return
 
-    total = 0
     try:
-        total = int(self._count_saved_passwords() or 0)
+        total = max(0, int(self._count_saved_passwords() or 0))
     except Exception:
-        pass
-    if total <= 0:
-        try:
-            total = int(self._contar_codigos_mes(datetime.now()) or 0)
-        except Exception:
-            total = 0
+        total = 0
 
     try:
-        label.configure(text=f"{total} códigos no mês")
-        label.pack_configure(side="left", padx=(8, 0))
+        if total > 0:
+            label.configure(text=f"{total} Códigos salvos")
+            if label.winfo_manager() != "pack":
+                label.pack(side="left", padx=(8, 0))
+            else:
+                label.pack_configure(side="left", padx=(8, 0))
+        else:
+            label.pack_forget()
     except Exception:
         pass
 
@@ -87,7 +109,7 @@ def _select_history_tile(self, tile, ctrl=False):
         selected.clear()
         selected.add(tile)
 
-    self._hist_selected_tile = tile if tile in selected else None
+    self._hist_selected_tile = tile if tile in selected else (next(iter(selected), None))
     for other in tuple(selected):
         try:
             other.configure(
@@ -105,8 +127,7 @@ def _bind_history_tile(self, tile):
         return
 
     def on_click(event=None, current=tile):
-        ctrl = bool(getattr(event, "state", 0) & 0x0004) if event is not None else False
-        _select_history_tile(self, current, ctrl=ctrl)
+        _select_history_tile(self, current, ctrl=_ctrl_pressed(event))
         return "break"
 
     def on_double_click(_event=None, item=execucao, current=tile):
@@ -132,9 +153,17 @@ def _bind_history_tile(self, tile):
 
     for widget in _walk_children(tile):
         try:
-            for sequence in ("<Button-1>", "<Double-Button-1>", "<Double-1>", "<Enter>", "<Leave>"):
+            for sequence in (
+                "<Button-1>",
+                "<Control-Button-1>",
+                "<Double-Button-1>",
+                "<Double-1>",
+                "<Enter>",
+                "<Leave>",
+            ):
                 widget.unbind(sequence)
             widget.bind("<Button-1>", on_click)
+            widget.bind("<Control-Button-1>", on_click)
             widget.bind("<Double-Button-1>", on_double_click)
             widget.bind("<Double-1>", on_double_click)
             widget.bind("<Enter>", on_enter)
@@ -160,11 +189,16 @@ def _create_history_tile(self, execucao, atual=False):
         valid_grid = False
     if not valid_grid:
         grid = ctk.CTkFrame(parent, fg_color="transparent")
-        grid.pack(anchor="center", pady=(6, 8))
+        grid.pack(anchor="center", pady=(4, 6))
         self._hist_grid = grid
 
     count = len(grid.winfo_children())
     row, col = divmod(count, 5)
+    for index in range(5):
+        try:
+            grid.grid_columnconfigure(index, weight=0)
+        except Exception:
+            pass
 
     tile = ctk.CTkFrame(
         grid,
@@ -172,10 +206,10 @@ def _create_history_tile(self, execucao, atual=False):
         corner_radius=8,
         border_width=1,
         border_color=self.BORDER,
-        width=118,
-        height=94,
+        width=128,
+        height=104,
     )
-    tile.grid(row=row, column=col, padx=5, pady=5)
+    tile.grid(row=row, column=col, padx=2, pady=2, sticky="nw")
     tile.grid_propagate(False)
     tile._sm_execucao = execucao
     self._hist_tiles.add(tile)
@@ -186,15 +220,21 @@ def _create_history_tile(self, execucao, atual=False):
     dia = inicio.split(" ")[0] if inicio else ""
     hora = inicio.split(" ")[1] if " " in inicio else ""
 
-    ctk.CTkLabel(tile, text="📁", font=("Segoe UI Emoji", 19), text_color=self.ACCENT).pack(pady=(5, 0))
-    ctk.CTkLabel(tile, text=dia, text_color=self.TEXT, font=("Segoe UI", 9, "bold")).pack()
-    ctk.CTkLabel(tile, text=hora, text_color=self.SUBTEXT, font=("Segoe UI", 8)).pack()
+    ctk.CTkLabel(
+        tile, text="📁", font=("Segoe UI Emoji", 21), text_color=self.ACCENT
+    ).pack(pady=(6, 0))
+    ctk.CTkLabel(
+        tile, text=dia, text_color=self.TEXT, font=("Segoe UI", 10, "bold")
+    ).pack()
+    ctk.CTkLabel(
+        tile, text=hora, text_color=self.SUBTEXT, font=("Segoe UI", 8)
+    ).pack()
     ctk.CTkLabel(
         tile,
         text=f"{status} • {erros}",
         text_color=self.SUBTEXT,
         font=("Segoe UI", 8),
-        wraplength=102,
+        wraplength=112,
     ).pack(pady=(2, 0))
 
     _bind_history_tile(self, tile)
@@ -242,7 +282,7 @@ def _calendar_click(self, event):
     if data not in por_dia:
         return "break"
 
-    ctrl = bool(getattr(event, "state", 0) & 0x0004)
+    ctrl = _ctrl_pressed(event)
     if ctrl or getattr(self, "_arquivos_modo_selecao", False):
         self._toggle_data_selecionada(data)
         return "break"
@@ -260,7 +300,25 @@ def _calendar_click(self, event):
     return "break"
 
 
+def _bind_calendar_controls(self):
+    canvas = getattr(self, "_arquivos_calendar_canvas", None)
+    if canvas is None:
+        return
+    try:
+        canvas.unbind("<Button-1>")
+        canvas.unbind("<Control-Button-1>")
+        canvas.bind("<Button-1>", self._clique_calendario_arquivos)
+        canvas.bind("<Control-Button-1>", self._clique_calendario_arquivos)
+    except Exception:
+        pass
+
+
 def _global_click(self, event=None):
+    # Ctrl+clique deve preservar a seleção atual para permitir acrescentar
+    # outro item, exatamente como no Windows Explorer.
+    if _ctrl_pressed(event):
+        return
+
     widget = getattr(event, "widget", None) if event is not None else None
 
     selected_tiles = getattr(self, "_hist_selected_tiles", set())
@@ -325,6 +383,15 @@ def install(App):
     App._restaurar_historico_na_tela = _restore_history
     App._clique_calendario_arquivos = _calendar_click
     App._atualizar_contador_principal_29912 = _home_counter
+
+    original_render = App._renderizar_calendario_arquivos
+
+    def render_calendar_wrapper(self, *args, **kwargs):
+        result = original_render(self, *args, **kwargs)
+        _bind_calendar_controls(self)
+        return result
+
+    App._renderizar_calendario_arquivos = render_calendar_wrapper
 
     original_global_config = App.config_app
 
