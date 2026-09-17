@@ -7,6 +7,7 @@ from pathlib import Path
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(\.\d+)?$")
 ACTION_USE_RE = re.compile(r"^\s*uses:\s*([^\s]+)\s*$", re.MULTILINE)
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
@@ -79,6 +80,16 @@ def require_markers(name: str, content: str, markers: tuple[str, ...]) -> None:
             fail(f"{name} não contém: {marker}")
 
 
+def validate_dependencies(root: Path) -> None:
+    content = read_text(root, "requirements.txt")
+    lines = [line.strip() for line in content.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    if not lines:
+        fail("requirements.txt está vazio")
+    for line in lines:
+        if not REQUIREMENT_PIN_RE.fullmatch(line):
+            fail(f"dependência sem versão exata em requirements.txt: {line}")
+
+
 def validate_workflow_pins(root: Path) -> None:
     for relative in WORKFLOW_PATHS:
         content = read_text(root, relative)
@@ -145,6 +156,7 @@ def validate(root: Path) -> None:
     require_markers("patch.py", patch, PATCH_MARKERS)
     require_markers("main.py", main, UI_MARKERS)
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
+    validate_dependencies(root)
     validate_workflow_pins(root)
     validate_workflow_security(root)
 
