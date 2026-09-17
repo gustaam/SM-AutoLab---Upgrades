@@ -34,10 +34,10 @@ jobs:
 
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
-            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
+            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Recurso obrigatório ausente: $path" } }
-          foreach ($obsoletePath in @("ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml")) {
+          foreach ($obsoletePath in @("version_info_template.txt", "ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml")) {
             if (Test-Path $obsoletePath) { throw "Arquivo/artefato obsoleto ainda presente: $obsoletePath" }
           }
 
@@ -76,11 +76,14 @@ jobs:
           if ($config -notmatch 'DEFAULT_PORTAL_USUARIO\s*=\s*""') { throw "Usuário padrão não está vazio em config.py." }
           if ($config -notmatch 'DEFAULT_PORTAL_SENHA\s*=\s*""') { throw "Senha padrão não está vazia em config.py." }
           if ($interface -match '"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"' -or $interface -match '"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"') { throw "Valor de acesso literal encontrado em interface.py." }
-          foreach ($legacyPath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", "planilha.py", "resultados.py", "splash.py", "ui_fixes_29912.py")) {
+          foreach ($legacyPath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", "planilha.py", "resultados.py", "splash.py", "ui_fixes_29912.py", "version_info_template.txt")) {
             if ($build -like "*$legacyPath*") { throw "build_windows.bat ainda referencia arquivo legado: $legacyPath" }
           }
           if ($build -notlike "*SM AutoLab*") { throw "build_windows.bat não contém a rotina de build do SM AutoLab." }
           if ($build -notlike "*from interface import App; from patch import aplicar_patch_ui*") { throw "build_windows.bat não usa a integração consolidada." }
+          foreach ($expectedBuild in @("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")) {
+            if ($build -notlike "*$expectedBuild*") { throw "build_windows.bat não contém o metadado de versão embutido: $expectedBuild" }
+          }
 
       - name: Instalar dependências
         shell: pwsh
