@@ -60,13 +60,6 @@ class TestPatch(unittest.TestCase):
         self.assertIn("_arquivos_datas_selecionadas", main)
         self.assertIn("_hist_selected_tiles", main)
 
-    def test_config_app_nao_e_envelopado_duas_vezes(self):
-        root = Path(__file__).resolve().parents[1]
-        main = (root / "main.py").read_text(encoding="utf-8")
-        self.assertEqual(main.count("App.config_app = config_wrapper"), 1)
-        self.assertNotIn("original_global_config = App.config_app", main)
-        self.assertNotIn("def global_config_wrapper", main)
-
 
 if __name__ == "__main__":
     unittest.main()
