@@ -69,14 +69,16 @@ jobs:
           if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
           if ($app -notlike "*class Resultados*") { throw "app.py não contém o módulo consolidado de resultados." }
           if ($app -notlike "*def carregar_codigos*") { throw "app.py não contém o leitor de planilhas consolidado." }
-          foreach ($expected in @(
+          foreach ($expectedPatch in @(
             "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE", "_SOURCE_PATCH_ARQUIVOS", "_SOURCE_PATCH_AJUSTES",
             "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS", "_NS_PATCH_AJUSTES",
             "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER",
             "_historico_tem_erro", "_history_rebind_open_299", "_planilha_selecionar_tudo_2991", "_count_saved_passwords",
-            "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910", "_preencher_detalhe_pasta_297",
-            "SM_AUTOLAB_UI_FIXES_29912", "_home_counter", "_calendar_click", "_create_history_tile", "_select_history_tile", "def install_ui_29912", "def aplicar_patch_ui"
-          )) { if ($patch -notlike "*$expected*") { throw "patch.py não contém a funcionalidade consolidada: $expected" } }
+            "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910", "_preencher_detalhe_pasta_297", "def aplicar_patch_ui"
+          )) { if ($patch -notlike "*$expectedPatch*") { throw "patch.py não contém a funcionalidade consolidada: $expectedPatch" } }
+          foreach ($expectedMainUi in @(
+            "SM_AUTOLAB_UI_FIXES_29912", "_home_counter", "_calendar_click", "_create_history_tile", "_select_history_tile", "def install_ui_29912"
+          )) { if ($main -notlike "*$expectedMainUi*") { throw "main.py não contém: $expectedMainUi" } }
           foreach ($legacyImport in @("from patch_base import", "from patch_arquivos import", "from patch_ajustes import", "from patch_297 import", "from patch_298 import", "from patch_299 import", "from patch_2991 import", "from patch_29910 import", "from patch_ui import", "from planilha import", "from resultados import", "from splash import", "from ui_fixes_29912 import")) {
             if ($main -like "*$legacyImport*" -or $interface -like "*$legacyImport*" -or $app -like "*$legacyImport*" -or $atualizacao -like "*$legacyImport*") { throw "Import legado detectado: $legacyImport" }
           }
