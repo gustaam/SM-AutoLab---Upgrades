@@ -101,6 +101,10 @@ def validate_workflow_security(root: Path) -> None:
         fail("release.yml deve conceder contents: write somente ao job de release")
     if "RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}" not in release:
         fail("release.yml não centraliza a tag recebida em RELEASE_TAG")
+    for relative in WORKFLOW_PATHS:
+        content = read_text(root, relative)
+        if "fetch-depth: 1\n          persist-credentials: false" not in content:
+            fail(f"{relative} deve desativar a persistência de credenciais do checkout")
     for marker in ("$tag = $env:RELEASE_TAG", "if ($version -ne $tagVersion)"):
         if marker not in release:
             fail(f"release.yml não usa a entrada de tag de forma segura: {marker}")
