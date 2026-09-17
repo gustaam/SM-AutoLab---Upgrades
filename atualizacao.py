@@ -116,7 +116,9 @@ def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
     manifest_digest = str(manifest.get("main_sha256") or "").strip().lower()
     if manifest_digest and not re.fullmatch(r"[0-9a-f]{64}", manifest_digest):
         return None
-    if asset_digest and (not re.fullmatch(r"[0-9a-f]{64}", asset_digest) or manifest_digest != asset_digest):
+    if asset_digest and not re.fullmatch(r"[0-9a-f]{64}", asset_digest):
+        return None
+    if asset_digest and manifest_digest and manifest_digest != asset_digest:
         return None
     return manifest
 
