@@ -57,6 +57,8 @@ echo.
 if errorlevel 1 goto :erro
 %PYTHON% -m pip install -r requirements.txt
 if errorlevel 1 goto :erro
+%PYTHON% -m pip check
+if errorlevel 1 goto :erro
 %PYTHON% -m pip install pyinstaller==6.22.2
 if errorlevel 1 goto :erro
 
