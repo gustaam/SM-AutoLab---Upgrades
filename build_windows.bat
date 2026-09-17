@@ -33,7 +33,7 @@ if not errorlevel 1 (
     echo ERRO: interface.py ainda contem dependencia externa tkcalendar.
     goto :erro
 )
-for %%F in (main.py interface.py app.py automacao.py config.py atualizacao.py patch.py VERSION version_info_template.txt) do (
+for %%F in (main.py interface.py app.py automacao.py config.py atualizacao.py patch.py VERSION) do (
     if not exist "%%F" (
         echo ERRO: %%F nao encontrado.
         goto :erro
@@ -120,7 +120,34 @@ if errorlevel 1 (
     goto :erro
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$v=(Get-Content VERSION -Raw).Trim(); $p=$v.Split('.'); if($p.Count -lt 3 -or $p.Count -gt 4){throw 'VERSION invalida'}; $t=Get-Content version_info_template.txt -Raw; $b=if($p.Count -eq 4){$p[3]}else{'0'}; $t=$t.Replace('__MAJOR__',$p[0]).Replace('__MINOR__',$p[1]).Replace('__PATCH__',$p[2]).Replace('__BUILD__',$b).Replace('__VERSION__',$v); Set-Content version_info.txt $t -Encoding UTF8"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$v=(Get-Content VERSION -Raw).Trim(); $p=$v.Split('.'); if($p.Count -lt 3 -or $p.Count -gt 4){throw 'VERSION invalida'}; $b=if($p.Count -eq 4){$p[3]}else{'0'}; $t=@' 
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(__MAJOR__, __MINOR__, __PATCH__, __BUILD__),
+    prodvers=(__MAJOR__, __MINOR__, __PATCH__, __BUILD__),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable('040904B0', [
+        StringStruct('CompanyName', 'SM AutoLab'),
+        StringStruct('FileDescription', 'SM AutoLab'),
+        StringStruct('FileVersion', '__VERSION__'),
+        StringStruct('InternalName', 'SM AutoLab'),
+        StringStruct('OriginalFilename', 'SM AutoLab.exe'),
+        StringStruct('ProductName', 'SM AutoLab'),
+        StringStruct('ProductVersion', '__VERSION__')
+      ])
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+'@; $t=$t.TrimStart(); $t=$t.Replace('__MAJOR__',$p[0]).Replace('__MINOR__',$p[1]).Replace('__PATCH__',$p[2]).Replace('__BUILD__',$b).Replace('__VERSION__',$v); Set-Content version_info.txt $t -Encoding UTF8"
 if errorlevel 1 goto :erro
 
 if not exist "version_info.txt" (
