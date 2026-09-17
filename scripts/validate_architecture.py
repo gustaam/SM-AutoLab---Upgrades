@@ -111,7 +111,9 @@ def validate_workflow_pins(root: Path) -> None:
             if not action_name or not SHA_RE.fullmatch(revision):
                 fail(f"GitHub Action não está fixada em SHA de commit em {relative}: {action_ref}")
             expected_revision = ACTION_RUNTIME_REFS.get(action_name)
-            if expected_revision and revision.lower() != expected_revision:
+            if expected_revision is None:
+                fail(f"GitHub Action não autorizada em {relative}: {action_ref}")
+            if revision.lower() != expected_revision:
                 fail(f"GitHub Action desatualizada em {relative}: {action_ref}")
 
 
