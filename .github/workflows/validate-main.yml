@@ -27,42 +27,24 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Remover fallback de credenciais embutidas
+      - name: Remover valores de acesso embutidos no fallback da interface
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
         run: |
-          @'
-from pathlib import Path
-import re
-import subprocess
-
-path = Path("interface.py")
-text = path.read_text(encoding="utf-8")
-pattern = re.compile(
-    r'except Exception:\s+dados\s*=\s*\{\s*'
-    r'"SITE_URL"\s*:\s*".*?",\s*'
-    r'"PORTAL_USUARIO"\s*:\s*".*?",\s*'
-    r'"PORTAL_SENHA"\s*:\s*".*?",\s*\}',
-    re.S,
-)
-replacement = '''except Exception:
-            dados = {
-                "SITE_URL": "",
-                "PORTAL_USUARIO": "",
-                "PORTAL_SENHA": "",
-            }'''
-new_text, count = pattern.subn(replacement, text, count=1)
-if count == 0 or new_text == text:
-    raise SystemExit(0)
-path.write_text(new_text, encoding="utf-8")
-subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
-subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
-subprocess.run(["git", "add", "interface.py"], check=True)
-if subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode == 0:
-    raise SystemExit(0)
-subprocess.run(["git", "commit", "-m", "Remover fallback de credenciais embutidas"], check=True)
-subprocess.run(["git", "push", "origin", "HEAD:main"], check=True)
-'@ | python
+          $path = "interface.py"
+          $text = Get-Content $path -Raw
+          $updated = [regex]::Replace($text, '("PORTAL_USUARIO"\s*:\s*")[^"]*(")', '$1$2')
+          $updated = [regex]::Replace($updated, '("PORTAL_SENHA"\s*:\s*")[^"]*(")', '$1$2')
+          if ($updated -eq $text) {
+            Write-Host "Nenhum valor de acesso embutido no fallback foi encontrado."
+            exit 0
+          }
+          Set-Content -Path $path -Value $updated -Encoding UTF8
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- interface.py
+          git commit -m "Remover valores de acesso embutidos"
+          git push origin HEAD:main
 
       - name: Validar versão, estrutura e arquitetura consolidada
         shell: pwsh
@@ -110,8 +92,9 @@ subprocess.run(["git", "push", "origin", "HEAD:main"], check=True)
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Atualizador separado/modo auxiliar antigo detectado." }
-          if ($config -match 'DEFAULT_PORTAL_USUARIO\s*=\s*["'']\s*[^"'']\S' -or $config -match 'DEFAULT_PORTAL_SENHA\s*=\s*["'']\s*[^"'']\S') { throw "Credencial padrão embutida em config.py." }
-          if ($interface -match '"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"' -or $interface -match '"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"') { throw "Credencial literal encontrada em interface.py." }
+          if ($config -notmatch 'DEFAULT_PORTAL_USUARIO\s*=\s*""') { throw "Usuário padrão não está vazio em config.py." }
+          if ($config -notmatch 'DEFAULT_PORTAL_SENHA\s*=\s*""') { throw "Senha padrão não está vazia em config.py." }
+          if ($interface -match '"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"' -or $interface -match '"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"') { throw "Valor de acesso literal encontrado em interface.py." }
           foreach ($legacyPath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", "planilha.py", "resultados.py", "splash.py", "ui_fixes_29912.py")) {
             if ($build -like "*$legacyPath*") { throw "build_windows.bat ainda referencia arquivo legado: $legacyPath" }
           }
