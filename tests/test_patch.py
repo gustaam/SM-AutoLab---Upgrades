@@ -116,8 +116,8 @@ class TestPatch(unittest.TestCase):
         interface = (root / "interface.py").read_text(encoding="utf-8")
         self.assertRegex(config, r'DEFAULT_PORTAL_USUARIO\s*=\s*""')
         self.assertRegex(config, r'DEFAULT_PORTAL_SENHA\s*=\s*""')
-        self.assertNotRegex(interface, r'"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"')
-        self.assertNotRegex(interface, r'"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"')
+        self.assertNotRegex(interface, r'"PORTAL_USUARIO"\s*=\s*"[^"\r\n]+"')
+        self.assertNotRegex(interface, r'"PORTAL_SENHA"\s*=\s*"[^"\r\n]+"')
 
     def test_automacao_usa_imports_explicitos(self):
         root = Path(__file__).resolve().parents[1]
@@ -401,6 +401,38 @@ class UpdateDiscoveryTests(unittest.TestCase):
             atualizacao, "fetch_releases", return_value=[release]
         ):
             self.assertIsNone(atualizacao.find_update())
+
+    def test_rejects_manifest_when_asset_digest_does_not_match(self):
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return (
+                    b'{"channel":"SM-AUTOLAB-RESET-2026-09","version":"2.99.10",'
+                    b'"tag":"v2.99.10","main_asset":"SM AutoLab.exe",'
+                    b'"main_sha256":"1111111111111111111111111111111111111111111111111111111111111111"}'
+                )
+
+        release = {
+            "tag_name": "v2.99.10",
+            "assets": [
+                {
+                    "name": "SM AutoLab Release Manifest.json",
+                    "browser_download_url": "https://github.com/gustaam/SM-AutoLab---Upgrades/releases/download/v2.99.10/SM%20AutoLab%20Release%20Manifest.json",
+                },
+                {
+                    "name": "SM AutoLab.exe",
+                    "browser_download_url": "https://github.com/gustaam/SM-AutoLab---Upgrades/releases/download/v2.99.10/SM%20AutoLab.exe",
+                    "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+                },
+            ],
+        }
+        with patch.object(atualizacao.urllib.request, "urlopen", return_value=FakeResponse()):
+            self.assertIsNone(atualizacao._load_release_manifest(release))
 
 
 if __name__ == "__main__":
