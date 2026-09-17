@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -20,11 +20,49 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.14"
+
+      - name: Remover fallback de credenciais embutidas
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          @'
+from pathlib import Path
+import re
+import subprocess
+
+path = Path("interface.py")
+text = path.read_text(encoding="utf-8")
+pattern = re.compile(
+    r'except Exception:\s+dados\s*=\s*\{\s*'
+    r'"SITE_URL"\s*:\s*".*?",\s*'
+    r'"PORTAL_USUARIO"\s*:\s*".*?",\s*'
+    r'"PORTAL_SENHA"\s*:\s*".*?",\s*\}',
+    re.S,
+)
+replacement = '''except Exception:
+            dados = {
+                "SITE_URL": "",
+                "PORTAL_USUARIO": "",
+                "PORTAL_SENHA": "",
+            }'''
+new_text, count = pattern.subn(replacement, text, count=1)
+if count == 0 or new_text == text:
+    raise SystemExit(0)
+path.write_text(new_text, encoding="utf-8")
+subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
+subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
+subprocess.run(["git", "add", "interface.py"], check=True)
+if subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode == 0:
+    raise SystemExit(0)
+subprocess.run(["git", "commit", "-m", "Remover fallback de credenciais embutidas"], check=True)
+subprocess.run(["git", "push", "origin", "HEAD:main"], check=True)
+'@ | python
 
       - name: Validar versão, estrutura e arquitetura consolidada
         shell: pwsh
@@ -46,12 +84,13 @@ jobs:
           $interface = Get-Content interface.py -Raw
           $app = Get-Content app.py -Raw
           $atualizacao = Get-Content atualizacao.py -Raw
+          $config = Get-Content config.py -Raw
           $build = Get-Content build_windows.bat -Raw
           if ($main -notlike "*from patch import aplicar_patch_ui*") { throw "main.py não usa patch.py como integração única." }
           if ($main -like "*from ui_fixes_29912 import*") { throw "main.py ainda referencia o módulo UI removido." }
           if ($main -notlike "*def install_ui_29912*") { throw "main.py não contém as correções finais de UI consolidadas." }
           if ($main -notlike "*class StartupSplash*") { throw "main.py não contém o splash consolidado." }
-          if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
+          if ($main -notlike "*def _corrigir_historico_ilimitado*") { throw "main.py perdeu a correção de histórico ilimitado." }
           if ($app -notlike "*class Resultados*") { throw "app.py não contém o módulo consolidado de resultados." }
           if ($app -notlike "*def carregar_codigos*") { throw "app.py não contém o leitor de planilhas consolidado." }
           foreach ($expectedPatch in @(
@@ -60,11 +99,10 @@ jobs:
             "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER",
             "_historico_tem_erro", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299",
             "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991",
-            "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910", "def aplicar_patch_ui"
+            "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910",
+            "SM_AUTOLAB_UI_FIXES_29912", "_home_counter", "_calendar_click", "_create_history_tile", "_select_history_tile", "def install_ui_29912",
+            "def aplicar_patch_ui"
           )) { if ($patch -notlike "*$expectedPatch*") { throw "patch.py não contém: $expectedPatch" } }
-          foreach ($expectedMainUi in @(
-            "SM_AUTOLAB_UI_FIXES_29912", "_home_counter", "_calendar_click", "_create_history_tile", "_select_history_tile", "def install_ui_29912"
-          )) { if ($main -notlike "*$expectedMainUi*") { throw "main.py não contém: $expectedMainUi" } }
           foreach ($legacyImport in @("from patch_base import", "from patch_arquivos import", "from patch_ajustes import", "from patch_297 import", "from patch_298 import", "from patch_299 import", "from patch_2991 import", "from patch_29910 import", "from patch_ui import", "from planilha import", "from resultados import", "from splash import", "from ui_fixes_29912 import")) {
             if ($main -like "*$legacyImport*" -or $interface -like "*$legacyImport*" -or $app -like "*$legacyImport*" -or $atualizacao -like "*$legacyImport*" -or $build -like "*$legacyImport*") { throw "Import legado detectado: $legacyImport" }
           }
@@ -72,6 +110,8 @@ jobs:
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Atualizador separado/modo auxiliar antigo detectado." }
+          if ($config -match 'DEFAULT_PORTAL_USUARIO\s*=\s*["'']\s*[^"'']\S' -or $config -match 'DEFAULT_PORTAL_SENHA\s*=\s*["'']\s*[^"'']\S') { throw "Credencial padrão embutida em config.py." }
+          if ($interface -match '"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"' -or $interface -match '"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"') { throw "Credencial literal encontrada em interface.py." }
           foreach ($legacyPath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", "planilha.py", "resultados.py", "splash.py", "ui_fixes_29912.py")) {
             if ($build -like "*$legacyPath*") { throw "build_windows.bat ainda referencia arquivo legado: $legacyPath" }
           }
