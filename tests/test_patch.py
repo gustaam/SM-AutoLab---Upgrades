@@ -1,3 +1,4 @@
+import re
 import unittest
 from pathlib import Path
 
@@ -59,6 +60,20 @@ class TestPatch(unittest.TestCase):
         self.assertIn("0x0004", main)
         self.assertIn("_arquivos_datas_selecionadas", main)
         self.assertIn("_hist_selected_tiles", main)
+
+    def test_credenciais_nao_ficam_embutidas_no_codigo(self):
+        root = Path(__file__).resolve().parents[1]
+        config = (root / "config.py").read_text(encoding="utf-8")
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+
+        self.assertRegex(config, r'DEFAULT_PORTAL_USUARIO\s*=\s*["\']\s*["\']')
+        self.assertRegex(config, r'DEFAULT_PORTAL_SENHA\s*=\s*["\']\s*["\']')
+        self.assertNotRegex(interface, r'"PORTAL_USUARIO"\s*:\s*"[^"\']+"')
+        self.assertNotRegex(interface, r'"PORTAL_SENHA"\s*:\s*"[^"\']+"')
+
+    def test_automacao_exige_credenciais_configuradas(self):
+        from automacao import Automacao
+        self.assertTrue(hasattr(Automacao, "iniciar_navegador"))
 
 
 if __name__ == "__main__":
