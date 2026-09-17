@@ -39,63 +39,14 @@ jobs:
           $tagCommit = (git rev-parse HEAD).Trim()
           if ($tagCommit -ne $mainCommit) { throw "A tag deve apontar exatamente para o commit atual da main. Tag: $tagCommit; main: $mainCommit" }
 
-      - name: Validar origem, versão e arquitetura
+      - name: Validar tag e arquitetura consolidada
         shell: pwsh
         run: |
           $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
           $tagVersion = $tag.TrimStart('vV')
           $version = (Get-Content VERSION -Raw).Trim()
           if ($version -ne $tagVersion) { throw "VERSION ($version) não corresponde à tag ($tag)." }
-          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw "VERSION inválida: $version" }
-
-          $required = @(
-            "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
-            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat"
-          )
-          foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @(
-            "version_info_template.txt", "ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py",
-            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py",
-            "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py",
-            "patch_2991.py", "patch_29910.py", "patch_ui.py"
-          )) {
-            if (Test-Path $legacyPath) { throw "Arquivo legado/consolidado ainda presente: $legacyPath" }
-          }
-
-          $main = Get-Content main.py -Raw
-          $patch = Get-Content patch.py -Raw
-          $interface = Get-Content interface.py -Raw
-          $app = Get-Content app.py -Raw
-          $atualizacao = Get-Content atualizacao.py -Raw
-          $config = Get-Content config.py -Raw
-          $build = Get-Content build_windows.bat -Raw
-
-          foreach ($expected in @(
-            "from patch import aplicar_patch_ui", "def install_ui_29912", "class StartupSplash",
-            "def _corrigir_historico_ilimitado", "def _validar_base_aplicacao"
-          )) { if (-not $main.Contains($expected)) { throw "main.py não contém: $expected" } }
-          foreach ($expected in @("class Resultados", "def carregar_codigos")) { if (-not $app.Contains($expected)) { throw "app.py não contém: $expected" } }
-          foreach ($expected in @(
-            "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE",
-            "_SOURCE_PATCH_ARQUIVOS", "_SOURCE_PATCH_AJUSTES", "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS",
-            "_NS_PATCH_AJUSTES", "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER",
-            "PATCH_2991_MARKER", "PATCH_29910_MARKER", "_count_saved_passwords", "firstweekday",
-            "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910", "def aplicar_patch_ui"
-          )) { if (-not $patch.Contains($expected)) { throw "patch.py não contém: $expected" } }
-          foreach ($expected in @("from patch_base import", "from patch_arquivos import", "from patch_ajustes import", "from patch_297 import", "from patch_298 import", "from patch_299 import", "from patch_2991 import", "from patch_29910 import", "from patch_ui import", "from planilha import", "from resultados import", "from splash import", "from ui_fixes_29912 import")) {
-            if ($main.Contains($expected) -or $interface.Contains($expected) -or $app.Contains($expected) -or $atualizacao.Contains($expected) -or $build.Contains($expected)) { throw "Import legado detectado: $expected" }
-          }
-          if ($patch.Contains("Ctrl + clique para selecionar várias datas")) { throw "Instrução visual antiga ainda presente." }
-          if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
-          if (-not $interface.Contains("from atualizacao import find_update, launch_updater")) { throw "Atualizador integrado não encontrado." }
-          if ($atualizacao -notmatch 'def\s+find_update\s*\(' -or $atualizacao -notmatch 'def\s+launch_updater\s*\(') { throw "atualizacao.py não expõe o motor integrado." }
-          if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao atualizador separado detectada." }
-          if ($config -notmatch 'DEFAULT_PORTAL_USUARIO\s*=\s*""' -or $config -notmatch 'DEFAULT_PORTAL_SENHA\s*=\s*""') { throw "Credenciais padrão não estão vazias em config.py." }
-          if ($interface -match '"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"' -or $interface -match '"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"') { throw "Valor de acesso literal encontrado em interface.py." }
-          if ($build.Contains("version_info_template.txt")) { throw "build_windows.bat ainda depende do template externo." }
-          foreach ($expected in @("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")) {
-            if (-not $build.Contains($expected)) { throw "build_windows.bat não contém o metadado embutido esperado: $expected" }
-          }
+          python scripts/validate_architecture.py
 
       - name: Instalar dependências
         shell: pwsh
