@@ -1,4 +1,3 @@
-import re
 import unittest
 from pathlib import Path
 
@@ -84,6 +83,14 @@ class TestPatch(unittest.TestCase):
             "carregar_configuracoes",
         ):
             self.assertIn(symbol, automacao)
+
+    def test_config_app_tem_apenas_um_wrapper(self):
+        root = Path(__file__).resolve().parents[1]
+        main = (root / "main.py").read_text(encoding="utf-8")
+        self.assertEqual(main.count("App.config_app = config_wrapper"), 1)
+        self.assertNotIn("original_global_config = App.config_app", main)
+        self.assertNotIn("def global_config_wrapper", main)
+        self.assertIn('self.app.bind_all("<Button-1>", lambda event: _global_click(self, event), add="+")', main)
 
 
 if __name__ == "__main__":
