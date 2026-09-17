@@ -34,10 +34,10 @@ jobs:
 
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
-            "patch.py", "ui_fixes_29912.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
+            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "version_info_template.txt"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Recurso obrigatório ausente: $path" } }
-          foreach ($obsoletePath in @("planilha.py", "resultados.py", "splash.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml")) {
+          foreach ($obsoletePath in @("ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml")) {
             if (Test-Path $obsoletePath) { throw "Arquivo/artefato obsoleto ainda presente: $obsoletePath" }
           }
 
@@ -48,7 +48,8 @@ jobs:
           $atualizacao = Get-Content atualizacao.py -Raw
           $build = Get-Content build_windows.bat -Raw
           if ($main -notlike "*from patch import aplicar_patch_ui*") { throw "main.py não usa patch.py como integração única." }
-          if ($main -notlike "*from ui_fixes_29912 import install as install_ui_29912*") { throw "main.py não instala a camada final de correções da UI." }
+          if ($main -like "*from ui_fixes_29912 import*") { throw "main.py ainda referencia o módulo UI removido." }
+          if ($main -notlike "*def install_ui_29912*") { throw "main.py não contém as correções finais de UI consolidadas." }
           if ($main -notlike "*class StartupSplash*") { throw "main.py não contém o splash consolidado." }
           if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
           if ($app -notlike "*class Resultados*") { throw "app.py não contém o módulo consolidado de resultados." }
@@ -60,16 +61,17 @@ jobs:
             "_historico_tem_erro", "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299",
             "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991", "_planilha_iniciar_digitacao_2991",
             "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910",
+            "SM_AUTOLAB_UI_FIXES_29912", "_home_counter", "_calendar_click", "_create_history_tile", "_select_history_tile", "def install_ui_29912",
             "def aplicar_patch_ui"
           )) { if ($patch -notlike "*$expected*") { throw "patch.py não contém: $expected" } }
-          foreach ($legacyImport in @("from patch_base import", "from patch_arquivos import", "from patch_ajustes import", "from patch_297 import", "from patch_298 import", "from patch_299 import", "from patch_2991 import", "from patch_29910 import", "from patch_ui import", "from planilha import", "from resultados import", "from splash import")) {
+          foreach ($legacyImport in @("from patch_base import", "from patch_arquivos import", "from patch_ajustes import", "from patch_297 import", "from patch_298 import", "from patch_299 import", "from patch_2991 import", "from patch_29910 import", "from patch_ui import", "from planilha import", "from resultados import", "from splash import", "from ui_fixes_29912 import")) {
             if ($main -like "*$legacyImport*" -or $interface -like "*$legacyImport*" -or $app -like "*$legacyImport*" -or $atualizacao -like "*$legacyImport*" -or $build -like "*$legacyImport*") { throw "Import legado detectado: $legacyImport" }
           }
           if ($patch -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente em patch.py." }
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
           if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Atualizador separado/modo auxiliar antigo detectado." }
-          foreach ($legacyPath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", "planilha.py", "resultados.py", "splash.py")) {
+          foreach ($legacyPath in @("patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", "planilha.py", "resultados.py", "splash.py", "ui_fixes_29912.py")) {
             if ($build -like "*$legacyPath*") { throw "build_windows.bat ainda referencia arquivo legado: $legacyPath" }
           }
           if ($build -notlike "*SM AutoLab*") { throw "build_windows.bat não contém a rotina de build do SM AutoLab." }
@@ -88,7 +90,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Falha de compilação sintática." }
           python -m unittest discover -s tests -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Falha nos testes automatizados." }
-          python -c "from interface import App; from patch import aplicar_patch_ui; from main import _corrigir_historico_ilimitado, _validar_base_aplicacao; from ui_fixes_29912 import install as install_ui_29912; aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+          python -c "from interface import App; from patch import aplicar_patch_ui; from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912; aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
 
       - name: Verificar Defender
         shell: pwsh
