@@ -37,7 +37,14 @@ jobs:
             "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Recurso obrigatório ausente: $path" } }
-          foreach ($obsoletePath in @("version_info_template.txt", "ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml")) {
+          foreach ($obsoletePath in @(
+            "version_info_template.txt", "ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py",
+            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py",
+            "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py",
+            "patch_2991.py", "patch_29910.py", "patch_ui.py", "tests/test_atualizacao.py",
+            "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py",
+            ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml"
+          )) {
             if (Test-Path $obsoletePath) { throw "Arquivo/artefato obsoleto ainda presente: $obsoletePath" }
           }
 
@@ -48,6 +55,7 @@ jobs:
           $atualizacao = Get-Content atualizacao.py -Raw
           $config = Get-Content config.py -Raw
           $build = Get-Content build_windows.bat -Raw
+          $tests = Get-Content tests/test_patch.py -Raw
           if ($main -notlike "*from patch import aplicar_patch_ui*") { throw "main.py não usa patch.py como integração única." }
           if ($main -like "*from ui_fixes_29912 import*") { throw "main.py ainda referencia o módulo UI removido." }
           if ($main -notlike "*def install_ui_29912*") { throw "main.py não contém as correções finais de UI consolidadas." }
@@ -84,6 +92,11 @@ jobs:
           foreach ($expectedBuild in @("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")) {
             if (-not $build.Contains($expectedBuild)) { throw "build_windows.bat não contém o metadado de versão embutido: $expectedBuild" }
           }
+          foreach ($expectedTest in @(
+            "class VersionComparisonTests", "class UpdateEnvironmentTests", "class UpdateDiscoveryTests",
+            "class UIFixes29912Tests", "class HistoricoIlimitadoTests",
+            "test_arquivos_de_teste_auxiliares_foram_consolidados"
+          )) { if (-not $tests.Contains($expectedTest)) { throw "tests/test_patch.py não contém: $expectedTest" } }
 
       - name: Instalar dependências
         shell: pwsh
