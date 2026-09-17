@@ -7,6 +7,12 @@ from pathlib import Path
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(\.\d+)?$")
 ACTION_USE_RE = re.compile(r"^\s*uses:\s*([^\s]+)\s*$", re.MULTILINE)
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+
+ACTION_RUNTIME_REFS = {
+    "actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "actions/setup-python": "5fda3b95a4ea91299a34e894583c3862153e4b97",
+    "softprops/action-gh-release": "efb35369e0ad2afab669f228072c1b0d510eae64",
+}
 REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 
 REQUIRED_PATHS = (
@@ -102,6 +108,9 @@ def validate_workflow_pins(root: Path) -> None:
             action_name, revision = action_ref.rsplit("@", 1)
             if not action_name or not SHA_RE.fullmatch(revision):
                 fail(f"GitHub Action não está fixada em SHA de commit em {relative}: {action_ref}")
+            expected_revision = ACTION_RUNTIME_REFS.get(action_name)
+            if expected_revision and revision.lower() != expected_revision:
+                fail(f"GitHub Action desatualizada em {relative}: {action_ref}")
 
 
 def validate_workflow_security(root: Path) -> None:
