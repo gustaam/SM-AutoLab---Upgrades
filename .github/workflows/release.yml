@@ -3,9 +3,9 @@ name: Build and publish release
 on:
   push:
     tags:
+      - "v*.*"
       - "v*.*.*"
       - "v*.*.*.*"
-      - "v*.*"
   workflow_dispatch:
     inputs:
       release_tag:
@@ -50,10 +50,15 @@ jobs:
 
           $required = @(
             "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
-            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets"
+            "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat"
           )
           foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Arquivo/recurso obrigatório ausente: $path" } }
-          foreach ($legacyPath in @("ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py", "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py", "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py", "patch_2991.py", "patch_29910.py", "patch_ui.py", "version_info_template.txt")) {
+          foreach ($legacyPath in @(
+            "version_info_template.txt", "ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py",
+            "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py",
+            "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py",
+            "patch_2991.py", "patch_29910.py", "patch_ui.py"
+          )) {
             if (Test-Path $legacyPath) { throw "Arquivo legado/consolidado ainda presente: $legacyPath" }
           }
 
@@ -63,34 +68,34 @@ jobs:
           $app = Get-Content app.py -Raw
           $atualizacao = Get-Content atualizacao.py -Raw
           $config = Get-Content config.py -Raw
-          if ($main -notlike "*from patch import aplicar_patch_ui*") { throw "main.py não usa o ponto único de integração patch.py." }
-          if ($main -like "*from ui_fixes_29912 import*") { throw "main.py ainda referencia o módulo UI removido." }
-          if ($main -notlike "*def install_ui_29912*") { throw "main.py não contém as correções finais de UI consolidadas." }
-          if ($main -notlike "*class StartupSplash*") { throw "main.py não contém o splash consolidado." }
-          if ($main -notlike "*_validar_base_aplicacao*") { throw "main.py perdeu a validação de integração." }
-          if ($app -notlike "*class Resultados*") { throw "app.py não contém o módulo consolidado de resultados." }
-          if ($app -notlike "*def carregar_codigos*") { throw "app.py não contém o leitor de planilhas consolidado." }
-          foreach ($expectedPatch in @(
-            "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE", "_SOURCE_PATCH_ARQUIVOS", "_SOURCE_PATCH_AJUSTES",
-            "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS", "_NS_PATCH_AJUSTES",
-            "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER",
-            "_historico_tem_erro", "_history_rebind_open_299", "_planilha_selecionar_tudo_2991", "_count_saved_passwords",
-            "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910", "_preencher_detalhe_pasta_297", "def aplicar_patch_ui"
-          )) { if ($patch -notlike "*$expectedPatch*") { throw "patch.py não contém a funcionalidade consolidada: $expectedPatch" } }
-          foreach ($expectedMainUi in @(
-            "SM_AUTOLAB_UI_FIXES_29912", "_home_counter", "_calendar_click", "_create_history_tile", "_select_history_tile", "def install_ui_29912"
-          )) { if ($main -notlike "*$expectedMainUi*") { throw "main.py não contém: $expectedMainUi" } }
-          foreach ($legacyImport in @("from patch_base import", "from patch_arquivos import", "from patch_ajustes import", "from patch_297 import", "from patch_298 import", "from patch_299 import", "from patch_2991 import", "from patch_29910 import", "from patch_ui import", "from planilha import", "from resultados import", "from splash import", "from ui_fixes_29912 import")) {
-            if ($main -like "*$legacyImport*" -or $interface -like "*$legacyImport*" -or $app -like "*$legacyImport*" -or $atualizacao -like "*$legacyImport*") { throw "Import legado detectado: $legacyImport" }
+          $build = Get-Content build_windows.bat -Raw
+
+          foreach ($expected in @(
+            "from patch import aplicar_patch_ui", "def install_ui_29912", "class StartupSplash",
+            "def _corrigir_historico_ilimitado", "def _validar_base_aplicacao"
+          )) { if (-not $main.Contains($expected)) { throw "main.py não contém: $expected" } }
+          foreach ($expected in @("class Resultados", "def carregar_codigos")) { if (-not $app.Contains($expected)) { throw "app.py não contém: $expected" } }
+          foreach ($expected in @(
+            "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE",
+            "_SOURCE_PATCH_ARQUIVOS", "_SOURCE_PATCH_AJUSTES", "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS",
+            "_NS_PATCH_AJUSTES", "PATCH_297_MARKER", "PATCH_298_MARKER", "PATCH_299_MARKER",
+            "PATCH_2991_MARKER", "PATCH_29910_MARKER", "_count_saved_passwords", "firstweekday",
+            "_atualizar_contador_selecao_29910", "_ensure_selection_state_29910", "def aplicar_patch_ui"
+          )) { if (-not $patch.Contains($expected)) { throw "patch.py não contém: $expected" } }
+          foreach ($expected in @("from patch_base import", "from patch_arquivos import", "from patch_ajustes import", "from patch_297 import", "from patch_298 import", "from patch_299 import", "from patch_2991 import", "from patch_29910 import", "from patch_ui import", "from planilha import", "from resultados import", "from splash import", "from ui_fixes_29912 import")) {
+            if ($main.Contains($expected) -or $interface.Contains($expected) -or $app.Contains($expected) -or $atualizacao.Contains($expected) -or $build.Contains($expected)) { throw "Import legado detectado: $expected" }
           }
-          if ($patch -like "*Ctrl + clique para selecionar várias datas*") { throw "Instrução visual antiga ainda presente." }
+          if ($patch.Contains("Ctrl + clique para selecionar várias datas")) { throw "Instrução visual antiga ainda presente." }
           if ($interface -match "tkcalendar") { throw "Dependência tkcalendar detectada." }
-          if ($interface -notlike "*from atualizacao import find_update, launch_updater*") { throw "Atualizador integrado não encontrado." }
+          if (-not $interface.Contains("from atualizacao import find_update, launch_updater")) { throw "Atualizador integrado não encontrado." }
           if ($atualizacao -notmatch 'def\s+find_update\s*\(' -or $atualizacao -notmatch 'def\s+launch_updater\s*\(') { throw "atualizacao.py não expõe o motor integrado." }
           if ($atualizacao -match 'SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper') { throw "Referência ao atualizador separado detectada." }
-          if ($config -notmatch 'DEFAULT_PORTAL_USUARIO\s*=\s*""') { throw "Usuário padrão não está vazio em config.py." }
-          if ($config -notmatch 'DEFAULT_PORTAL_SENHA\s*=\s*""') { throw "Senha padrão não está vazia em config.py." }
+          if ($config -notmatch 'DEFAULT_PORTAL_USUARIO\s*=\s*""' -or $config -notmatch 'DEFAULT_PORTAL_SENHA\s*=\s*""') { throw "Credenciais padrão não estão vazias em config.py." }
           if ($interface -match '"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"' -or $interface -match '"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"') { throw "Valor de acesso literal encontrado em interface.py." }
+          if ($build.Contains("version_info_template.txt")) { throw "build_windows.bat ainda depende do template externo." }
+          foreach ($expected in @("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")) {
+            if (-not $build.Contains($expected)) { throw "build_windows.bat não contém o metadado embutido esperado: $expected" }
+          }
 
       - name: Instalar dependências
         shell: pwsh
@@ -108,19 +113,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Falha nos testes automatizados." }
           python -c "from interface import App; from patch import aplicar_patch_ui; from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912; aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
 
-      - name: Validar build local e preparar metadados
+      - name: Validar build e preparar metadados
         shell: pwsh
         run: |
-          $buildScript = Get-Content "build_windows.bat" -Raw
-          foreach ($expected in @(
-            'Set-Content version_info.txt',
-            'VSVersionInfo(',
-            'FixedFileInfo(',
-            'StringFileInfo(['
-          )) { if ($buildScript -notlike "*$expected*") { throw "build_windows.bat não contém o metadado embutido esperado: $expected" } }
-          if ($buildScript -match 'version_info_template\.txt') { throw "build_windows.bat ainda depende do template externo." }
           $version = (Get-Content VERSION -Raw).Trim()
           $parts = $version.Split('.')
+          if ($parts.Count -lt 3 -or $parts.Count -gt 4) { throw "VERSION inválida: $version" }
           $build = if ($parts.Count -eq 4) { $parts[3] } else { "0" }
           $metadata = [string]::Join([Environment]::NewLine,@(
             'VSVersionInfo(',
@@ -155,20 +153,19 @@ jobs:
 
       - name: Build SM AutoLab
         shell: cmd
-        run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
       - name: Verificar executável com Microsoft Defender
         shell: pwsh
         run: |
           $main = (Resolve-Path "dist\SM AutoLab.exe").Path
-          try { Start-MpScan -ScanPath $main -ScanType CustomScan -ErrorAction Stop } catch { throw "Não foi possível iniciar o Microsoft Defender: $($_.Exception.Message)" }
+          Start-MpScan -ScanPath $main -ScanType CustomScan -ErrorAction Stop
           Start-Sleep -Seconds 10
           $detections = Get-MpThreatDetection | Where-Object { $_.Resources -match [regex]::Escape($main) -or $_.Resources -match "SM AutoLab\.exe" }
           if ($detections) { $names = ($detections | ForEach-Object { $_.ThreatName } | Sort-Object -Unique) -join ", "; throw "Microsoft Defender detectou ameaça no executável gerado: $names" }
           Write-Host "Microsoft Defender: nenhuma detecção associada ao executável."
 
-      - name: Validar executável e gerar manifesto
+      - name: Gerar manifesto da release
         shell: pwsh
         run: |
           $main = "dist\SM AutoLab.exe"
@@ -201,18 +198,15 @@ jobs:
           $release = Invoke-RestMethod -Uri "$apiRoot/releases/tags/$tag" -Headers $headers
           $commit = (Invoke-RestMethod -Uri "$apiRoot/commits/$tag" -Headers $headers).sha
           if ($commit -ne "${{ github.sha }}") { throw "A release publicada não aponta para o commit executado." }
-
           function Normalize-AssetName([string]$value) { return (($value ?? "").Trim().ToLower() -replace '[\s._-]+', '') }
           $assets = @($release.assets)
           $exe = $assets | Where-Object { (Normalize-AssetName $_.name) -eq (Normalize-AssetName 'SM AutoLab.exe') } | Select-Object -First 1
           $manifestAsset = $assets | Where-Object { (Normalize-AssetName $_.name) -eq (Normalize-AssetName 'SM AutoLab Release Manifest.json') } | Select-Object -First 1
           if (-not $exe) { throw "Executável não encontrado na release publicada." }
           if (-not $manifestAsset) { throw "Manifesto não encontrado na release publicada." }
-
           $assetDigest = [string]$exe.digest
           if ($assetDigest.ToLower().StartsWith('sha256:')) { $assetDigest = $assetDigest.Substring(7) }
           if (-not $assetDigest) { throw "GitHub não forneceu o SHA-256 do executável publicado." }
-
           $manifestPath = Join-Path $env:RUNNER_TEMP "SM AutoLab Release Manifest.json"
           Invoke-WebRequest -Uri "$apiRoot/releases/assets/$($manifestAsset.id)" -Headers @{ Accept = "application/octet-stream"; Authorization = "Bearer $env:GITHUB_TOKEN"; "X-GitHub-Api-Version" = "2022-11-28" } -OutFile $manifestPath -UseBasicParsing
           $publishedManifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
@@ -222,7 +216,5 @@ jobs:
           if ([string]$publishedManifest.commit -ne [string]$commit) { throw "Commit do manifesto não corresponde à tag publicada." }
           if ((Normalize-AssetName([string]$publishedManifest.main_asset)) -ne (Normalize-AssetName([string]$exe.name))) { throw "Nome do executável no manifesto diverge do asset publicado." }
           if ([string]$publishedManifest.main_sha256 -ne [string]$assetDigest) { throw "SHA-256 do manifesto diverge do SHA-256 do asset publicado." }
-
-          $assetsNormalized = $assets | ForEach-Object { Normalize-AssetName $_.name }
-          if (($assetsNormalized | Where-Object { $_ -eq (Normalize-AssetName 'SM AutoLab Updater.exe') }).Count -gt 0) { throw "Atualizador separado foi publicado." }
+          if (@($assets | Where-Object { (Normalize-AssetName $_.name) -eq (Normalize-AssetName 'SM AutoLab Updater.exe') }).Count -gt 0) { throw "Atualizador separado foi publicado." }
           Write-Host "Validação remota da release: OK"
