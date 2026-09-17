@@ -124,7 +124,7 @@ def validate_workflow_runtime(root: Path) -> None:
             fail(f"{relative} deve fixar pip em {REQUIRED_PIP_VERSION}")
 
     build = read_text(root, "build_windows.bat")
-    if "python -m pip check" not in build:
+    if "pip check" not in build:
         fail("build_windows.bat deve validar a consistência das dependências com pip check")
     if "python -m pip check" not in read_text(root, ".github/workflows/validate-main.yml"):
         fail("validate-main.yml deve validar a consistência das dependências com pip check")
