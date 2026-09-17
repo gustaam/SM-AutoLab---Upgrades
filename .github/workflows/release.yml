@@ -13,12 +13,19 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
+permissions: {}
+
+concurrency:
+  group: sm-autolab-release-${{ github.event.inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   release:
+    permissions:
+      contents: write
     runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
     steps:
       - name: Checkout da tag exata
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -42,7 +49,7 @@ jobs:
       - name: Validar tag e arquitetura consolidada
         shell: pwsh
         run: |
-          $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
+          $tag = $env:RELEASE_TAG
           $tagVersion = $tag.TrimStart('vV')
           $version = (Get-Content VERSION -Raw).Trim()
           if ($version -ne $tagVersion) { throw "VERSION ($version) não corresponde à tag ($tag)." }
@@ -123,7 +130,7 @@ jobs:
           if (-not (Test-Path $main)) { throw "Executável principal não foi gerado." }
           if ((Get-Item $main).Length -lt 1000000) { throw "Executável principal suspeitamente pequeno." }
           $version = (Get-Content VERSION -Raw).Trim()
-          $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
+          $tag = $env:RELEASE_TAG
           $mainSha256 = (Get-FileHash -Algorithm SHA256 $main).Hash.ToLower()
           $manifest = @{ channel = "SM-AUTOLAB-RESET-2026-09"; version = $version; tag = $tag; commit = "${{ github.sha }}"; main_asset = "SM AutoLab.exe"; main_sha256 = $mainSha256 } | ConvertTo-Json -Compress
           Set-Content -Path "SM AutoLab Release Manifest.json" -Value $manifest -Encoding UTF8
@@ -143,7 +150,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = "${{ github.event.inputs.release_tag || github.ref_name }}"
+          $tag = $env:RELEASE_TAG
           $headers = @{ Accept = "application/vnd.github+json"; Authorization = "Bearer $env:GITHUB_TOKEN"; "X-GitHub-Api-Version" = "2022-11-28" }
           $apiRoot = "https://api.github.com/repos/${{ github.repository }}"
           $release = Invoke-RestMethod -Uri "$apiRoot/releases/tags/$tag" -Headers $headers
