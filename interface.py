@@ -298,7 +298,7 @@ class App:
         self.percentual_label.pack(side="right")
         self.progresso = ctk.CTkProgressBar(
             progress, height=10, corner_radius=5,
-            fg_color=("#E5E5E5", "#454C52"), progress_color=self.ACCENT
+            fg_color=self.BORDER, progress_color=self.ACCENT
         )
         self.progresso.set(0)
         self.progresso.pack(fill="x", padx=14, pady=(0, 2))
