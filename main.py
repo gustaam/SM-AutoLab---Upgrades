@@ -1495,6 +1495,8 @@ def install_ui_dashboard_29917(App):
             _dashboard_refrescar(self)
         return result
 
+    setattr(App, "_selecionar_tema", theme_wrapper)
+
 
 if __name__ == "__main__":
     aplicar_patch_ui(App)

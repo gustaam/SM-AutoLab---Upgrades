@@ -11,6 +11,7 @@ class DashboardStage3Tests(unittest.TestCase):
         self.assertIn("SM_AUTOLAB_DASHBOARD_29917", source)
         self.assertIn("def install_ui_dashboard_29917", source)
         self.assertIn("install_ui_dashboard_29917(App)", source)
+        self.assertIn('setattr(App, "_selecionar_tema", theme_wrapper)', source)
 
     def test_dashboard_clamp_is_safe(self):
         self.assertEqual(main._dashboard_clamp(-1), 0.0)
