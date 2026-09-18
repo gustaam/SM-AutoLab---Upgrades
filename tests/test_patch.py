@@ -166,6 +166,44 @@ class TestPatch(unittest.TestCase):
 
 
 
+
+class AuditoriaStage6Tests(unittest.TestCase):
+    def test_stage6_marcador_e_integracao(self):
+        root = Path(__file__).resolve().parents[1]
+        main_content = (root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("SM_AUTOLAB_AUDITORIA_29920", main_content)
+        self.assertIn("def _configurar_dpi_windows", main_content)
+        self.assertIn("def install_ui_auditoria_29920", main_content)
+        self.assertIn("install_ui_auditoria_29920(App)", main_content)
+
+    def test_stage6_splash_reduz_trabalho_por_frame(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("FPS_MS = 16", content)
+        self.assertIn("self._canvas_image_id", content)
+        self.assertIn("self.canvas.itemconfigure(self._canvas_image_id, image=self._photo)", content)
+        self.assertNotIn('self.canvas.delete("all")', content)
+
+    def test_stage6_dpi_por_monitor_com_fallback(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("SetProcessDpiAwarenessContext", content)
+        self.assertIn("ctypes.c_void_p(-4)", content)
+        self.assertIn("SetProcessDpiAwareness", content)
+        self.assertIn("setter(2)", content)
+
+    def test_stage6_preserva_todas_as_camadas_no_boot(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "main.py").read_text(encoding="utf-8")
+        for marker in (
+            "install_ui_dashboard_29917(App)",
+            "install_ui_micro_29918(App)",
+            "install_ui_planilha_29919(App)",
+            "install_ui_auditoria_29920(App)",
+        ):
+            self.assertIn(marker, content)
+
+
 class PlanilhaStage5Tests(unittest.TestCase):
     def test_stage5_integracao_e_marcador(self):
         root = Path(__file__).resolve().parents[1]

@@ -3404,6 +3404,22 @@ class App:
             except Exception:pass
             self._status_finalizado_job=None
 
+        for job_attr in (
+            "_fluent_accent_job",
+            "_progress_anim_job",
+            "_micro_dashboard_complete_job",
+        ):
+            job = getattr(self, job_attr, None)
+            if job is not None:
+                try:
+                    self.app.after_cancel(job)
+                except Exception:
+                    pass
+                try:
+                    setattr(self, job_attr, None)
+                except Exception:
+                    pass
+
         self._fechar_menus()
         self.app.destroy()
 
