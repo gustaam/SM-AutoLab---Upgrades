@@ -211,7 +211,7 @@ class ResponsivoTooltipsStage7Tests(unittest.TestCase):
         self.assertIn("SM_AUTOLAB_RESPONSIVO_29921", main_content)
         self.assertIn("def install_ui_responsivo_29921", main_content)
         self.assertIn("install_ui_responsivo_29921(App)", main_content)
-        self.assertIn("UI_RADIUS_SM", main_content)
+        self.assertIn('"radius_sm": 8', main_content)
 
     def test_stage7_tooltips_cobrem_acoes_principais_e_navegacao(self):
         self.assertEqual(
