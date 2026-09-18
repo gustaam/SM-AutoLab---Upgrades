@@ -884,6 +884,40 @@ def _aplicar_fluent_ui_29916(self):
     except Exception:
         pass
 
+    # Cartões de métricas: trilho lateral de acento para hierarquia visual.
+    for card, accent in (
+        (getattr(self, "sucesso_card", None), self.SUCCESS),
+        (getattr(self, "erro_card", None), self.ERROR),
+        (getattr(self, "codigo_card", None), self.INFO),
+    ):
+        if card is None:
+            continue
+        try:
+            rail = getattr(card, "_fluent_accent_rail", None)
+            if rail is None or not rail.winfo_exists():
+                rail = ctk.CTkFrame(card, width=3, corner_radius=1, fg_color=accent)
+                rail.place(x=0, rely=0.18, relheight=0.64, anchor="nw")
+                card._fluent_accent_rail = rail
+        except Exception:
+            pass
+
+    # Separador do rodapé: mantém as ações visualmente ancoradas sem alterar
+    # a área clicável nem a posição dos botões.
+    try:
+        actions = next(
+            (w for w in self.app.winfo_children()
+             if isinstance(w, ctk.CTkFrame) and w is not header and w.winfo_height() >= 60),
+            None,
+        )
+        if actions is not None:
+            separator = getattr(actions, "_fluent_separator", None)
+            if separator is None or not separator.winfo_exists():
+                separator = ctk.CTkFrame(actions, height=1, corner_radius=0, fg_color=self.BORDER)
+                separator.place(relx=0, rely=0, relwidth=1, anchor="nw")
+                actions._fluent_separator = separator
+    except Exception:
+        pass
+
     # Tabs: superfície discreta e estado ativo mais próximo do Fluent.
     for nome, botao in getattr(self, "tab_buttons", {}).items():
         try:
