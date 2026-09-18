@@ -332,7 +332,8 @@ class App:
         for name in ("Atividade", "Não executados", "Histórico"):
             btn = ctk.CTkButton(
                 tabs, text=name, command=lambda n=name: self._selecionar_aba(n),
-                width=86, height=30, corner_radius=6,
+                width={"Atividade": 92, "Não executados": 122, "Histórico": 92}[name],
+                height=30, corner_radius=6,
                 fg_color=("#E5F1FB", "#183B54") if name == "Atividade" else "transparent",
                 hover_color="#EDEDED",
                 text_color=self.TEXT, font=("Segoe UI", 11, "bold")
