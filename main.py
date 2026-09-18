@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import customtkinter as ctk
+from CTkToolTip import CTkToolTip
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 
@@ -240,6 +241,173 @@ class StartupSplash:
 
 def run_splash():
     StartupSplash().run()
+
+
+SM_AUTOLAB_RESPONSIVO_29921 = "SM-AUTOLAB-RESPONSIVE-TOOLTIPS-29921"
+
+
+_STAGE7_TOOLTIP_MESSAGES = {
+    "iniciar": "Inicia a automação com os códigos selecionados.",
+    "parar": "Interrompe a automação com parada segura após o código atual.",
+    "configurações": "Abre as configurações do aplicativo.",
+    "aparência ›": "Abre as opções de tema claro, escuro e automático.",
+    "mudar o feegow": "Altera o endereço e os dados de acesso do Feegow.",
+    "verificar atualizações": "Procura uma versão mais recente do SM AutoLab.",
+    "abrir": "Abre a planilha interna.",
+    "arquivos": "Abre o histórico de planilhas salvas.",
+    "limpar histórico": "Remove o histórico de execuções exibido.",
+    "não executados": "Mostra os códigos que não foram executados.",
+    "atividade": "Mostra a atividade e os eventos da execução.",
+    "histórico": "Mostra o histórico das execuções anteriores.",
+    "restaurar": "Restaura as configurações padrão.",
+    "cancelar": "Fecha esta janela sem aplicar as alterações.",
+    "salvar": "Salva as alterações atuais.",
+    "salvar e sair": "Salva a planilha e fecha a janela.",
+    "salvar e iniciar": "Salva a planilha e inicia a automação.",
+    "limpar": "Limpa os dados preenchidos na planilha.",
+    "voltar": "Volta para a visualização anterior.",
+    "desfazer": "Desfaz a última alteração.",
+    "refazer": "Refaz a alteração desfeita.",
+    "←": "Volta para o mês anterior.",
+    "→": "Avança para o próximo mês.",
+    "×": "Exclui este item do histórico.",
+    "claro": "Usa o tema claro.",
+    "escuro": "Usa o tema escuro.",
+    "padrão do windows": "Segue automaticamente o tema do Windows.",
+}
+
+_STAGE7_UI_TOKENS = {
+    "radius_sm": 8,
+    "radius_md": 10,
+    "radius_lg": 12,
+    "button_sm": 32,
+    "button_md": 40,
+    "button_lg": 46,
+    "spacing_xs": 4,
+    "spacing_sm": 8,
+    "spacing_md": 12,
+    "spacing_lg": 16,
+}
+
+
+def _stage7_tooltip_text(widget):
+    try:
+        raw = str(widget.cget("text")).replace("✓", "").strip()
+    except Exception:
+        return None
+    key = " ".join(raw.split()).rstrip("›").strip().casefold()
+    if not key:
+        return None
+    explicit = _STAGE7_TOOLTIP_MESSAGES.get(key)
+    if explicit:
+        return explicit
+    if key.startswith(("http://", "https://")):
+        return "Ação relacionada ao endereço configurado."
+    if key.replace(" ", "").isalnum() and len(key) >= 4:
+        return "Clique para copiar este código."
+    return f"Executa: {key}."
+
+
+def _stage7_attach_tooltip(widget):
+    if not isinstance(widget, ctk.CTkButton):
+        return
+    if getattr(widget, "_sm_autolab_tooltip", None) is not None:
+        return
+    message = _stage7_tooltip_text(widget)
+    if not message:
+        return
+    try:
+        widget._sm_autolab_tooltip = CTkToolTip(
+            widget=widget,
+            delay=0.45,
+            message=message,
+            alpha=0.94,
+            corner_radius=9,
+            follow=True,
+            padding=(6, 4),
+            x_offset=-18,
+            y_offset=-44,
+        )
+    except Exception:
+        widget._sm_autolab_tooltip = None
+
+
+def _stage7_instalar_tooltips_universais():
+    button_class = ctk.CTkButton
+    if getattr(button_class, "_sm_autolab_tooltip_patched", False):
+        return
+    original_init = button_class.__init__
+
+    def init_with_tooltip(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        _stage7_attach_tooltip(self)
+
+    button_class.__init__ = init_with_tooltip
+    button_class._sm_autolab_tooltip_patched = True
+    button_class._sm_autolab_original_init = original_init
+
+
+def _stage7_aplicar_layout_responsivo(self):
+    try:
+        app = self.app
+        top = getattr(self, "_stage7_top_layout", None)
+        config = getattr(self, "_stage7_config_card", None)
+        progress = getattr(self, "_stage7_progress_card", None)
+        if top is None or config is None or progress is None:
+            return
+        if not (top.winfo_exists() and config.winfo_exists() and progress.winfo_exists()):
+            return
+        largura = max(1, int(app.winfo_width()))
+        compacto = largura < 820
+        if getattr(self, "_stage7_layout_compact", None) == compacto:
+            return
+        self._stage7_layout_compact = compacto
+
+        if compacto:
+            config.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 6))
+            progress.grid(row=1, column=0, sticky="ew", padx=0, pady=(0, 0))
+            top.grid_columnconfigure(0, weight=1)
+            top.grid_columnconfigure(1, weight=0)
+        else:
+            config.grid(row=0, column=0, sticky="nsew", padx=(0, 6), pady=0)
+            progress.grid(row=0, column=1, sticky="nsew", padx=(6, 0), pady=0)
+            top.grid_columnconfigure(0, weight=4)
+            top.grid_columnconfigure(1, weight=6)
+
+        try:
+            app.update_idletasks()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def install_ui_responsivo_29921(App):
+    """Etapa 7: base responsiva, tokens visuais e tooltip universal para CTkButton."""
+    if getattr(App, "_responsive_ui_29921_aplicado", False):
+        return
+    App._responsive_ui_29921_aplicado = True
+    App._responsive_ui_29921_marker = SM_AUTOLAB_RESPONSIVO_29921
+    for name, value in _STAGE7_UI_TOKENS.items():
+        setattr(App, f"UI_{name.upper()}", value)
+
+    _stage7_instalar_tooltips_universais()
+
+    original_config = App.config_app
+
+    def config_wrapper(self, *args, **kwargs):
+        result = original_config(self, *args, **kwargs)
+        try:
+            self.app.resizable(True, True)
+            self.app.minsize(760, 590)
+            self.app.bind("<Configure>", self._stage7_configure_responsivo, add="+")
+            self.app.after_idle(lambda: _stage7_aplicar_layout_responsivo(self))
+        except Exception:
+            _stage7_aplicar_layout_responsivo(self)
+        return result
+
+    App._stage7_configure_responsivo = _stage7_aplicar_layout_responsivo
+    App.config_app = config_wrapper
 
 
 # Correções finais de UI consolidadas diretamente no módulo de entrada.
@@ -2006,6 +2174,7 @@ if __name__ == "__main__":
     install_ui_dashboard_29917(App)
     install_ui_micro_29918(App)
     install_ui_planilha_29919(App)
+    install_ui_responsivo_29921(App)
     install_ui_auditoria_29920(App)
     _validar_base_aplicacao()
     run_splash()
