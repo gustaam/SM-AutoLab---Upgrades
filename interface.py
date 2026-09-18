@@ -264,7 +264,7 @@ class App:
         self.botao_historico_planilha = ctk.CTkButton(
             plan_buttons, text="Arquivos", command=self.abrir_historico_planilha,
             width=92, height=32, corner_radius=6,
-            fg_color=self.CARD, hover_color=("#F3F3F3", "#3A3A3A"),
+            fg_color=self.CARD, hover_color=("#EAF4FC", "#263F50"),
             border_width=1, border_color=self.BORDER, text_color=self.TEXT,
             font=("Segoe UI", 12, "bold")
         )
@@ -700,11 +700,11 @@ class App:
             menu,
             text="Verificar atualizações",
             command=self._verificar_atualizacoes_interativo,
-            width=190,
-            height=38,
-            corner_radius=6,
+            width=202,
+            height=40,
+            corner_radius=8,
             fg_color=self.CARD,
-            hover_color=("#F3F3F3", "#3A3A3A"),
+            hover_color=("#EAF4FC", "#263F50"),
             text_color=self.TEXT,
             font=("Segoe UI", 12),
             anchor="w"
