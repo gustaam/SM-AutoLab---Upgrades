@@ -382,14 +382,14 @@ class App:
         history_header = ctk.CTkFrame(self.aba_historico, fg_color="transparent")
         history_header.pack(fill="x", pady=(0, 5))
         ctk.CTkLabel(
-            history_header, text="Execuções dos últimos 60 dias",
+            history_header, text="Histórico de execuções",
             text_color=self.TEXT, font=("Segoe UI", 12, "bold")
         ).pack(side="left")
         self.botao_limpar_historico = ctk.CTkButton(
             history_header, text="Limpar histórico", command=self._limpar_historico,
             width=108, height=28, corner_radius=6,
-            fg_color="#FFFFFF", hover_color="#FDE7E9", border_width=1,
-            border_color="#E0E0E0", text_color=self.ERROR,
+            fg_color=self.CARD, hover_color=("#FDE7E9", "#4B2529"),
+            border_width=1, border_color=self.BORDER, text_color=self.ERROR,
             font=("Segoe UI", 11, "bold")
         )
         self.botao_limpar_historico.pack(side="right")
