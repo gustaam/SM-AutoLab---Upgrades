@@ -1740,7 +1740,7 @@ def install_ui_micro_29918(App):
             _micro_bind_dashboard_regions(self)
         return result
 
-    App.config_app = config_wrapper
+    setattr(App, "config_app", config_wrapper)
 
     original_progress = App._aplicar_progresso
 
