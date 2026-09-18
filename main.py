@@ -1107,11 +1107,401 @@ def install_ui_fluent_29916(App):
 
     setattr(App, "config_app", config_wrapper)
 
+
+# Dashboard moderno — Stage 3.
+SM_AUTOLAB_DASHBOARD_29917 = "SM-AUTOLAB-DASHBOARD-29917"
+
+
+def _dashboard_clamp(value):
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _dashboard_exists(widget):
+    try:
+        return widget is not None and widget.winfo_exists()
+    except Exception:
+        return False
+
+
+def _dashboard_cor(value, modo=None):
+    try:
+        if isinstance(value, tuple):
+            modo = modo or str(ctk.get_appearance_mode()).lower()
+            return value[1] if modo == "dark" else value[0]
+        return str(value)
+    except Exception:
+        return "#0F6CBD"
+
+
+def _dashboard_refrescar(self, progresso=None):
+    hero = getattr(self, "_dashboard_hero", None)
+    if not _dashboard_exists(hero):
+        return
+
+    try:
+        pct = _dashboard_clamp(
+            self.progresso.get() if progresso is None else progresso
+        )
+    except Exception:
+        pct = _dashboard_clamp(progresso)
+
+    modo = str(ctk.get_appearance_mode()).lower()
+    bg = _dashboard_cor(self.CARD, modo)
+    border = _dashboard_cor(self.BORDER, modo)
+    text = _dashboard_cor(self.TEXT, modo)
+    accent = _dashboard_cor(self.ACCENT, modo)
+    track = "#D7DEE5" if modo != "dark" else "#414A51"
+
+    try:
+        hero.configure(fg_color=self.CARD, border_color=self.BORDER)
+        canvas = hero._dashboard_ring
+        canvas.configure(bg=bg)
+        canvas.itemconfigure(hero._dashboard_ring_track, outline=track)
+        canvas.itemconfigure(
+            hero._dashboard_ring_value,
+            outline=accent,
+            extent=-359.5 * pct if pct else 0,
+        )
+        canvas.itemconfigure(
+            hero._dashboard_ring_text,
+            text=f"{pct:.0%}",
+            fill=text,
+        )
+    except Exception:
+        pass
+
+    try:
+        status_widget = getattr(self, "status_text", None)
+        status = str(status_widget.cget("text")).strip() if status_widget is not None else "Pronto"
+        low = status.lower()
+        if "process" in low:
+            status_bg = ("#E5F1FB", "#183B54")
+            status_color = self.INFO
+        elif "erro" in low or "atenção" in low:
+            status_bg = ("#FDE7E9", "#4B2529")
+            status_color = self.ERROR
+        elif "parand" in low:
+            status_bg = ("#FFF4CE", "#4B3A1A")
+            status_color = self.WARNING
+        else:
+            status_bg = ("#E7F5E7", "#21482A")
+            status_color = self.SUCCESS
+        hero._dashboard_status.configure(
+            fg_color=status_bg,
+            text_color=status_color,
+            text=status,
+        )
+    except Exception:
+        pass
+
+    try:
+        caminho = getattr(self, "caminho", None)
+        if caminho:
+            fonte = Path(str(caminho)).name
+        else:
+            total_codigos = 0
+            try:
+                total_codigos = len(self._extrair_codigos_planilha())
+            except Exception:
+                pass
+            fonte = "Planilha interna" if total_codigos else "Nenhuma selecionada"
+        hero._dashboard_source_value.configure(text=fonte, text_color=text)
+    except Exception:
+        pass
+
+    try:
+        pagina_widget = getattr(self, "pagina", None)
+        pagina = "—"
+        if pagina_widget is not None:
+            raw = str(pagina_widget.get()).strip()
+            if raw:
+                pagina = f"Página {max(1, int(raw))}"
+        if not getattr(self, "caminho", None):
+            pagina = "Interna" if getattr(self, "_execucao_atual", None) else pagina
+        hero._dashboard_page_value.configure(text=pagina, text_color=text)
+    except Exception:
+        pass
+
+    try:
+        codigo = "—"
+        card_label = getattr(getattr(self, "codigo_card", None), "value_label", None)
+        if card_label is not None:
+            codigo = str(card_label.cget("text")).strip() or "—"
+        hero._dashboard_code_value.configure(text=codigo, text_color=text)
+    except Exception:
+        pass
+
+    try:
+        sucessos = str(self.sucesso_card.value_label.cget("text"))
+        erros = str(self.erro_card.value_label.cget("text"))
+        hero._dashboard_success.configure(text=f"{sucessos} executados")
+        hero._dashboard_errors.configure(text=f"{erros} não executados")
+    except Exception:
+        pass
+
+
+def _dashboard_chipe(self, parent, caption, initial, width):
+    chip = ctk.CTkFrame(
+        parent,
+        fg_color=("#F7F9FB", "#30373D"),
+        corner_radius=9,
+        border_width=1,
+        border_color=self.BORDER,
+        width=width,
+        height=42,
+    )
+    chip.pack_propagate(False)
+    ctk.CTkLabel(
+        chip,
+        text=caption.upper(),
+        text_color=self.SUBTEXT,
+        font=("Segoe UI", 8, "bold"),
+    ).pack(anchor="w", padx=10, pady=(5, 0))
+    value = ctk.CTkLabel(
+        chip,
+        text=initial,
+        text_color=self.TEXT,
+        font=("Segoe UI", 10, "bold"),
+        anchor="w",
+    )
+    value.pack(fill="x", padx=10, pady=(0, 4))
+    return chip, value
+
+
+def _dashboard_criar(self):
+    if _dashboard_exists(getattr(self, "_dashboard_hero", None)):
+        _dashboard_refrescar(self)
+        return
+
+    try:
+        scroll = next(
+            (
+                widget
+                for widget in self.app.winfo_children()
+                if isinstance(widget, ctk.CTkScrollableFrame)
+            ),
+            None,
+        )
+        if scroll is None:
+            return
+
+        children = scroll.winfo_children()
+        first = children[0] if children else None
+
+        hero = ctk.CTkFrame(
+            scroll,
+            fg_color=self.CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=self.BORDER,
+            height=128,
+        )
+        pack_options = {"fill": "x", "pady": (0, 8)}
+        if first is not None:
+            pack_options["before"] = first
+        hero.pack(**pack_options)
+        hero.pack_propagate(False)
+
+        left = ctk.CTkFrame(hero, fg_color="transparent")
+        left.pack(side="left", fill="both", expand=True, padx=(16, 4), pady=14)
+
+        title_row = ctk.CTkFrame(left, fg_color="transparent")
+        title_row.pack(fill="x")
+        ctk.CTkLabel(
+            title_row,
+            text="PAINEL DE CONTROLE",
+            text_color=self.ACCENT,
+            font=("Segoe UI", 8, "bold"),
+        ).pack(side="left")
+        hero._dashboard_status = ctk.CTkLabel(
+            title_row,
+            text="Pronto",
+            text_color=self.SUCCESS,
+            fg_color=("#E7F5E7", "#21482A"),
+            corner_radius=12,
+            font=("Segoe UI", 8, "bold"),
+            width=88,
+            height=22,
+        )
+        hero._dashboard_status.pack(side="right", padx=(8, 0))
+
+        ctk.CTkLabel(
+            left,
+            text="Automação Feegow",
+            text_color=self.TEXT,
+            font=("Segoe UI", 20, "bold"),
+        ).pack(anchor="w", pady=(2, 0))
+
+        ctk.CTkLabel(
+            left,
+            text="Acompanhe a sessão atual sem perder de vista a próxima ação.",
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 9),
+        ).pack(anchor="w", pady=(0, 8))
+
+        chips = ctk.CTkFrame(left, fg_color="transparent")
+        chips.pack(fill="x")
+        source_chip, hero._dashboard_source_value = _dashboard_chipe(
+            self, chips, "Fonte", "Nenhuma selecionada", 160
+        )
+        source_chip.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        page_chip, hero._dashboard_page_value = _dashboard_chipe(
+            self, chips, "Página", "—", 112
+        )
+        page_chip.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        code_chip, hero._dashboard_code_value = _dashboard_chipe(
+            self, chips, "Código", "—", 112
+        )
+        code_chip.pack(side="left", fill="x", expand=True)
+
+        metrics = ctk.CTkFrame(left, fg_color="transparent")
+        metrics.pack(fill="x", pady=(5, 0))
+        hero._dashboard_success = ctk.CTkLabel(
+            metrics, text="0 executados", text_color=self.SUCCESS,
+            font=("Segoe UI", 8, "bold")
+        )
+        hero._dashboard_success.pack(side="left")
+        hero._dashboard_errors = ctk.CTkLabel(
+            metrics, text="0 não executados", text_color=self.ERROR,
+            font=("Segoe UI", 8, "bold")
+        )
+        hero._dashboard_errors.pack(side="left", padx=(12, 0))
+
+        side = ctk.CTkFrame(hero, fg_color="transparent", width=116)
+        side.pack(side="right", fill="y", padx=(4, 16), pady=10)
+        side.pack_propagate(False)
+
+        ring = tk.Canvas(
+            side,
+            width=92,
+            height=92,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            bg=_dashboard_cor(self.CARD),
+        )
+        ring.pack(anchor="center")
+        track_id = ring.create_oval(
+            6, 6, 86, 86,
+            outline="#D7DEE5",
+            width=7,
+        )
+        value_id = ring.create_arc(
+            6, 6, 86, 86,
+            start=90,
+            extent=0,
+            style="arc",
+            outline=_dashboard_cor(self.ACCENT),
+            width=7,
+        )
+        text_id = ring.create_text(
+            46, 46,
+            text="0%",
+            fill=_dashboard_cor(self.TEXT),
+            font=("Segoe UI", 16, "bold"),
+        )
+        ctk.CTkLabel(
+            side,
+            text="CONCLUÍDO",
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 8, "bold"),
+        ).pack(anchor="center", pady=(0, 1))
+
+        hero._dashboard_ring = ring
+        hero._dashboard_ring_track = track_id
+        hero._dashboard_ring_value = value_id
+        hero._dashboard_ring_text = text_id
+
+        self._dashboard_hero = hero
+        _dashboard_refrescar(self)
+    except Exception:
+        self._dashboard_hero = None
+
+
+def _dashboard_aplicar_metricas(self):
+    for card in (
+        getattr(self, "sucesso_card", None),
+        getattr(self, "erro_card", None),
+        getattr(self, "codigo_card", None),
+    ):
+        try:
+            card.configure(corner_radius=12, height=88)
+            card.value_label.configure(font=("Segoe UI", 19, "bold"))
+        except Exception:
+            pass
+    try:
+        self.percentual_label.configure(font=("Segoe UI", 24, "bold"))
+        self.progresso.configure(height=11, corner_radius=5)
+    except Exception:
+        pass
+    _dashboard_refrescar(self)
+
+
+def install_ui_dashboard_29917(App):
+    """Instala o dashboard moderno da Stage 3 sem trocar a lógica funcional."""
+    if getattr(App, "_dashboard_ui_29917_aplicado", False):
+        return
+    App._dashboard_ui_29917_aplicado = True
+
+    original_config = App.config_app
+
+    def config_wrapper(self, *args, **kwargs):
+        result = original_config(self, *args, **kwargs)
+        try:
+            self.app.after_idle(lambda: _dashboard_criar(self))
+            self.app.after_idle(lambda: _dashboard_aplicar_metricas(self))
+        except Exception:
+            _dashboard_criar(self)
+            _dashboard_aplicar_metricas(self)
+        return result
+
+    setattr(App, "config_app", config_wrapper)
+
+    original_progress = App._aplicar_progresso
+
+    def progress_wrapper(self, *args, **kwargs):
+        result = original_progress(self, *args, **kwargs)
+        try:
+            porcentagem = args[0] / args[1] if len(args) >= 2 and args[1] else 0
+            _dashboard_refrescar(self, porcentagem)
+        except Exception:
+            pass
+        return result
+
+    App._aplicar_progresso = progress_wrapper
+
+    original_status = App._aplicar_status
+
+    def status_wrapper(self, *args, **kwargs):
+        result = original_status(self, *args, **kwargs)
+        try:
+            _dashboard_refrescar(self)
+        except Exception:
+            pass
+        return result
+
+    App._aplicar_status = status_wrapper
+
+    original_theme = App._selecionar_tema
+
+    def theme_wrapper(self, *args, **kwargs):
+        result = original_theme(self, *args, **kwargs)
+        try:
+            self.app.after_idle(lambda: _dashboard_refrescar(self))
+        except Exception:
+            _dashboard_refrescar(self)
+        return result
+
+
 if __name__ == "__main__":
     aplicar_patch_ui(App)
     _corrigir_historico_ilimitado()
     install_ui_29912(App)
     install_ui_fluent_29916(App)
+    install_ui_dashboard_29917(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
