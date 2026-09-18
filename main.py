@@ -1498,12 +1498,396 @@ def install_ui_dashboard_29917(App):
     setattr(App, "_selecionar_tema", theme_wrapper)
 
 
+
+# Microinterações discretas — Stage 4.
+SM_AUTOLAB_MICRO_29918 = "SM-AUTOLAB-MICRO-29918"
+
+
+def _micro_widget_exists(widget):
+    try:
+        return widget is not None and widget.winfo_exists()
+    except Exception:
+        return False
+
+
+def _micro_pulse_border(widget, accent, duration_ms=180, pulse_width=2):
+    if not _micro_widget_exists(widget):
+        return
+
+    try:
+        if not hasattr(widget, "_micro_base_border_color"):
+            widget._micro_base_border_color = widget.cget("border_color")
+            widget._micro_base_border_width = int(widget.cget("border_width") or 0)
+
+        base_color = widget._micro_base_border_color
+        base_width = int(widget._micro_base_border_width)
+
+        old_job = getattr(widget, "_micro_pulse_job", None)
+        if old_job is not None:
+            try:
+                widget.after_cancel(old_job)
+            except Exception:
+                pass
+
+        widget.configure(
+            border_width=max(base_width, int(pulse_width)),
+            border_color=accent,
+        )
+
+        def restore():
+            try:
+                if widget.winfo_exists():
+                    widget.configure(
+                        border_width=base_width,
+                        border_color=base_color,
+                    )
+            except Exception:
+                pass
+            try:
+                widget._micro_pulse_job = None
+            except Exception:
+                pass
+
+        widget._micro_pulse_job = widget.after(max(1, int(duration_ms)), restore)
+    except Exception:
+        pass
+
+
+def _micro_bind_button(app, widget):
+    if not isinstance(widget, ctk.CTkButton):
+        return
+    try:
+        _fluent_bind_button_feedback(
+            app,
+            widget,
+            int(widget.cget("border_width") or 0),
+        )
+    except Exception:
+        pass
+
+
+def _micro_bind_tree_buttons(app, root):
+    if not _micro_widget_exists(root):
+        return
+    for widget in _walk_children(root):
+        try:
+            _micro_bind_button(app, widget)
+        except Exception:
+            continue
+
+
+def _micro_bind_hover_region(widget, accent):
+    if not _micro_widget_exists(widget):
+        return
+    if getattr(widget, "_micro_hover_bound", False):
+        return
+
+    try:
+        widget._micro_hover_bound = True
+        widget._micro_hover_accent = accent
+        widget._micro_base_border_color = widget.cget("border_color")
+        widget._micro_base_border_width = int(widget.cget("border_width") or 0)
+
+        def inside(current):
+            if current is None:
+                return False
+            try:
+                return _widget_inside(current, widget)
+            except Exception:
+                return False
+
+        def enter(_event=None):
+            try:
+                if not widget.winfo_exists():
+                    return
+                widget.configure(
+                    border_width=max(1, int(widget._micro_base_border_width)),
+                    border_color=widget._micro_hover_accent,
+                )
+            except Exception:
+                pass
+
+        def leave(_event=None):
+            def restore_if_outside():
+                try:
+                    if not widget.winfo_exists():
+                        return
+                    current = widget.winfo_containing(
+                        widget.winfo_pointerx(),
+                        widget.winfo_pointery(),
+                    )
+                    if not inside(current):
+                        widget.configure(
+                            border_width=int(widget._micro_base_border_width),
+                            border_color=widget._micro_base_border_color,
+                        )
+                except Exception:
+                    pass
+
+            try:
+                widget.after_idle(restore_if_outside)
+            except Exception:
+                restore_if_outside()
+
+        for child in _walk_children(widget):
+            try:
+                child.bind("<Enter>", enter, add="+")
+                child.bind("<Leave>", leave, add="+")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _micro_confirm_error_button(self, button, codigo):
+    if not _micro_widget_exists(button):
+        return
+    try:
+        original_text = str(button.cget("text"))
+        old_job = getattr(button, "_micro_copy_job", None)
+        if old_job is not None:
+            try:
+                button.after_cancel(old_job)
+            except Exception:
+                pass
+
+        button.configure(
+            text="✓ Copiado",
+            text_color=self.SUCCESS,
+        )
+
+        def restore():
+            try:
+                if button.winfo_exists():
+                    button.configure(
+                        text=original_text,
+                        text_color=self.ERROR,
+                    )
+            except Exception:
+                pass
+            try:
+                button._micro_copy_job = None
+            except Exception:
+                pass
+
+        button._micro_copy_job = button.after(700, restore)
+    except Exception:
+        pass
+
+
+def _micro_dashboard_complete(self):
+    hero = getattr(self, "_dashboard_hero", None)
+    if not _micro_widget_exists(hero):
+        return
+
+    try:
+        canvas = hero._dashboard_ring
+        canvas.itemconfigure(
+            hero._dashboard_ring_value,
+            outline=self.SUCCESS,
+        )
+        old_job = getattr(self, "_micro_dashboard_complete_job", None)
+        if old_job is not None:
+            try:
+                self.app.after_cancel(old_job)
+            except Exception:
+                pass
+
+        def restore():
+            try:
+                if _micro_widget_exists(hero):
+                    canvas.itemconfigure(
+                        hero._dashboard_ring_value,
+                        outline=_dashboard_cor(self.ACCENT),
+                    )
+            except Exception:
+                pass
+            self._micro_dashboard_complete_job = None
+
+        self._micro_dashboard_complete_job = self.app.after(420, restore)
+    except Exception:
+        pass
+
+
+def _micro_bind_dashboard_regions(self):
+    for attr, accent in (
+        ("sucesso_card", self.SUCCESS),
+        ("erro_card", self.ERROR),
+        ("codigo_card", self.INFO),
+    ):
+        card = getattr(self, attr, None)
+        if card is not None:
+            _micro_bind_hover_region(card, self.ACCENT_HOVER)
+
+
+def install_ui_micro_29918(App):
+    """Instala feedbacks transitórios e não invasivos, sem tocar na lógica da automação."""
+    if getattr(App, "_micro_ui_29918_aplicado", False):
+        return
+    App._micro_ui_29918_aplicado = True
+
+    original_config = App.config_app
+
+    def config_wrapper(self, *args, **kwargs):
+        result = original_config(self, *args, **kwargs)
+        try:
+            self._micro_ui_29918_ready = True
+            self.app.after_idle(lambda: _micro_bind_tree_buttons(self.app, self.app))
+            self.app.after_idle(lambda: _micro_bind_dashboard_regions(self))
+        except Exception:
+            self._micro_ui_29918_ready = True
+            _micro_bind_tree_buttons(self.app, self.app)
+            _micro_bind_dashboard_regions(self)
+        return result
+
+    App.config_app = config_wrapper
+
+    original_progress = App._aplicar_progresso
+
+    def progress_wrapper(self, *args, **kwargs):
+        before = {}
+        for attr in ("sucesso_card", "erro_card", "codigo_card"):
+            try:
+                card = getattr(self, attr)
+                before[attr] = str(card.value_label.cget("text"))
+            except Exception:
+                before[attr] = None
+
+        result = original_progress(self, *args, **kwargs)
+
+        try:
+            accents = {
+                "sucesso_card": self.SUCCESS,
+                "erro_card": self.ERROR,
+                "codigo_card": self.INFO,
+            }
+            for attr, accent in accents.items():
+                card = getattr(self, attr, None)
+                if card is None:
+                    continue
+                try:
+                    after = str(card.value_label.cget("text"))
+                except Exception:
+                    after = None
+                if before.get(attr) != after:
+                    _micro_pulse_border(card, accent, duration_ms=180, pulse_width=2)
+
+            try:
+                total = int(args[1]) if len(args) >= 2 else 0
+                processados = int(args[0]) if args else 0
+                if total > 0 and processados >= total:
+                    _micro_dashboard_complete(self)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        return result
+
+    App._aplicar_progresso = progress_wrapper
+
+    original_status = App._aplicar_status
+
+    def status_wrapper(self, *args, **kwargs):
+        try:
+            previous = str(self.status_text.cget("text"))
+        except Exception:
+            previous = None
+
+        result = original_status(self, *args, **kwargs)
+
+        try:
+            current = str(self.status_text.cget("text"))
+        except Exception:
+            current = None
+
+        if getattr(self, "_micro_ui_29918_ready", False) and previous != current:
+            _micro_pulse_border(self.status_pill, self.ACCENT_HOVER, duration_ms=150, pulse_width=2)
+        return result
+
+    App._aplicar_status = status_wrapper
+
+    original_select_tab = App._selecionar_aba
+
+    def select_tab_wrapper(self, nome, *args, **kwargs):
+        result = original_select_tab(self, nome, *args, **kwargs)
+        try:
+            if getattr(self, "_micro_ui_29918_ready", False):
+                button = getattr(self, "tab_buttons", {}).get(nome)
+                if button is not None:
+                    _micro_pulse_border(
+                        button,
+                        self.ACCENT_HOVER,
+                        duration_ms=130,
+                        pulse_width=2,
+                    )
+        except Exception:
+            pass
+        return result
+
+    App._selecionar_aba = select_tab_wrapper
+
+    original_create_error = App._criar_botao_erro
+
+    def create_error_wrapper(self, codigo, parent=None):
+        button = original_create_error(self, codigo, parent=parent)
+        try:
+            _micro_bind_button(self.app, button)
+
+            def copy_with_feedback(code=str(codigo), current_button=button):
+                self._copiar_codigo(code)
+                _micro_confirm_error_button(self, current_button, code)
+
+            button.configure(command=copy_with_feedback)
+        except Exception:
+            pass
+        return button
+
+    App._criar_botao_erro = create_error_wrapper
+
+    original_show_config = App._mostrar_menu_configuracoes
+
+    def show_config_wrapper(self, *args, **kwargs):
+        result = original_show_config(self, *args, **kwargs)
+        try:
+            _micro_bind_tree_buttons(self.app, getattr(self, "_menu_config", None))
+        except Exception:
+            pass
+        return result
+
+    App._mostrar_menu_configuracoes = show_config_wrapper
+
+    original_show_appearance = App._mostrar_menu_aparencia
+
+    def show_appearance_wrapper(self, *args, **kwargs):
+        result = original_show_appearance(self, *args, **kwargs)
+        try:
+            _micro_bind_tree_buttons(self.app, getattr(self, "_menu_aparencia", None))
+        except Exception:
+            pass
+        return result
+
+    App._mostrar_menu_aparencia = show_appearance_wrapper
+
+    original_open_files_history = App.abrir_historico_planilha
+
+    def open_files_history_wrapper(self, *args, **kwargs):
+        result = original_open_files_history(self, *args, **kwargs)
+        try:
+            _micro_bind_tree_buttons(self.app, getattr(self, "_planilha_historico_window", None))
+        except Exception:
+            pass
+        return result
+
+    App.abrir_historico_planilha = open_files_history_wrapper
+
+
 if __name__ == "__main__":
     aplicar_patch_ui(App)
     _corrigir_historico_ilimitado()
     install_ui_29912(App)
     install_ui_fluent_29916(App)
     install_ui_dashboard_29917(App)
+    install_ui_micro_29918(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
