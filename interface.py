@@ -1048,9 +1048,14 @@ class App:
         }
         mapa[nome].pack(fill="both", expand=True)
         for n, btn in self.tab_buttons.items():
+            ativo = n == nome
             btn.configure(
-                fg_color=("#E5F1FB", "#183B54") if n == nome else "transparent",
-                text_color=self.ACCENT if n == nome else self.TEXT
+                fg_color=("#E5F1FB", "#183B54") if ativo else "transparent",
+                hover_color=("#E8F2FC", "#204965"),
+                border_width=1 if ativo else 0,
+                border_color=self.ACCENT if ativo else self.BORDER,
+                text_color=self.ACCENT if ativo else self.TEXT,
+                font=("Segoe UI", 11, "bold"),
             )
 
     def _card(self, parent):
