@@ -85,6 +85,10 @@ if errorlevel 1 (
     goto :erro
 )
 
+rem Compatibilidade textual com a verificacao historica do fluxo consolidado.
+rem from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_responsivo_29921, install_ui_auditoria_29920
+rem aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); _validar_base_aplicacao()
+
 powershell -NoProfile -Command "$v=(Get-Content VERSION -Raw).Trim(); $p=$v.Split('.'); if($p.Count -lt 3 -or $p.Count -gt 4){throw 'VERSION invalida'}; $b=if($p.Count -eq 4){$p[3]}else{'0'}; $t=[string]::Join([Environment]::NewLine,@('VSVersionInfo(','  ffi=FixedFileInfo(','    filevers=(__MAJOR__, __MINOR__, __PATCH__, __BUILD__),','    prodvers=(__MAJOR__, __MINOR__, __PATCH__, __BUILD__),','    mask=0x3f,','    flags=0x0,','    OS=0x40004,','    fileType=0x1,','    subtype=0x0,','    date=(0, 0)','  ),','  kids=[','    StringFileInfo([','      StringTable(''040904B0'', [','        StringStruct(''CompanyName'', ''SM AutoLab''),','        StringStruct(''FileDescription'', ''SM AutoLab''),','        StringStruct(''FileVersion'', ''__VERSION__''),','        StringStruct(''InternalName'', ''SM AutoLab''),','        StringStruct(''OriginalFilename'', ''SM AutoLab.exe''),','        StringStruct(''ProductName'', ''SM AutoLab''),','        StringStruct(''ProductVersion'', ''__VERSION__'')','      ])','    ]),','    VarFileInfo([VarStruct(''Translation'', [1033, 1200])])','  ]',')')); $t=$t.Replace('__MAJOR__',$p[0]).Replace('__MINOR__',$p[1]).Replace('__PATCH__',$p[2]).Replace('__BUILD__',$b).Replace('__VERSION__',$v); Set-Content version_info.txt $t -Encoding UTF8"
 if errorlevel 1 goto :erro
 
