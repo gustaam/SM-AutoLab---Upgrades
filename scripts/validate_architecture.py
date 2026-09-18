@@ -65,7 +65,7 @@ UI_MARKERS = (
 
 TEST_MARKERS = (
     "class VersionComparisonTests", "class UpdateEnvironmentTests", "class UpdateDiscoveryTests",
-    "class UIFixes29912Tests", "class HistoricoIlimitadoTests", "test_arquivos_de_teste_auxiliares_foram_consolidados",
+    "class UIFixes29912Tests", "class HistoricoIlimitadoTests", "class GradePerformanceStage9Tests", "test_arquivos_de_teste_auxiliares_foram_consolidados",
 )
 
 BUILD_MARKERS = ("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")
@@ -205,6 +205,7 @@ def validate(root: Path) -> None:
         "SM_AUTOLAB_AUDITORIA_29920", "def _configurar_dpi_windows",
         "def install_ui_auditoria_29920", "SM_AUTOLAB_RESPONSIVO_29921",
         "def install_ui_responsivo_29921",
+        "SM_AUTOLAB_GRADE_29922", "def install_ui_grade_29922",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
@@ -220,6 +221,8 @@ def validate(root: Path) -> None:
             "def install_ui_auditoria_29920",
             "SM_AUTOLAB_RESPONSIVO_29921",
             "def install_ui_responsivo_29921",
+            "SM_AUTOLAB_GRADE_29922",
+            "def install_ui_grade_29922",
             "FPS_MS = 16",
             "SetProcessDpiAwarenessContext",
             "ctypes.c_void_p(-4)",
@@ -275,9 +278,9 @@ def validate(root: Path) -> None:
         fail("build_windows.bat não contém a rotina de build do SM AutoLab")
     if "from interface import App; from patch import aplicar_patch_ui" not in build:
         fail("build_windows.bat não usa a integração consolidada")
-    if "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_responsivo_29921, install_ui_auditoria_29920" not in build:
+    if "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_grade_29922, install_ui_responsivo_29921, install_ui_auditoria_29920" not in build:
         fail("build_windows.bat não usa o mesmo fluxo de integração do CI")
-    if "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); _validar_base_aplicacao()" not in build:
+    if "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); _validar_base_aplicacao()" not in build:
         fail("build_windows.bat não executa o fluxo consolidado completo")
     for marker in BUILD_MARKERS:
         if marker not in build:
