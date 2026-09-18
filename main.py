@@ -954,7 +954,7 @@ def install_ui_fluent_29916(App):
             _aplicar_fluent_ui_29916(self)
         return result
 
-    App.config_app = config_wrapper
+    setattr(App, "config_app", config_wrapper)
 
 if __name__ == "__main__":
     aplicar_patch_ui(App)
