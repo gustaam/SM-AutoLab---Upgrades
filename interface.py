@@ -3153,7 +3153,10 @@ class App:
         self._set_stat(self.sucesso_card, sucessos)
         self._set_stat(self.erro_card, erros)
         self._set_stat(self.codigo_card, codigo)
-        self.status_label.configure(text=f"Processando código {processados} de {total}")
+        self.status_label.configure(
+            text=f"Processando código {processados} de {total}",
+            text_color=self.INFO,
+        )
         self._status_text_base = "Processando"
         self.status_pill.configure(fg_color=("#E5F1FB", "#183B54"))
         self.status_text.configure(text="Processando", text_color=self.INFO)
