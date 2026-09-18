@@ -224,7 +224,7 @@ class ResponsivoTooltipsStage7Tests(unittest.TestCase):
         )
         self.assertEqual(
             main._stage7_tooltip_text(SimpleNamespace(cget=lambda key: "↶")),
-            "Executa: ↶.",
+            "Desfaz a última alteração.",
         )
         self.assertEqual(
             main._stage7_tooltip_text(SimpleNamespace(cget=lambda key: "ABC123")),
