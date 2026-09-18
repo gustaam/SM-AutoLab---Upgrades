@@ -995,7 +995,7 @@ class App:
             command=restaurar,
             width=110,
             height=40,
-            corner_radius=7,
+            corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             border_width=1,
@@ -1029,7 +1029,7 @@ class App:
             command=salvar,
             width=110,
             height=40,
-            corner_radius=7,
+            corner_radius=8,
             fg_color=("#E5E5E5", "#454C52"),
             hover_color=("#E5E5E5", "#454C52"),
             text_color=("#8A8A8A", "#AEB4B9"),
@@ -1178,7 +1178,7 @@ class App:
         parent = parent or self.erros_frame
         btn = ctk.CTkButton(
             parent, text=codigo, command=lambda c=codigo: self._copiar_codigo(c),
-            height=30, corner_radius=7, fg_color=("#FDE7E9", "#4B2529"),
+            height=30, corner_radius=8, fg_color=("#FDE7E9", "#4B2529"),
             hover_color=("#FAD2D5", "#603034"), text_color=self.ERROR,
             border_width=1, border_color=("#F1B8BC", "#7A4448"),
             font=("Segoe UI", 11, "bold"), anchor="w"
