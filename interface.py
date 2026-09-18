@@ -242,10 +242,10 @@ class App:
             scrollbar_button_color=("#C8C8C8", "#626262"),
             scrollbar_button_hover_color=("#AFAFAF", "#777777")
         )
-        main.pack(fill="both", expand=True, padx=14, pady=8)
+        main.pack(fill="both", expand=True, padx=16, pady=8)
 
         top = ctk.CTkFrame(main, fg_color="transparent")
-        top.pack(fill="x", pady=(0, 7))
+        top.pack(fill="x", pady=(0, 8))
         top.grid_columnconfigure(0, weight=4)
         top.grid_columnconfigure(1, weight=6)
 
@@ -309,7 +309,7 @@ class App:
         self.progresso_label.pack(anchor="w", padx=14, pady=(0, 9))
 
         stats = ctk.CTkFrame(main, fg_color="transparent")
-        stats.pack(fill="x", pady=(0, 6))
+        stats.pack(fill="x", pady=(0, 8))
         stats.grid_columnconfigure((0, 1, 2), weight=1)
         self.sucesso_card = self._stat_card(stats, "✓", "Executados", "0", self.SUCCESS)
         self.sucesso_card.grid(row=0, column=0, sticky="ew", padx=(0, 5))
@@ -319,7 +319,7 @@ class App:
         self.codigo_card.grid(row=0, column=2, sticky="ew", padx=(5, 0))
 
         activity_card = self._card(main)
-        activity_card.pack(fill="x", pady=(0, 5))
+        activity_card.pack(fill="x", pady=(0, 6))
         activity_card.configure(height=205)
         activity_card.pack_propagate(False)
         self._section_title(activity_card, "Acompanhamento")
@@ -340,6 +340,8 @@ class App:
                 text_color=self.TEXT, font=("Segoe UI", 11, "bold")
             )
             btn.pack(side="left", padx=2, pady=2)
+            btn._fluent_no_press = True
+            btn._fluent_no_focus_ring = True
             self.tab_buttons[name] = btn
 
         self.tab_area = ctk.CTkFrame(activity_card, fg_color="transparent")

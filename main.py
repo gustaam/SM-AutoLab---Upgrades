@@ -786,8 +786,77 @@ def _fluent_cor(cor, modo=None):
         return "#0F6CBD"
 
 
-def _fluent_aplicar_estilo_widget(widget, card_radius=10):
-    """Aplica apenas acabamento visual; não altera comandos ou geometria funcional."""
+def _fluent_bind_button_feedback(app, widget, base_border_width):
+    if getattr(widget, "_fluent_interactions_bound", False):
+        return
+    widget._fluent_interactions_bound = True
+
+    try:
+        base_color = widget.cget("border_color")
+    except Exception:
+        base_color = None
+
+    def restore():
+        try:
+            if not widget.winfo_exists():
+                return
+            focused = widget.focus_get() is widget
+            width = max(1, int(base_border_width)) if focused else int(base_border_width)
+            color = app.ACCENT_HOVER if focused else base_color
+            widget.configure(border_width=width, border_color=color)
+        except Exception:
+            pass
+
+    def on_focus_in(_event=None):
+        if getattr(widget, "_fluent_no_focus_ring", False):
+            return
+        try:
+            widget.configure(
+                border_width=max(1, int(base_border_width)),
+                border_color=app.ACCENT_HOVER,
+            )
+        except Exception:
+            pass
+
+    def on_focus_out(_event=None):
+        try:
+            widget.configure(
+                border_width=int(base_border_width),
+                border_color=base_color,
+            )
+        except Exception:
+            pass
+
+    def on_press(_event=None):
+        if getattr(widget, "_fluent_no_press", False):
+            return
+        try:
+            if str(widget.cget("state")) == "disabled":
+                return
+        except Exception:
+            pass
+        try:
+            widget.configure(
+                border_width=max(2, int(base_border_width) + 1),
+                border_color=app.ACCENT_HOVER,
+            )
+            old_job = getattr(widget, "_fluent_press_job", None)
+            if old_job is not None:
+                try:
+                    widget.after_cancel(old_job)
+                except Exception:
+                    pass
+            widget._fluent_press_job = widget.after(90, restore)
+        except Exception:
+            pass
+
+    widget.bind("<FocusIn>", on_focus_in, add="+")
+    widget.bind("<FocusOut>", on_focus_out, add="+")
+    widget.bind("<ButtonPress-1>", on_press, add="+")
+
+
+def _fluent_aplicar_estilo_widget(app, widget, card_radius=10):
+    """Aplica acabamento visual + feedback de interação sem alterar comandos."""
     try:
         if isinstance(widget, ctk.CTkFrame):
             fg = widget.cget("fg_color")
@@ -797,12 +866,25 @@ def _fluent_aplicar_estilo_widget(widget, card_radius=10):
             altura = int(widget.cget("height") or 32)
             raio = 10 if altura >= 40 else 8
             widget.configure(corner_radius=raio, cursor="hand2")
+            try:
+                base_border_width = int(widget.cget("border_width") or 0)
+            except Exception:
+                base_border_width = 0
+            _fluent_bind_button_feedback(app, widget, base_border_width)
         elif isinstance(widget, ctk.CTkProgressBar):
             widget.configure(height=10, corner_radius=5)
         elif isinstance(widget, ctk.CTkTextbox):
             widget.configure(corner_radius=9)
         elif isinstance(widget, ctk.CTkEntry):
             widget.configure(corner_radius=8)
+            try:
+                widget.configure(cursor="ibeam")
+            except Exception:
+                pass
+            try:
+                _fluent_bind_button_feedback(app, widget, int(widget.cget("border_width") or 0))
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -854,7 +936,7 @@ def _aplicar_fluent_ui_29916(self):
             if widget is header:
                 continue
             for descendant in _walk_children(widget):
-                _fluent_aplicar_estilo_widget(descendant)
+                _fluent_aplicar_estilo_widget(self, descendant)
         except Exception:
             continue
 
@@ -975,6 +1057,38 @@ def _aplicar_fluent_ui_29916(self):
         pass
 
 
+def _fluent_animar_entrada(app):
+    if getattr(app, "_fluent_entry_animation_done", False):
+        return
+    app._fluent_entry_animation_done = True
+
+    try:
+        app.attributes("-alpha", 0.94)
+    except Exception:
+        return
+
+    total_frames = 7
+    interval_ms = 24
+
+    def tick(frame=0):
+        try:
+            if getattr(app, "_closing", False) or not app.winfo_exists():
+                return
+            if frame >= total_frames:
+                app.attributes("-alpha", 1.0)
+                return
+            fator = (frame + 1) / total_frames
+            app.attributes("-alpha", 0.94 + (0.06 * fator))
+            app.after(interval_ms, lambda: tick(frame + 1))
+        except Exception:
+            try:
+                app.attributes("-alpha", 1.0)
+            except Exception:
+                pass
+
+    app.after_idle(tick)
+
+
 def install_ui_fluent_29916(App):
     """Instala a camada visual sem substituir a arquitetura funcional existente."""
     if getattr(App, "_fluent_ui_29916_aplicado", False):
@@ -986,6 +1100,7 @@ def install_ui_fluent_29916(App):
         result = original_config(self, *args, **kwargs)
         try:
             self.app.after_idle(lambda: _aplicar_fluent_ui_29916(self))
+            self.app.after_idle(lambda: _fluent_animar_entrada(self.app))
         except Exception:
             _aplicar_fluent_ui_29916(self)
         return result
