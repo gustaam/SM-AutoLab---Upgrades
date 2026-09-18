@@ -362,7 +362,7 @@ class App:
             erro_info, text="Nenhum código não executado", text_color=self.TEXT,
             font=("Segoe UI", 12, "bold")
         )
-        self.erros_titulo.pack(side="left")
+        self.erros_titulo.pack(side="left", padx=(1, 0))
         ctk.CTkLabel(
             erro_info, text="Clique no código para copiar", text_color=self.SUBTEXT,
             font=("Segoe UI", 10)
@@ -1176,10 +1176,10 @@ class App:
         parent = parent or self.erros_frame
         btn = ctk.CTkButton(
             parent, text=codigo, command=lambda c=codigo: self._copiar_codigo(c),
-            height=28, corner_radius=6, fg_color=("#FDE7E9", "#4B2529"),
+            height=30, corner_radius=7, fg_color=("#FDE7E9", "#4B2529"),
             hover_color=("#FAD2D5", "#603034"), text_color=self.ERROR,
             border_width=1, border_color=("#F1B8BC", "#7A4448"),
-            font=("Segoe UI", 10), anchor="w"
+            font=("Segoe UI", 11, "bold"), anchor="w"
         )
         btn.pack(fill="x", padx=6, pady=3)
         return btn
