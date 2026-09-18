@@ -227,7 +227,7 @@ def validate(root: Path) -> None:
             "setter(2)",
         ),
     )
-    require_markers("interface.py", interface, ("def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente"))
+    require_markers("interface.py", interface, ("def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "_planilha_povoamento_job", "fim = min(10000, inicio + 500)"))
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
     validate_dependencies(root)
     validate_workflow_pins(root)
