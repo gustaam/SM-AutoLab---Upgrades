@@ -2,7 +2,7 @@
 
 ## Base atual
 
-Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a declarada no arquivo `VERSION`; a aplicação usa calendário nativo com `tkinter.Canvas` e elementos `CustomTkinter` no visual Fluent 2. A numeração de versões futuras não altera a estrutura funcional da base.
+Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a declarada no arquivo `VERSION`; a aplicação usa calendário nativo com `tkinter.Canvas` e elementos `CustomTkinter` no visual Fluent 2. A numeração de versões futuras não altera a estrutura funcional da base. A partir da 2.99.16, a interface principal também recebe uma camada visual Fluent 2 refinada, com superfícies mais consistentes, estados hover e uma microanimação discreta de acento no cabeçalho.
 
 ## Arquivos e histórico
 
