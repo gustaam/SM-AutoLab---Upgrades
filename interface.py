@@ -2447,7 +2447,7 @@ class App:
         nav = ctk.CTkFrame(card, fg_color="transparent")
         nav.pack(fill="x", padx=18, pady=(10, 8))
         self._arquivos_btn_mes_anterior = ctk.CTkButton(
-            nav, text="‹", width=38, height=32, corner_radius=7,
+            nav, text="‹", width=38, height=32, corner_radius=8,
             fg_color=self.CARD, hover_color=self.ACCENT_HOVER,
             border_width=1, border_color=self.BORDER, text_color=self.TEXT,
             font=("Segoe UI", 17, "bold"), command=lambda: self._mudar_mes_arquivos(-1)
@@ -2458,7 +2458,7 @@ class App:
         )
         self._arquivos_mes_label.pack(side="left", expand=True)
         self._arquivos_btn_mes_proximo = ctk.CTkButton(
-            nav, text="›", width=38, height=32, corner_radius=7,
+            nav, text="›", width=38, height=32, corner_radius=8,
             fg_color=self.CARD, hover_color=self.ACCENT_HOVER,
             border_width=1, border_color=self.BORDER, text_color=self.TEXT,
             font=("Segoe UI", 17, "bold"), command=lambda: self._mudar_mes_arquivos(1)
@@ -2658,7 +2658,7 @@ class App:
         header.pack(fill="x", pady=(0, 8))
         ctk.CTkButton(
             header, text="← Voltar", command=self._renderizar_calendario_arquivos,
-            width=88, height=30, corner_radius=6, fg_color=self.CARD,
+            width=88, height=30, corner_radius=8, fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"), border_width=1,
             border_color=self.BORDER, text_color=self.TEXT, font=("Segoe UI", 10, "bold")
         ).pack(side="left")
