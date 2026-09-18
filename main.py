@@ -770,10 +770,197 @@ def _validar_base_aplicacao():
         raise RuntimeError("A correção de histórico ilimitado não foi aplicada.")
 
 
+
+# Camada visual Fluent 2 — refinamento não invasivo da interface principal.
+SM_AUTOLAB_FLUENT_UI_29916 = "SM-AUTOLAB-FLUENT-2-29916"
+
+
+def _fluent_cor(cor, modo=None):
+    try:
+        if isinstance(cor, tuple):
+            if modo is None:
+                modo = str(ctk.get_appearance_mode()).lower()
+            return cor[1] if modo == "dark" else cor[0]
+        return str(cor)
+    except Exception:
+        return "#0F6CBD"
+
+
+def _fluent_aplicar_estilo_widget(widget, card_radius=10):
+    """Aplica apenas acabamento visual; não altera comandos ou geometria funcional."""
+    try:
+        if isinstance(widget, ctk.CTkFrame):
+            fg = widget.cget("fg_color")
+            if fg != "transparent" and widget is not getattr(widget, "_fluent_header", None):
+                widget.configure(corner_radius=card_radius)
+        elif isinstance(widget, ctk.CTkButton):
+            altura = int(widget.cget("height") or 32)
+            raio = 10 if altura >= 40 else 8
+            widget.configure(corner_radius=raio)
+        elif isinstance(widget, ctk.CTkProgressBar):
+            widget.configure(height=10, corner_radius=5)
+        elif isinstance(widget, ctk.CTkTextbox):
+            widget.configure(corner_radius=9)
+    except Exception:
+        pass
+
+
+def _fluent_marcar_hover(widget, base, hover):
+    try:
+        widget.configure(hover_color=hover)
+    except Exception:
+        pass
+
+
+def _aplicar_fluent_ui_29916(self):
+    """Refina a tela inicial com superfícies, estados e microdetalhes Fluent 2."""
+    try:
+        self.app.configure(fg_color=self.BG)
+        children = self.app.winfo_children()
+    except Exception:
+        return
+
+    # Cabeçalho: superfície elevada com uma linha de acento discreta.
+    header = next(
+        (w for w in children if isinstance(w, ctk.CTkFrame)),
+        None,
+    )
+    if header is not None:
+        try:
+            header._fluent_header = True
+            header.configure(
+                fg_color=self.CARD,
+                border_width=0,
+                corner_radius=0,
+            )
+            accent_line = getattr(self, "_fluent_accent_line", None)
+            if accent_line is None or not accent_line.winfo_exists():
+                accent_line = ctk.CTkFrame(
+                    header,
+                    height=2,
+                    corner_radius=1,
+                    fg_color=self.ACCENT,
+                )
+                accent_line.place(relx=0, rely=1.0, relwidth=1.0, anchor="sw")
+                self._fluent_accent_line = accent_line
+        except Exception:
+            pass
+
+    # Acabamento consistente das superfícies que já existem.
+    for widget in children:
+        try:
+            if widget is header:
+                continue
+            for descendant in _walk_children(widget):
+                _fluent_aplicar_estilo_widget(descendant)
+        except Exception:
+            continue
+
+    # Botões principais: estados hover coerentes com o Fluent 2.
+    try:
+        self.botao_iniciar.configure(
+            corner_radius=10,
+            height=46,
+            hover_color=self.ACCENT_HOVER,
+        )
+        self.botao_parar.configure(
+            corner_radius=10,
+            height=46,
+            hover_color=("#FDECEC", "#43282A"),
+        )
+        self.botao_configuracoes.configure(
+            corner_radius=10,
+            height=40,
+            hover_color=("#F3F6F9", "#353D43"),
+        )
+        self.botao_planilha.configure(
+            corner_radius=8,
+            hover_color=self.ACCENT_HOVER,
+        )
+        self.botao_historico_planilha.configure(
+            corner_radius=8,
+            hover_color=("#F3F6F9", "#353D43"),
+        )
+    except Exception:
+        pass
+
+    # Tabs: superfície discreta e estado ativo mais próximo do Fluent.
+    for nome, botao in getattr(self, "tab_buttons", {}).items():
+        try:
+            botao.configure(
+                corner_radius=8,
+                hover_color=("#E8F2FC", "#204965"),
+                font=("Segoe UI", 11, "bold"),
+            )
+        except Exception:
+            pass
+
+    # Status: contorno sutil e indicador preservado.
+    try:
+        self.status_pill.configure(
+            border_width=1,
+            border_color=("#C5E4C8", "#37653E"),
+            corner_radius=20,
+        )
+    except Exception:
+        pass
+
+    # Barra de progresso mais suave visualmente.
+    try:
+        self.progresso.configure(height=10, corner_radius=5)
+    except Exception:
+        pass
+
+    # Pequena microinteração: o acento do cabeçalho respira lentamente,
+    # sem deslocar nenhum controle e sem interferir na automação.
+    def _pulse_accent(step=0):
+        line = getattr(self, "_fluent_accent_line", None)
+        if line is None:
+            return
+        try:
+            if not line.winfo_exists() or getattr(self, "_closing", False):
+                return
+            # Alterna entre o azul base e o hover em baixa frequência.
+            color = self.ACCENT if step % 2 == 0 else self.ACCENT_HOVER
+            line.configure(fg_color=color)
+            self._fluent_accent_job = self.app.after(
+                1800, lambda: _pulse_accent(step + 1)
+            )
+        except Exception:
+            self._fluent_accent_job = None
+
+    try:
+        old_job = getattr(self, "_fluent_accent_job", None)
+        if old_job is not None:
+            self.app.after_cancel(old_job)
+        self._fluent_accent_job = None
+        self.app.after(500, _pulse_accent)
+    except Exception:
+        pass
+
+
+def install_ui_fluent_29916(App):
+    """Instala a camada visual sem substituir a arquitetura funcional existente."""
+    if getattr(App, "_fluent_ui_29916_aplicado", False):
+        return
+    App._fluent_ui_29916_aplicado = True
+    original_config = App.config_app
+
+    def config_wrapper(self, *args, **kwargs):
+        result = original_config(self, *args, **kwargs)
+        try:
+            self.app.after_idle(lambda: _aplicar_fluent_ui_29916(self))
+        except Exception:
+            _aplicar_fluent_ui_29916(self)
+        return result
+
+    App.config_app = config_wrapper
+
 if __name__ == "__main__":
     aplicar_patch_ui(App)
     _corrigir_historico_ilimitado()
     install_ui_29912(App)
+    install_ui_fluent_29916(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
