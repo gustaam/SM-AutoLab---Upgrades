@@ -231,7 +231,7 @@ class App:
             text_color=self.SUCCESS,
             font=("Segoe UI", 13, "bold")
         )
-        self.status_text.place(x=57, y=6)
+        self.status_text.place(x=57, y=7)
 
         # Mantém a área principal rolável e o rodapé fixo para proteger
         # Iniciar/Parar em janelas compactas.
