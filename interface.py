@@ -180,7 +180,7 @@ class App:
             height=40,
             corner_radius=7,
             fg_color=self.CARD,
-            hover_color=("#F3F3F3", "#3A3A3A"),
+            hover_color=("#EAF4FC", "#263F50"),
             border_width=1,
             border_color=self.BORDER,
             text_color=self.TEXT,
