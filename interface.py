@@ -359,7 +359,7 @@ class App:
         erro_info = ctk.CTkFrame(self.aba_erros, fg_color="transparent")
         erro_info.pack(fill="x", pady=(0, 6))
         self.erros_titulo = ctk.CTkLabel(
-            erro_info, text="Nenhum código não executado", text_color=self.SUBTEXT,
+            erro_info, text="Nenhum código não executado", text_color=self.TEXT,
             font=("Segoe UI", 12, "bold")
         )
         self.erros_titulo.pack(side="left")
