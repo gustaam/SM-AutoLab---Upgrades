@@ -418,7 +418,7 @@ def install_ui_responsivo_29921(App):
         return result
 
     App._stage7_configure_responsivo = _stage7_aplicar_layout_responsivo
-    App.config_app = config_wrapper
+    setattr(App, "config_app", config_wrapper)
 
 
 # Correções finais de UI consolidadas diretamente no módulo de entrada.
