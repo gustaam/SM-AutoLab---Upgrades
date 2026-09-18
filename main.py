@@ -328,7 +328,7 @@ def _bind_history_tile(self, tile):
         if current in getattr(self, "_hist_selected_tiles", set()):
             return
         try:
-            current.configure(border_color=self.ACCENT_HOVER, fg_color=("#F3F3F3", "#3A3A3A"))
+            current.configure(border_color=self.ACCENT_HOVER, fg_color=("#EAF4FC", "#263F50"))
         except Exception:
             pass
 
