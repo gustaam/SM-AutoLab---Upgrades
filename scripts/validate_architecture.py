@@ -199,7 +199,7 @@ def validate(root: Path) -> None:
     tests = contents["tests/test_patch.py"]
 
     require_markers("main.py", main, (
-        "from patch import aplicar_patch_ui", "def install_ui_29912", "class StartupSplash",
+        "from patch import aplicar_patch_ui", "def install_ui_29912", "def install_ui_fluent_29916", "class StartupSplash",
         "def _corrigir_historico_ilimitado", "def _validar_base_aplicacao",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
@@ -252,9 +252,9 @@ def validate(root: Path) -> None:
         fail("build_windows.bat não contém a rotina de build do SM AutoLab")
     if "from interface import App; from patch import aplicar_patch_ui" not in build:
         fail("build_windows.bat não usa a integração consolidada")
-    if "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912" not in build:
+    if "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916" not in build:
         fail("build_windows.bat não usa o mesmo fluxo de integração do CI")
-    if "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); _validar_base_aplicacao()" not in build:
+    if "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); _validar_base_aplicacao()" not in build:
         fail("build_windows.bat não executa o fluxo consolidado completo")
     for marker in BUILD_MARKERS:
         if marker not in build:
