@@ -213,8 +213,9 @@ class App:
         )
         self.status_indicator.place(x=31, y=13)
 
+        # Halo amplo e ponto central para um indicador mais limpo e legível.
         self._status_halo = self.status_indicator.create_oval(
-            2, 2, 16, 16,
+            1, 1, 17, 17,
             fill="#BCE7C1",
             outline=""
         )
