@@ -1776,6 +1776,138 @@ def install_ui_planilha_29919(App):
     setattr(App, "_selecionar_tema", theme_wrapper)
 
 
+
+
+# Grade da Planilha — Etapa 9.
+SM_AUTOLAB_GRADE_29922 = "SM-AUTOLAB-GRADE-PERFORMANCE-29922"
+
+
+def _stage9_planilha_existe(widget):
+    try:
+        return widget is not None and widget.winfo_exists()
+    except Exception:
+        return False
+
+
+def _stage9_desenhar_cabecalho_linhas(self, first_fraction=None):
+    """Reutiliza itens Canvas do cabeçalho em vez de recriá-los a cada rolagem."""
+    canvas = getattr(self, "_planilha_row_header", None)
+    tree = getattr(self, "_planilha_tree", None)
+    if canvas is None or tree is None:
+        return
+    try:
+        altura = max(int(canvas.winfo_height()), 28)
+    except Exception:
+        altura = 360
+    try:
+        fraction = float(first_fraction) if first_fraction is not None else float(tree.yview()[0])
+    except Exception:
+        fraction = 0.0
+    fraction = max(0.0, min(1.0, fraction))
+    row_height = 28
+    total_rows = 10000
+    inicio = max(0, min(total_rows - 1, int(fraction * total_rows + 0.0001)))
+    visiveis = max(1, int(altura / row_height) + 3)
+    fim = min(total_rows, inicio + visiveis)
+    modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
+    bg = "#252A2F" if modo_escuro else "#F7F7F7"
+    fg = "#AEB4B9" if modo_escuro else "#6B6B6B"
+    line = "#384148" if modo_escuro else "#EEEEEE"
+    border = "#465058" if modo_escuro else "#E0E0E0"
+    canvas.configure(bg=bg, highlightbackground=border)
+
+    state = getattr(self, "_stage9_row_header_state", None)
+    if not isinstance(state, dict):
+        state = {"items": []}
+        self._stage9_row_header_state = state
+    items = state["items"]
+    quantidade = max(0, fim - inicio)
+    while len(items) < quantidade:
+        items.append((canvas.create_text(5, 0, anchor="w", fill=fg, font=("Segoe UI", 8), tags=("rownum",)),
+                      canvas.create_line(0, 0, 42, 0, fill=line, tags=("rownum",))))
+    for pos, logical_row in enumerate(range(inicio, fim)):
+        y0 = pos * row_height
+        text_id, line_id = items[pos]
+        canvas.coords(text_id, 5, y0 + row_height // 2)
+        canvas.itemconfigure(text_id, text=str(logical_row + 1), fill=fg, state="normal")
+        canvas.coords(line_id, 0, y0 + row_height, 42, y0 + row_height)
+        canvas.itemconfigure(line_id, fill=line, state="normal")
+    for text_id, line_id in items[quantidade:]:
+        canvas.itemconfigure(text_id, state="hidden")
+        canvas.itemconfigure(line_id, state="hidden")
+    top_line = state.get("top_line")
+    if top_line is None:
+        top_line = canvas.create_line(0, 0, 42, 0, fill=border, tags=("rownum",))
+        state["top_line"] = top_line
+    else:
+        canvas.coords(top_line, 0, 0, 42, 0)
+    canvas.itemconfigure(top_line, fill=border, state="normal")
+
+
+def _stage9_limpar_borda(self):
+    """Oculta a moldura de seleção para que ela possa ser reutilizada."""
+    for widget in getattr(self, "_planilha_borda_widgets", []):
+        try:
+            widget.place_forget()
+        except Exception:
+            pass
+    self._stage9_borda_bbox = None
+
+
+def _stage9_desenhar_borda(self):
+    tree = getattr(self, "_planilha_tree", None)
+    if tree is None:
+        return
+    alvo = getattr(self, "_planilha_celula_ativa", None)
+    if not alvo:
+        _stage9_limpar_borda(self)
+        return
+    iid, col_index = alvo
+    try:
+        bbox = tree.bbox(iid, f"#{int(col_index) + 1}")
+    except Exception:
+        bbox = None
+    if not bbox:
+        _stage9_limpar_borda(self)
+        return
+    x, y, w, h = bbox
+    signature = (str(iid), int(col_index), int(x), int(y), int(w), int(h))
+    if getattr(self, "_stage9_borda_bbox", None) == signature:
+        return
+    cor = self.ACCENT[0] if isinstance(self.ACCENT, tuple) else self.ACCENT
+    widgets = getattr(self, "_planilha_borda_widgets", None)
+    if not isinstance(widgets, list):
+        widgets = []
+        self._planilha_borda_widgets = widgets
+    segmentos = ((x, y, w, 2), (x, y + h - 2, w, 2), (x, y, 2, h), (x + w - 2, y, 2, h))
+    while len(widgets) < 4:
+        widgets.append(Frame(tree, bd=0, highlightthickness=0, relief="flat"))
+    for frame, (px, py, pw, ph) in zip(widgets, segmentos):
+        try:
+            frame.configure(width=max(int(pw), 1), height=max(int(ph), 1), bg=cor)
+            frame.place(x=int(px), y=int(py))
+            frame.lift()
+        except Exception:
+            pass
+    for frame in widgets[4:]:
+        try:
+            frame.place_forget()
+        except Exception:
+            pass
+    self._stage9_borda_bbox = signature
+
+
+def install_ui_grade_29922(App):
+    """Etapa 9: reduz churn de widgets e itens durante scroll/seleção da grade."""
+    if getattr(App, "_grade_ui_29922_aplicado", False):
+        return
+    App._grade_ui_29922_aplicado = True
+    App._grade_ui_29922_marker = SM_AUTOLAB_GRADE_29922
+    App._planilha_desenhar_cabecalho_linhas = _stage9_desenhar_cabecalho_linhas
+    App._planilha_limpar_borda = _stage9_limpar_borda
+    App._planilha_desenhar_borda = _stage9_desenhar_borda
+
+
 def _auditar_ui_29920():
     """Retorna os critérios técnicos finais sem alterar a automação."""
     return {
@@ -2185,6 +2317,7 @@ if __name__ == "__main__":
     install_ui_dashboard_29917(App)
     install_ui_micro_29918(App)
     install_ui_planilha_29919(App)
+    install_ui_grade_29922(App)
     install_ui_responsivo_29921(App)
     install_ui_auditoria_29920(App)
     _validar_base_aplicacao()
