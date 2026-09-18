@@ -871,7 +871,7 @@ def _aplicar_fluent_ui_29916(self):
         self.botao_configuracoes.configure(
             corner_radius=10,
             height=40,
-            hover_color=("#F3F6F9", "#353D43"),
+            hover_color=("#EAF4FC", "#263F50"),
         )
         self.botao_planilha.configure(
             corner_radius=8,
@@ -879,7 +879,7 @@ def _aplicar_fluent_ui_29916(self):
         )
         self.botao_historico_planilha.configure(
             corner_radius=8,
-            hover_color=("#F3F6F9", "#353D43"),
+            hover_color=("#EAF4FC", "#263F50"),
         )
     except Exception:
         pass
