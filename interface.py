@@ -178,7 +178,7 @@ class App:
             command=self._fixar_menu_configuracoes,
             width=128,
             height=40,
-            corner_radius=8,
+            corner_radius=7,
             fg_color=self.CARD,
             hover_color=("#F3F3F3", "#3A3A3A"),
             border_width=1,
@@ -370,7 +370,7 @@ class App:
 
         self.erros_frame = ctk.CTkScrollableFrame(
             self.aba_erros, height=80, fg_color=("#FAFAFA", "#252A2F"),
-            corner_radius=8, border_width=1, border_color=self.BORDER
+            corner_radius=7, border_width=1, border_color=self.BORDER
         )
         self.erros_frame.pack(fill="both", expand=True)
         self._limpar_erros_visuais(salvar=False)
@@ -396,7 +396,7 @@ class App:
 
         self.historico_lista = ctk.CTkScrollableFrame(
             self.aba_historico, fg_color=("#FAFAFA", "#252A2F"),
-            corner_radius=8, border_width=1, border_color=self.BORDER
+            corner_radius=7, border_width=1, border_color=self.BORDER
         )
         self.historico_lista.pack(fill="both", expand=True)
 
@@ -993,7 +993,7 @@ class App:
             command=restaurar,
             width=110,
             height=40,
-            corner_radius=8,
+            corner_radius=7,
             fg_color=self.CARD,
             hover_color=("#F3F3F3", "#3A3A3A"),
             border_width=1,
@@ -1012,7 +1012,7 @@ class App:
             command=popup.destroy,
             width=110,
             height=40,
-            corner_radius=8,
+            corner_radius=7,
             fg_color=self.CARD,
             hover_color=("#F3F3F3", "#3A3A3A"),
             border_width=1,
@@ -2014,3 +2014,1217 @@ class App:
     def _planilha_desfazer(self):
         if not self._planilha_undo:return
         self._planilha_redo.append(self._planilha_snapshot())
+        self._planilha_data=self._planilha_undo.pop(); self._planilha_atualizar_grade(); self._planilha_marcar_alteracao()
+
+    def _planilha_refazer(self):
+        if not self._planilha_redo:return
+        self._planilha_undo.append(self._planilha_snapshot())
+        self._planilha_data=self._planilha_redo.pop(); self._planilha_atualizar_grade(); self._planilha_marcar_alteracao()
+
+    def _planilha_fechar_edicao(self):
+        if self._planilha_edit_entry is not None:
+            try:self._planilha_edit_entry.destroy()
+            except Exception:pass
+            self._planilha_edit_entry=None
+
+    def _planilha_encerrar_janela(self):
+        """Fecha a janela da planilha de forma robusta, sem depender do foco."""
+        win=self._planilha_window
+        self._planilha_window=None
+        self._planilha_tree=None
+        self._planilha_row_header=None
+        self._planilha_edit_entry=None
+
+        if win is None:
+            return
+
+        def destroy_win():
+            try:
+                if win.winfo_exists():
+                    try:
+                        win.grab_release()
+                    except Exception:
+                        pass
+                    try:
+                        win.withdraw()
+                    except Exception:
+                        pass
+                    win.destroy()
+            except Exception:
+                pass
+            try:
+                self.app.lift()
+                self.app.update_idletasks()
+            except Exception:
+                pass
+
+        try:
+            self.app.after_idle(destroy_win)
+        except Exception:
+            destroy_win()
+
+    def _planilha_fechar_sem_salvar_confirmado(self):
+        self._planilha_apagar_rascunho()
+        self._planilha_efetuou_alteracao=False
+        self._planilha_encerrar_janela()
+
+    def _planilha_fechar_pela_janela(self):
+        """Fechamento pelo X: pergunta apenas se houver alterações não salvas."""
+        self._planilha_fechar_edicao()
+        if self._planilha_tem_alteracoes():
+            resposta=messagebox.askyesnocancel(
+                "Sair da planilha",
+                "Existem alterações que ainda não foram salvas.\n\n"
+                "Deseja salvar antes de sair?",
+                parent=self._planilha_window
+            )
+            if resposta is None:
+                return
+            if resposta:
+                self._planilha_salvar_e_sair()
+            else:
+                self._planilha_fechar_sem_salvar_confirmado()
+            return
+
+        self._planilha_encerrar_janela()
+
+    def _planilha_salvar_e_sair(self):
+        self._planilha_fechar_edicao()
+        try:
+            self._salvar_planilha_interna_data()
+            self._registrar_historico_planilha(self._planilha_data)
+            self._planilha_salva_data=dict(self._planilha_data)
+            self._planilha_apagar_rascunho()
+            self._planilha_efetuou_alteracao=False
+            self._planilha_atualizar_contador()
+            self._add_activity("Planilha interna salva.",self.SUCCESS)
+        except Exception as exc:
+            messagebox.showerror(
+                "Não foi possível salvar",
+                str(exc),
+                parent=self._planilha_window
+            )
+            return
+
+        self._planilha_encerrar_janela()
+
+    def _extrair_codigos_planilha(self):
+        """Retorna todos os códigos preenchidos na segunda coluna (Senha)."""
+        codigos=[]
+        itens=[]
+        for chave, valor in self._planilha_data.items():
+            try:
+                linha, coluna = [int(x) for x in str(chave).split(",")]
+            except Exception:
+                continue
+            if coluna != 1:
+                continue
+            texto=str(valor).strip()
+            if texto:
+                itens.append((linha, texto))
+        itens.sort(key=lambda item: item[0])
+        return [texto for _, texto in itens]
+
+    def _garantir_pasta_planilha(self):
+        self._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
+
+    def _filtrar_arquivos_60_dias(self, itens):
+        agora = datetime.now()
+        limite = agora - timedelta(days=ARQUIVOS_DIAS)
+        validos = []
+        for item in itens or []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            if limite <= salvo <= agora:
+                validos.append(item)
+        validos.sort(key=lambda item: str(item.get("saved_at", "")))
+        return validos
+
+    def _carregar_historico_planilhas(self):
+        self._garantir_pasta_planilha()
+        if not self._planilha_historico_arquivo.exists():
+            return []
+        try:
+            data = json.loads(self._planilha_historico_arquivo.read_text(encoding="utf-8"))
+            itens = data.get("items", []) if isinstance(data, dict) else []
+            if not isinstance(itens, list):
+                return []
+            filtrados = self._filtrar_arquivos_60_dias(itens)
+            if filtrados != itens:
+                try:
+                    self._salvar_historico_planilhas(filtrados)
+                except Exception:
+                    pass
+            return filtrados
+        except Exception:
+            return []
+
+    def _salvar_historico_planilhas(self, itens):
+        self._garantir_pasta_planilha()
+        validos = self._filtrar_arquivos_60_dias(itens)
+        payload = {"version": 3, "items": validos}
+        tmp = self._planilha_historico_arquivo.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(self._planilha_historico_arquivo)
+
+    def _registrar_historico_planilha(self, cells, timestamp=None):
+        cells = {str(k): str(v) for k, v in cells.items() if str(v) != ""}
+        if not cells:
+            return
+        agora = timestamp or datetime.now()
+        itens = self._carregar_historico_planilhas()
+        linhas = set()
+        for chave, valor in cells.items():
+            if str(valor).strip() == "":
+                continue
+            try:
+                linha, coluna = [int(x) for x in str(chave).split(",")]
+            except Exception:
+                continue
+            if 0 <= coluna < 3:
+                linhas.add(linha)
+        entrada = {
+            "id": agora.strftime("%Y%m%d_%H%M%S_%f"),
+            "saved_at": agora.isoformat(timespec="seconds"),
+            "cells": cells,
+            "filled": len(linhas),
+        }
+        if itens:
+            ultimo = itens[-1]
+            if ultimo.get("cells") == cells:
+                entrada["id"] = ultimo.get("id", entrada["id"])
+                entrada["saved_at"] = ultimo.get("saved_at", entrada["saved_at"])
+                entrada["filled"] = ultimo.get("filled", len(linhas))
+                itens[-1] = entrada
+            else:
+                itens.append(entrada)
+        else:
+            itens.append(entrada)
+        self._salvar_historico_planilhas(itens)
+
+    def _preparar_planilha_do_dia(self):
+        """Rota a planilha salva de dia anterior para o histórico de Arquivos."""
+        self._garantir_pasta_planilha()
+        if not self._planilha_arquivo.exists():
+            return
+        try:
+            data = json.loads(self._planilha_arquivo.read_text(encoding="utf-8"))
+            cells = data.get("cells", {}) if isinstance(data, dict) else {}
+            updated_at = data.get("updated_at") if isinstance(data, dict) else None
+            if not isinstance(cells, dict) or not cells or not updated_at:
+                return
+            salvo = datetime.fromisoformat(str(updated_at))
+            if salvo.date() < datetime.now().date():
+                self._registrar_historico_planilha(cells, salvo)
+                payload = {"version": 1, "updated_at": datetime.now().isoformat(timespec="seconds"), "cells": {}}
+                tmp = self._planilha_arquivo.with_suffix(".tmp")
+                tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+                tmp.replace(self._planilha_arquivo)
+        except Exception:
+            pass
+
+    def _abrir_snapshot_historico(self, item):
+        cells = item.get("cells", {}) if isinstance(item, dict) else {}
+        if not isinstance(cells, dict):
+            return
+        self._fechar_historico_planilha()
+        self.abrir_planilha(cells)
+        try:
+            if self._planilha_window is not None:
+                self._planilha_window.title("Arquivo — Planilha — SM AutoLab")
+        except Exception:
+            pass
+
+    def _fechar_historico_planilha(self):
+        w = getattr(self, "_planilha_historico_window", None)
+        if w is not None:
+            try:
+                w.destroy()
+            except Exception:
+                pass
+        self._planilha_historico_window = None
+        self._arquivos_body = None
+
+    def _excluir_historico_planilha(self, item):
+        ident = str(item.get("id", ""))
+        itens = self._carregar_historico_planilhas()
+        novos = [x for x in itens if str(x.get("id", "")) != ident]
+        self._salvar_historico_planilhas(novos)
+        if self._arquivos_data_selecionada is not None:
+            self._mostrar_planilhas_do_dia(self._arquivos_data_selecionada)
+        else:
+            self._renderizar_calendario_arquivos()
+
+    def _limpar_historico_planilhas(self):
+        itens = self._carregar_historico_planilhas()
+        if not itens:
+            messagebox.showinfo("Arquivos", "Não há arquivos no histórico.", parent=self._planilha_historico_window)
+            return
+        confirmar = messagebox.askyesno(
+            "Limpar Arquivos",
+            "Tem certeza que deseja apagar todos os arquivos do histórico?",
+            parent=self._planilha_historico_window
+        )
+        if not confirmar:
+            return
+        self._salvar_historico_planilhas([])
+        self._arquivos_data_selecionada = None
+        self._renderizar_calendario_arquivos()
+
+    def _contar_codigos_mes(self, referencia=None):
+        """Retorna a quantidade de códigos do mês exibido no calendário.
+
+        A fonte principal é o histórico de execuções. Quando o mês não possui
+        registros de execução (por exemplo, históricos antigos migrados apenas
+        como planilhas salvas), faz fallback para o histórico de Arquivos e soma
+        as linhas preenchidas das planilhas daquele mês. Isso evita que meses
+        antigos apareçam como zero apesar de possuírem arquivos registrados.
+        """
+        referencia = referencia or datetime.now()
+        if hasattr(referencia, "year") and hasattr(referencia, "month"):
+            ano = int(referencia.year)
+            mes = int(referencia.month)
+        else:
+            hoje = datetime.now()
+            ano, mes = hoje.year, hoje.month
+
+        total_execucoes = 0
+        encontrou_execucao = False
+        for execucao in self._filtrar_historico_execucoes_60_dias(self._historico_execucoes):
+            try:
+                inicio = datetime.fromisoformat(str(execucao.get("inicio", "")))
+            except Exception:
+                continue
+            if inicio.year != ano or inicio.month != mes:
+                continue
+            encontrou_execucao = True
+
+            # Compatibilidade com históricos antigos: algumas execuções
+            # podem ter processados=0/ausente mesmo tendo códigos concluídos.
+            # Nesses casos, usamos a soma Executados + Não executados; como
+            # último recurso, usamos o total planejado.
+            processados = int(execucao.get("processados", 0) or 0)
+            sucessos = int(execucao.get("sucessos", 0) or 0)
+            erros = int(execucao.get("erros", 0) or 0)
+            planejados = int(execucao.get("total", 0) or 0)
+
+            if processados > 0:
+                quantidade = processados
+            elif (sucessos + erros) > 0:
+                quantidade = sucessos + erros
+            else:
+                quantidade = planejados
+            total_execucoes += quantidade
+
+        if encontrou_execucao and total_execucoes > 0:
+            return total_execucoes
+
+        # Fallback para meses que possuem Arquivos salvos, mas não possuem
+        # histórico de execução compatível (situação comum em dados antigos).
+        total_arquivos = 0
+        try:
+            for item in self._carregar_historico_planilhas():
+                try:
+                    salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
+                except Exception:
+                    continue
+                if salvo.year != ano or salvo.month != mes:
+                    continue
+                try:
+                    preenchidas = int(item.get("filled", 0) or 0)
+                except Exception:
+                    preenchidas = 0
+                total_arquivos += max(0, preenchidas)
+        except Exception:
+            total_arquivos = 0
+        return total_arquivos
+
+    def _formatar_contador_arquivos(self, referencia=None):
+        valor = self._contar_codigos_mes(referencia)
+        return f"{valor:,}".replace(",", ".") + " códigos no mês"
+
+    def _atualizar_contador_arquivos(self, referencia=None):
+        """Atualiza os contadores. O contador da janela usa o mês exibido no calendário."""
+        texto_main = self._formatar_contador_arquivos()
+        if self.arquivos_contador_label is not None:
+            try:
+                self.arquivos_contador_label.configure(text=texto_main)
+            except Exception:
+                pass
+
+        label = getattr(self, "_arquivos_contador_janela", None)
+        if label is not None:
+            try:
+                texto_janela = self._formatar_contador_arquivos(referencia)
+                label.configure(text=texto_janela)
+            except Exception:
+                pass
+
+    def _mes_anterior(self, data):
+        if data.month == 1:
+            return data.replace(year=data.year - 1, month=12, day=1)
+        return data.replace(month=data.month - 1, day=1)
+
+    def _mes_proximo(self, data):
+        if data.month == 12:
+            return data.replace(year=data.year + 1, month=1, day=1)
+        return data.replace(month=data.month + 1, day=1)
+
+    @staticmethod
+    def _nome_mes(mes):
+        meses = (
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+        )
+        return meses[mes - 1]
+
+    def _cor_fluente(self, valor):
+        """Resolve uma cor CTk (tupla claro/escuro) para um widget tkinter nativo."""
+        if isinstance(valor, (tuple, list)):
+            modo = str(ctk.get_appearance_mode()).lower()
+            return str(valor[1] if modo == "dark" else valor[0])
+        return str(valor)
+
+    def _mes_minimo_arquivos(self):
+        limite = datetime.now().date() - timedelta(days=ARQUIVOS_DIAS)
+        return datetime(limite.year, limite.month, 1)
+
+    def _mes_atual_arquivos(self):
+        agora = datetime.now()
+        return datetime(agora.year, agora.month, 1)
+
+    def _renderizar_calendario_arquivos(self):
+        """Renderiza um calendário Fluent 2 nativo, sem dependências externas."""
+        if self._arquivos_body is None:
+            return
+
+        for widget in self._arquivos_body.winfo_children():
+            widget.destroy()
+        self._arquivos_data_selecionada = None
+        self._arquivos_calendar_canvas = None
+        self._arquivos_calendar_widget = None
+
+        hoje = datetime.now().date()
+        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        itens = self._carregar_historico_planilhas()
+        por_dia = {}
+        for item in itens:
+            try:
+                dt = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            por_dia.setdefault(dt.date(), []).append(item)
+
+        card = ctk.CTkFrame(
+            self._arquivos_body, fg_color=self.CARD, corner_radius=12,
+            border_width=1, border_color=self.BORDER
+        )
+        card.pack(fill="both", expand=True, padx=8, pady=(0, 4))
+
+        intro = ctk.CTkFrame(card, fg_color="transparent")
+        intro.pack(fill="x", padx=18, pady=(14, 4))
+        ctk.CTkLabel(
+            intro, text="Selecione uma data", text_color=self.TEXT,
+            font=("Segoe UI", 15, "bold")
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            intro,
+            text="Os dias com planilhas salvas ficam destacados. O histórico mantém até 60 dias.",
+            text_color=self.SUBTEXT, font=("Segoe UI", 9)
+        ).pack(anchor="w", pady=(2, 0))
+
+        nav = ctk.CTkFrame(card, fg_color="transparent")
+        nav.pack(fill="x", padx=18, pady=(10, 8))
+        self._arquivos_btn_mes_anterior = ctk.CTkButton(
+            nav, text="‹", width=38, height=32, corner_radius=7,
+            fg_color=self.CARD, hover_color=self.ACCENT_HOVER,
+            border_width=1, border_color=self.BORDER, text_color=self.TEXT,
+            font=("Segoe UI", 17, "bold"), command=lambda: self._mudar_mes_arquivos(-1)
+        )
+        self._arquivos_btn_mes_anterior.pack(side="left")
+        self._arquivos_mes_label = ctk.CTkLabel(
+            nav, text="", text_color=self.TEXT, font=("Segoe UI", 14, "bold")
+        )
+        self._arquivos_mes_label.pack(side="left", expand=True)
+        self._arquivos_btn_mes_proximo = ctk.CTkButton(
+            nav, text="›", width=38, height=32, corner_radius=7,
+            fg_color=self.CARD, hover_color=self.ACCENT_HOVER,
+            border_width=1, border_color=self.BORDER, text_color=self.TEXT,
+            font=("Segoe UI", 17, "bold"), command=lambda: self._mudar_mes_arquivos(1)
+        )
+        self._arquivos_btn_mes_proximo.pack(side="right")
+
+        hint = ctk.CTkFrame(card, fg_color="transparent")
+        hint.pack(fill="x", padx=18, pady=(0, 4))
+        dot_color = self._cor_fluente(self.ACCENT)
+        ctk.CTkLabel(
+            hint, text="●", text_color=dot_color, font=("Segoe UI", 12, "bold")
+        ).pack(side="left")
+        ctk.CTkLabel(
+            hint, text=" possui planilhas salvas", text_color=self.SUBTEXT,
+            font=("Segoe UI", 9)
+        ).pack(side="left", padx=(4, 0))
+
+        canvas = tk.Canvas(
+            card,
+            height=360,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            bg=self._cor_fluente(self.CARD),
+        )
+        canvas.pack(fill="both", expand=True, padx=18, pady=(2, 16))
+        canvas.bind("<Button-1>", self._clique_calendario_arquivos)
+        canvas.bind("<Configure>", lambda _e: self._desenhar_calendario_arquivos())
+        self._arquivos_calendar_canvas = canvas
+        self._desenhar_calendario_arquivos()
+
+    def _desenhar_calendario_arquivos(self):
+        canvas = self._arquivos_calendar_canvas
+        if canvas is None or not canvas.winfo_exists():
+            return
+        canvas.delete("all")
+
+        hoje = datetime.now().date()
+        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        mes = self._arquivos_mes
+        if not mes:
+            mes = self._mes_atual_arquivos()
+            self._arquivos_mes = mes
+
+        itens = self._carregar_historico_planilhas()
+        por_dia = {}
+        for item in itens:
+            try:
+                dt = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            por_dia.setdefault(dt.date(), []).append(item)
+
+        modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
+        bg = self._cor_fluente(self.CARD)
+        border = self._cor_fluente(self.BORDER)
+        text = self._cor_fluente(self.TEXT)
+        subtext = self._cor_fluente(self.SUBTEXT)
+        accent = self._cor_fluente(self.ACCENT)
+        accent_hover = self._cor_fluente(self.ACCENT_HOVER)
+        disabled = "#555B61" if modo_escuro else "#B7B7B7"
+        today_fill = "#E8F1FB" if not modo_escuro else "#20384B"
+        today_outline = accent
+
+        self._arquivos_mes_label.configure(text=f"{self._nome_mes(mes.month)} {mes.year}")
+        # O contador da janela acompanha exatamente o mês atualmente exibido.
+        self._atualizar_contador_arquivos(mes)
+        self._arquivos_btn_mes_anterior.configure(
+            state="normal" if mes > self._mes_minimo_arquivos() else "disabled"
+        )
+        self._arquivos_btn_mes_proximo.configure(
+            state="normal" if mes < self._mes_atual_arquivos() else "disabled"
+        )
+
+        largura = max(canvas.winfo_width(), 640)
+        altura = max(canvas.winfo_height(), 330)
+        margem_x = 8
+        margem_y = 4
+        header_h = 30
+        grid_top = margem_y + header_h
+        col_w = (largura - 2 * margem_x) / 7
+        row_h = (altura - grid_top - 8) / 6
+
+        nomes = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]
+        for col, nome in enumerate(nomes):
+            x0 = margem_x + col * col_w
+            x1 = x0 + col_w
+            canvas.create_text(
+                (x0 + x1) / 2, margem_y + header_h / 2,
+                text=nome, fill=subtext, font=("Segoe UI", 9, "bold")
+            )
+
+        calendario = pycalendar.Calendar(firstweekday=0)
+        semanas = calendario.monthdayscalendar(mes.year, mes.month)
+        while len(semanas) < 6:
+            semanas.append([0] * 7)
+
+        for row in range(6):
+            y0 = grid_top + row * row_h + 2
+            y1 = grid_top + (row + 1) * row_h - 2
+            for col in range(7):
+                dia = semanas[row][col]
+                if not dia:
+                    continue
+                data = mes.replace(day=dia).date()
+                x0 = margem_x + col * col_w + 3
+                x1 = margem_x + (col + 1) * col_w - 3
+                centro_x = (x0 + x1) / 2
+                centro_y = (y0 + y1) / 2
+                valido = limite <= data <= hoje
+                tem_arquivo = data in por_dia
+                eh_hoje = data == hoje
+                fill = bg
+                outline = border
+                fg = text if valido else disabled
+                width = 1
+                if tem_arquivo and valido:
+                    fill = "#EAF4FF" if not modo_escuro else "#183B54"
+                    outline = accent
+                    width = 1
+                elif eh_hoje and valido:
+                    fill = today_fill
+                    outline = today_outline
+                    width = 2
+
+                canvas.create_rectangle(
+                    x0, y0, x1, y1,
+                    fill=fill, outline=outline, width=width,
+                    tags=(f"dia:{data.isoformat()}",)
+                )
+                canvas.create_text(
+                    centro_x, centro_y - 3,
+                    text=str(dia), fill=fg,
+                    font=("Segoe UI", 11, "bold" if (tem_arquivo or eh_hoje) else "normal"),
+                    tags=(f"dia:{data.isoformat()}",)
+                )
+                if tem_arquivo and valido:
+                    canvas.create_oval(
+                        centro_x - 3, y1 - 14, centro_x + 3, y1 - 8,
+                        fill=accent, outline="", tags=(f"dia:{data.isoformat()}",)
+                    )
+
+    def _clique_calendario_arquivos(self, event):
+        canvas = self._arquivos_calendar_canvas
+        if canvas is None:
+            return
+        try:
+            item_id = canvas.find_closest(event.x, event.y)[0]
+        except Exception:
+            return
+        tags = canvas.gettags(item_id)
+        data = None
+        for tag in tags:
+            if tag.startswith("dia:"):
+                try:
+                    data = datetime.fromisoformat(tag[4:]).date()
+                except Exception:
+                    data = None
+                break
+        if data is None:
+            return
+        hoje = datetime.now().date()
+        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        if limite <= data <= hoje:
+            self._mostrar_planilhas_do_dia(data)
+
+    def _mudar_mes_arquivos(self, direcao):
+        atual = self._arquivos_mes or self._mes_atual_arquivos()
+        novo = self._mes_proximo(atual) if direcao > 0 else self._mes_anterior(atual)
+        if novo < self._mes_minimo_arquivos() or novo > self._mes_atual_arquivos():
+            return
+        self._arquivos_mes = novo
+        self._atualizar_contador_arquivos(novo)
+        self._desenhar_calendario_arquivos()
+
+    def _mostrar_planilhas_do_dia(self, data):
+        if self._arquivos_body is None:
+            return
+        hoje = datetime.now().date()
+        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        if data < limite or data > hoje:
+            return
+        itens = []
+        for item in self._carregar_historico_planilhas():
+            try:
+                dt = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            if dt.date() == data:
+                itens.append(item)
+
+        self._arquivos_data_selecionada = data
+        for widget in self._arquivos_body.winfo_children():
+            widget.destroy()
+
+        header = ctk.CTkFrame(self._arquivos_body, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 8))
+        ctk.CTkButton(
+            header, text="← Voltar", command=self._renderizar_calendario_arquivos,
+            width=88, height=30, corner_radius=6, fg_color=self.CARD,
+            hover_color=("#F3F3F3", "#3A3A3A"), border_width=1,
+            border_color=self.BORDER, text_color=self.TEXT, font=("Segoe UI", 10, "bold")
+        ).pack(side="left")
+        ctk.CTkLabel(
+            header, text=data.strftime("%d/%m/%Y"), text_color=self.TEXT,
+            font=("Segoe UI", 15, "bold")
+        ).pack(side="left", padx=12)
+
+        if not itens:
+            ctk.CTkLabel(
+                self._arquivos_body, text="Nenhuma planilha foi salva nesta data.",
+                text_color=self.SUBTEXT, font=("Segoe UI", 10)
+            ).pack(anchor="w", pady=24)
+            return
+
+        ctk.CTkLabel(
+            self._arquivos_body, text=f"{len(itens)} planilha(s) salva(s) nesta data",
+            text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold")
+        ).pack(anchor="w", pady=(0, 6))
+
+        lista = ctk.CTkScrollableFrame(self._arquivos_body, fg_color="transparent")
+        lista.pack(fill="both", expand=True)
+        for item in reversed(itens):
+            saved = str(item.get("saved_at", ""))
+            try:
+                dt = datetime.fromisoformat(saved)
+                hora = dt.strftime("%H:%M")
+            except Exception:
+                hora = ""
+            filled = int(item.get("filled", 0) or 0)
+            card = ctk.CTkFrame(lista, fg_color=self.CARD, corner_radius=8, border_width=1, border_color=self.BORDER)
+            card.pack(fill="x", pady=4)
+            left = ctk.CTkFrame(card, fg_color="transparent")
+            left.pack(side="left", fill="x", expand=True, padx=10, pady=8)
+            ctk.CTkLabel(left, text=f"{hora}  •  {filled} linhas preenchidas", text_color=self.TEXT, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+            actions = ctk.CTkFrame(card, fg_color="transparent")
+            actions.pack(side="right", padx=8, pady=6)
+            ctk.CTkButton(
+                actions, text="Abrir", width=70, height=30, corner_radius=6,
+                fg_color=self.ACCENT, hover_color=self.ACCENT_HOVER,
+                text_color="#FFFFFF", font=("Segoe UI", 10, "bold"),
+                command=lambda it=item: self._abrir_snapshot_historico(it)
+            ).pack(side="left", padx=(0, 5))
+            ctk.CTkButton(
+                actions, text="×", width=30, height=30, corner_radius=6,
+                fg_color=self.CARD, hover_color=("#FDECEC", "#3A2424"),
+                border_width=1, border_color=self.ERROR, text_color=self.ERROR,
+                font=("Segoe UI", 14, "bold"), command=lambda it=item: self._excluir_historico_planilha(it)
+            ).pack(side="left")
+
+    def abrir_historico_planilha(self):
+        self._fechar_historico_planilha()
+        # Janela nativa para maximizar a estabilidade do container; o conteúdo continua Fluent 2.
+        win = tk.Toplevel(self.app)
+        self._planilha_historico_window = win
+        win.title("Arquivos — SM AutoLab")
+        win.geometry("820x650")
+        win.minsize(760, 590)
+        win.resizable(True, True)
+        win.transient(self.app)
+        win.configure(bg=self._cor_fluente(self.BG))
+        win.protocol("WM_DELETE_WINDOW", self._fechar_historico_planilha)
+        try:
+            self.app.update_idletasks()
+            px = self.app.winfo_rootx() + max(0, (self.app.winfo_width() - 820) // 2)
+            py = self.app.winfo_rooty() + max(0, (self.app.winfo_height() - 650) // 2)
+            win.geometry(f"820x650+{px}+{py}")
+        except Exception:
+            pass
+
+        header = ctk.CTkFrame(win, fg_color="transparent")
+        header.pack(fill="x", padx=18, pady=(16, 8))
+        ctk.CTkLabel(header, text="Arquivos", text_color=self.TEXT, font=("Segoe UI", 20, "bold")).pack(side="left")
+        self._arquivos_contador_janela = ctk.CTkLabel(header, text="0 códigos no mês", text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold"))
+        self._arquivos_contador_janela.pack(side="left", padx=(10, 0))
+        ctk.CTkButton(
+            header, text="Limpar histórico", command=self._limpar_historico_planilhas,
+            width=125, height=32, corner_radius=7, fg_color=self.CARD,
+            hover_color=("#FDECEC", "#3A2424"), border_width=1, border_color=self.ERROR,
+            text_color=self.ERROR, font=("Segoe UI", 10, "bold")
+        ).pack(side="right")
+        self._arquivos_body = ctk.CTkFrame(win, fg_color="transparent")
+        self._arquivos_body.pack(fill="both", expand=True, padx=16, pady=(0, 14))
+        hoje = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        self._arquivos_mes = hoje
+        self._arquivos_data_selecionada = None
+        self._atualizar_contador_arquivos()
+        self._renderizar_calendario_arquivos()
+        win.update_idletasks()
+
+    def _fechar_janela_planilha(self):
+        self._planilha_encerrar_janela()
+
+    def _planilha_salvar_e_iniciar(self):
+        self._planilha_fechar_edicao()
+        codigos=self._extrair_codigos_planilha()
+        if not codigos:
+            messagebox.showwarning(
+                "Nenhum código",
+                "Preencha os códigos na coluna 'Senha' antes de iniciar.",
+                parent=self._planilha_window
+            )
+            return
+
+        try:
+            self._salvar_planilha_interna_data()
+            self._registrar_historico_planilha(self._planilha_data)
+            self._planilha_salva_data=dict(self._planilha_data)
+            self._planilha_apagar_rascunho()
+            self._planilha_efetuou_alteracao=False
+            self._planilha_atualizar_contador()
+        except Exception as exc:
+            messagebox.showerror(
+                "Não foi possível salvar",
+                str(exc),
+                parent=self._planilha_window
+            )
+            return
+
+        # Close first. Only after Tk processes the destroy do we start Chrome.
+        win=self._planilha_window
+        self._planilha_window=None
+        self._planilha_tree=None
+        self._planilha_row_header=None
+        self._planilha_edit_entry=None
+
+        def iniciar_depois_de_fechar():
+            try:
+                if win is not None and win.winfo_exists():
+                    try:
+                        win.grab_release()
+                    except Exception:
+                        pass
+                    try:
+                        win.withdraw()
+                    except Exception:
+                        pass
+                    win.destroy()
+            except Exception:
+                pass
+
+            try:
+                self.app.lift()
+                self.app.update_idletasks()
+            except Exception:
+                pass
+
+            self._iniciar_automacao_interna(codigos)
+
+        try:
+            self.app.after_idle(iniciar_depois_de_fechar)
+        except Exception:
+            iniciar_depois_de_fechar()
+
+    def _iniciar_automacao_interna(self, codigos):
+        codigos=[str(c).strip() for c in codigos if str(c).strip()]
+        if not codigos:
+            messagebox.showwarning("Nenhum código","A coluna 'Senha' está vazia.",parent=self.app)
+            return
+
+        inicio=ler_checkpoint_interno(codigos)
+        start=0
+        if inicio is not None and inicio < len(codigos):
+            resposta=messagebox.askyesno(
+                "Retomar processamento",
+                f"Foi encontrado um processamento interrompido.\n\n"
+                f"Próximo código: {inicio+1} de {len(codigos)}.\n\n"
+                "Deseja continuar de onde parou?",
+                parent=self.app
+            )
+            if resposta:
+                start=inicio
+                self._add_activity(
+                    f"Retomando a partir do código {inicio+1}.",self.WARNING
+                )
+            else:
+                excluir_checkpoint_interno()
+                self._add_activity(
+                    "Retomada recusada. Começando do primeiro código.",self.INFO
+                )
+
+        self._iniciar_historico_execucao("Planilha interna",0,start)
+        self._execucao_atual["origem"] = "planilha_interna"
+        self._execucao_atual["total"] = len(codigos)
+        self._execucao_atual["checkpoint"] = int(start)
+        self._execucao_atual["proximo_indice"] = int(start)
+        self._execucao_atual["ultimo_codigo"] = ""
+        self._execucao_atual["status"] = "Em andamento"
+        self._checkpoint_indice_seguro = int(start)
+        self._salvar_estado_persistente()
+        self._parar=False
+        self.botao_iniciar.configure(state="disabled")
+        self.botao_planilha.configure(state="disabled")
+        self.botao_parar.configure(state="normal")
+        self.progresso.set(0)
+        self.progresso_label.configure(text=f"{start} / {len(codigos)}")
+        self.percentual_label.configure(
+            text=f"{(start/len(codigos)*100):.0f}%"
+        )
+        self._set_stat(self.sucesso_card,0)
+        self._set_stat(self.erro_card,0)
+        self._set_stat(self.codigo_card,"—")
+        self._limpar_erros_visuais()
+        self._add_activity(
+            f"Iniciando automação com {len(codigos)} código(s) da coluna 'Senha'.",
+            self.INFO
+        )
+        self._add_historico("Nova execução iniciada pela planilha interna.")
+        self.atualizar_status("Iniciando")
+        threading.Thread(
+            target=self._executar_interno,
+            args=(codigos,start),
+            daemon=True
+        ).start()
+
+    def _executar_interno(self,codigos,start):
+        try:
+            resultado=principal_interno(codigos,self,start)
+            if not self._closing:
+                self.app.after(0,lambda:self._finalizar(resultado))
+        except Exception as exc:
+            if not self._closing:
+                self.app.after(0,lambda:self._falha_geral(str(exc)))
+
+    def iniciar_thread(self):
+        """Inicia diretamente a partir dos códigos salvos na coluna Senha."""
+        codigos=self._extrair_codigos_planilha()
+        if not codigos:
+            self.abrir_planilha()
+            messagebox.showwarning(
+                "Nenhum código",
+                "Preencha os códigos na coluna 'Senha' da planilha.",
+                parent=self._planilha_window
+            )
+            return
+        self._iniciar_automacao_interna(codigos)
+
+    def _falha_geral(self, msg):
+        self.botao_iniciar.configure(state="normal")
+        self.botao_planilha.configure(state="normal")
+        self.botao_parar.configure(state="disabled")
+        self._add_activity("Processo interrompido por erro.", self.ERROR)
+        self._registrar_falha_historico(msg)
+        self._aplicar_status("Processo interrompido por erro")
+        messagebox.showerror("Erro no processo", msg)
+
+    def _finalizar(self, resultado):
+        self.botao_iniciar.configure(state="normal")
+        self.botao_planilha.configure(state="normal")
+        self.botao_parar.configure(state="disabled")
+
+        # A planilha que originou a execução passa a constar imediatamente em
+        # Anteriores quando o processamento termina.
+        try:
+            cells = self._carregar_planilha_interna()
+            if cells:
+                self._registrar_historico_planilha(cells)
+        except Exception:
+            pass
+
+        if self._parar:
+            self._add_activity("Processo parado. Ponto de retomada salvo.", self.WARNING)
+            self._finalizar_historico_execucao(resultado, "Parada pelo usuário")
+            self._aplicar_status("Parado pelo usuário")
+        else:
+            self._add_activity("Processo finalizado.", self.SUCCESS)
+            self._finalizar_historico_execucao(resultado, "Concluída")
+            # Aplicar imediatamente: evita que a messagebox bloqueie a atualização
+            # do cabeçalho deixando-o visualmente em "Processando".
+            self._aplicar_status("Finalizado")
+
+        for item in resultado.itens:
+            if item.status == "Erro":
+                self._add_erro_codigo(item.codigo)
+        self._selecionar_aba("Não executados" if resultado.erros else "Atividade")
+
+        if resultado.erros == 0 and not self._parar:
+            messagebox.showinfo(
+                "Processo concluído",
+                f"Processados: {resultado.processados}\nExecutados: {resultado.sucessos}\nNão executados: 0"
+            )
+        elif resultado.erros > 0:
+            messagebox.showwarning(
+                "Processo concluído",
+                f"Processados: {resultado.processados}\n"
+                f"Executados: {resultado.sucessos}\n"
+                f"Não executados: {resultado.erros}\n\n"
+                "Os códigos não executados estão na aba 'Não executados'."
+            )
+
+    def parar(self):
+        self._parar = True
+        self.atualizar_status("Parando após o código atual...")
+        self._add_activity("Solicitação de parada recebida.", self.WARNING)
+        self._add_historico("Usuário solicitou parada segura.")
+
+    def atualizar_status(self, texto):
+        if self._closing:
+            return
+        self.app.after(0, lambda: self._aplicar_status(texto))
+
+    def _iniciar_pisca_status(self, rapido=None):
+        if rapido is not None:
+            self._status_blink_fast = bool(rapido)
+
+        if self._status_blink_job is not None:
+            try:
+                self.app.after_cancel(self._status_blink_job)
+            except Exception:
+                pass
+            self._status_blink_job = None
+
+        # Muitos frames + intervalo curto = pulso visual contínuo, em vez de
+        # aparência de GIF. A geometria permanece idêntica.
+        self._status_anim_frame = 0
+        self._status_anim_frames = 28 if self._status_blink_fast else 36
+        self._status_anim_interval = 28 if self._status_blink_fast else 32
+        self._executar_pisca_status()
+
+    @staticmethod
+    def _interpolar_cor(c1, c2, fator):
+        def rgb(hex_color):
+            hex_color = hex_color.lstrip("#")
+            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+        a = rgb(c1)
+        b = rgb(c2)
+        v = tuple(round(a[i] + (b[i] - a[i]) * fator) for i in range(3))
+        return "#" + "".join(f"{x:02X}" for x in v)
+
+    def _executar_pisca_status(self):
+        try:
+            import math
+
+            frames = max(2, int(self._status_anim_frames))
+            idx = self._status_anim_frame % frames
+
+            # Seno suavizado: sobe e desce sem saltos perceptíveis.
+            fase = (2.0 * math.pi * idx) / frames
+            fator = (math.sin(fase - math.pi / 2.0) + 1.0) / 2.0
+            # Curva suave para manter o ponto visível mesmo no vale.
+            fator = fator * fator * (3.0 - 2.0 * fator)
+
+            if self._status_blink_fast:
+                # Azul/ciano mais discreto durante execução.
+                halo_base, halo_brilho = "#3B7285", "#8FD4EC"
+                dot_base, dot_brilho = "#2F6F87", "#65B8DB"
+            else:
+                halo_base, halo_brilho = "#4E8054", "#C9F0CC"
+                dot_base, dot_brilho = "#2F7437", "#6ECB72"
+
+            halo = self._interpolar_cor(halo_base, halo_brilho, fator)
+            dot = self._interpolar_cor(dot_base, dot_brilho, fator)
+
+            modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+            if self._status_blink_fast:
+                canvas_bg = "#183B54" if modo_escuro else "#E5F1FB"
+            else:
+                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
+            self.status_indicator.configure(bg=canvas_bg)
+            self.status_indicator.itemconfigure(
+                self._status_halo,
+                fill=halo
+            )
+            self.status_indicator.itemconfigure(
+                self._status_dot,
+                fill=dot
+            )
+
+            self._status_anim_frame = idx + 1
+            self._status_blink_job = self.app.after(
+                self._status_anim_interval,
+                self._executar_pisca_status
+            )
+        except Exception:
+            self._status_blink_job = None
+
+    def _agendar_retorno_pronto(self):
+        if self._status_finalizado_job is not None:
+            try:self.app.after_cancel(self._status_finalizado_job)
+            except Exception:pass
+        self._status_finalizado_job=self.app.after(10000,lambda:self._aplicar_status("Pronto"))
+
+    def _aplicar_status(self, texto):
+        self.status_label.configure(text=texto.replace("Status:", "").strip())
+        low = texto.lower()
+
+        if "process" in low and "erro" not in low:
+            self._status_text_base = "Processando"
+            self._status_blink_fast = True
+            cor_texto = self.INFO
+            cor_pill = ("#E5F1FB", "#183B54")
+        elif "parando" in low:
+            self._status_text_base = "Parando"
+            self._status_blink_fast = True
+            cor_texto = self.WARNING
+            cor_pill = ("#FFF4CE", "#4B3A1A")
+        elif "erro" in low or "interromp" in low:
+            self._status_text_base = "Atenção"
+            self._status_blink_fast = True
+            cor_texto = self.ERROR
+            cor_pill = ("#FDE7E9", "#4B2529")
+        elif "finalizado" in low:
+            self._status_text_base = "Finalizado"
+            self._status_blink_fast = False
+            cor_texto = self.SUCCESS
+            cor_pill = ("#E7F5E7", "#21482A")
+            self.status_pill.configure(fg_color=cor_pill)
+            self.status_text.configure(text=self._status_text_base,text_color=cor_texto,font=("Segoe UI",13,"bold"))
+            modo=ctk.get_appearance_mode().lower()
+            canvas_bg=cor_pill[1] if modo=="dark" else cor_pill[0]
+            self.status_indicator.configure(bg=canvas_bg)
+            self._iniciar_pisca_status()
+            self._agendar_retorno_pronto()
+            return
+        else:
+            self._status_text_base = "Pronto"
+            self._status_blink_fast = False
+            cor_texto = self.SUCCESS
+            cor_pill = ("#E7F5E7", "#21482A")
+
+        self.status_pill.configure(fg_color=cor_pill)
+        self.status_text.configure(
+            text=self._status_text_base,
+            text_color=cor_texto,
+            font=("Segoe UI", 13, "bold")
+        )
+        modo = ctk.get_appearance_mode().lower()
+        canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
+        self.status_indicator.configure(bg=canvas_bg)
+        self._iniciar_pisca_status()
+
+    def atualizar_progresso(self, processados, total, sucessos, erros, codigo):
+        if self._closing:
+            return
+        self.app.after(0, lambda: self._aplicar_progresso(processados, total, sucessos, erros, codigo))
+
+    def _animar_progresso(self, destino):
+        try:
+            atual=float(self.progresso.get())
+        except Exception:
+            atual=0.0
+
+        destino=max(0.0,min(1.0,float(destino)))
+
+        # Cancel any previous progress animation so multiple callbacks cannot
+        # fight each other when successive codes finish quickly.
+        job=getattr(self,"_progress_anim_job",None)
+        if job is not None:
+            try:self.app.after_cancel(job)
+            except Exception:pass
+            self._progress_anim_job=None
+
+        distancia=destino-atual
+        if abs(distancia)<0.0005:
+            self.progresso.set(destino)
+            return
+
+        # Slow, steady, linear movement (~420 ms per code-step).
+        duracao_ms=420
+        intervalo_ms=20
+        passos=max(1,int(duracao_ms/intervalo_ms))
+        passo=distancia/passos
+
+        def tick(i=0, valor=atual):
+            if self._closing:
+                self._progress_anim_job=None
+                return
+            novo=destino if i>=passos else valor+passo
+            self.progresso.set(max(0.0,min(1.0,novo)))
+            if i<passos:
+                self._progress_anim_job=self.app.after(
+                    intervalo_ms,lambda:tick(i+1,novo)
+                )
+            else:
+                self._progress_anim_job=None
+
+        tick()
+
+    def _aplicar_progresso(self, processados, total, sucessos, erros, codigo):
+        self._checkpoint_indice_seguro = int(processados)
+        if self._execucao_atual:
+            self._execucao_atual["status"] = "Em andamento"
+            self._execucao_atual["checkpoint"] = int(processados)
+            self._execucao_atual["proximo_indice"] = int(processados)
+            self._execucao_atual["total"] = int(total)
+            self._execucao_atual["ultimo_codigo"] = str(codigo)
+            self._execucao_atual["ultimo_checkpoint"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._salvar_estado_persistente()
+        pct = processados / total if total else 0
+        self._animar_progresso(pct)
+        self.progresso_label.configure(text=f"{processados} / {total}")
+        self.percentual_label.configure(text=f"{pct:.0%}")
+        self._set_stat(self.sucesso_card, sucessos)
+        self._set_stat(self.erro_card, erros)
+        self._set_stat(self.codigo_card, codigo)
+        self.status_label.configure(text=f"Processando código {processados} de {total}")
+        self._status_text_base = "Processando"
+        self.status_pill.configure(fg_color=("#E5F1FB", "#183B54"))
+        self.status_text.configure(text="Processando", text_color=self.INFO)
+        self._status_blink_fast = True
+        # O estado já atualiza a animação; reiniciar o temporizador a cada código
+        # tornaria o efeito irregular.
+        if getattr(self, "_status_blink_job", None) is None:
+            self._iniciar_pisca_status()
+        if erros and erros > len(self._erros_codigos):
+            # The actual error code is added at finalization; keep counter live.
+            pass
+
+    def mostrar_erro(self, mensagem):
+        self.app.after(0, lambda: messagebox.showerror("Erro", mensagem))
+
+    def deve_parar(self):
+        return self._parar
+
+    def _fechar_aplicativo(self):
+        # Salva imediatamente o último ponto confirmado antes de destruir a
+        # janela. O código que estava em execução não é contabilizado como
+        # concluído e será repetido na retomada.
+        self._closing = True
+
+        if self._execucao_atual:
+            try:
+                indice = max(0, int(self._checkpoint_indice_seguro))
+                self._execucao_atual["status"] = "Interrompida — ponto salvo"
+                self._execucao_atual["checkpoint"] = indice
+                self._execucao_atual["proximo_indice"] = indice
+                self._execucao_atual["interrompida_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                if str(self._execucao_atual.get("origem", "")) == "planilha_interna" and not self.caminho:
+                    codigos = self._extrair_codigos_planilha()
+                    if codigos:
+                        salvar_checkpoint_interno(codigos, indice)
+                elif self.caminho:
+                    pagina = int(self._execucao_atual.get("pagina", 1)) - 1
+                    salvar_checkpoint(self.caminho, pagina, indice)
+
+                self._salvar_estado_persistente()
+            except Exception:
+                # Mesmo que o histórico visual falhe, não impedir o fechamento
+                # nem mascarar o comportamento de saída do aplicativo.
+                try:
+                    pagina = max(0, int(self.pagina.get()) - 1)
+                    salvar_checkpoint(
+                        self.caminho,
+                        pagina,
+                        max(0, int(self._checkpoint_indice_seguro))
+                    )
+                except Exception:
+                    pass
+
+        # Fechar o navegador associado à execução antes de destruir a interface.
+        auto = getattr(self, "_automacao_atual", None)
+        if auto is not None:
+            try:
+                auto.fechar()
+            except Exception:
+                pass
+
+        if self._status_blink_job is not None:
+            try:
+                self.app.after_cancel(self._status_blink_job)
+            except Exception:
+                pass
+            self._status_blink_job = None
+        if self._status_finalizado_job is not None:
+            try:self.app.after_cancel(self._status_finalizado_job)
+            except Exception:pass
+            self._status_finalizado_job=None
+
+        self._fechar_menus()
+        self.app.destroy()
+
+    def run(self):
+        self.app.mainloop()
+
