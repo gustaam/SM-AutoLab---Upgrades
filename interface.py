@@ -1597,7 +1597,7 @@ class App:
         undo_row=ctk.CTkFrame(title_bar, fg_color="transparent")
         undo_row.pack(side="left", padx=(16,0))
         for glyph, cmd, label in (("↶", self._planilha_desfazer, "Desfazer"), ("↷", self._planilha_refazer, "Refazer")):
-            b=ctk.CTkButton(undo_row,text=glyph,command=cmd,width=34,height=34,corner_radius=7,fg_color="transparent",hover_color=("#F3F3F3","#3A3A3A"),text_color=self.TEXT,font=("Segoe UI Symbol",20,"bold"))
+            b=ctk.CTkButton(undo_row,text=glyph,command=cmd,width=34,height=34,corner_radius=7,fg_color="transparent",hover_color=("#EAF4FC","#263F50"),text_color=self.TEXT,font=("Segoe UI Symbol",20,"bold"))
             b.pack(side="left", padx=1)
             b.configure(cursor="hand2")
         self._planilha_contador_label=ctk.CTkLabel(title_bar,text="0 preenchidas",text_color=self.SUBTEXT,font=("Segoe UI",10))
