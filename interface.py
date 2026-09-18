@@ -11,6 +11,8 @@ from CTkToolTip import *
 
 import customtkinter as ctk
 
+from ui_platform import aplicar_backdrop_sistema, atualizar_backdrop_tema
+
 from app import (ler_checkpoint, salvar_checkpoint, principal, principal_interno, ler_checkpoint_interno, salvar_checkpoint_interno, excluir_checkpoint_interno)
 
 
@@ -493,6 +495,11 @@ class App:
                 x_offset= -45, y_offset= -45
             )
 
+        try:
+            aplicar_backdrop_sistema(self.app, "mica", dark=ctk.get_appearance_mode().lower() == "dark")
+        except Exception:
+            pass
+
         self._atualizar_contador_arquivos()
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
         self._iniciar_pisca_status()
@@ -829,6 +836,15 @@ class App:
             return
         self._tema = tema
         ctk.set_appearance_mode(tema)
+        try:
+            dark = ctk.get_appearance_mode().lower() == "dark"
+            atualizar_backdrop_tema(self.app, dark)
+            for attr in ("_planilha_window", "_planilha_historico_window"):
+                win = getattr(self, attr, None)
+                if win is not None:
+                    atualizar_backdrop_tema(win, dark)
+        except Exception:
+            pass
         self._salvar_estado_persistente()
         self._fechar_menus()
         self._add_activity(
@@ -857,6 +873,13 @@ class App:
         popup.transient(self.app)
         popup.grab_set()
         popup.configure(fg_color=self.BG)
+        try:
+            aplicar_backdrop_sistema(
+                popup, "acrylic",
+                dark=ctk.get_appearance_mode().lower() == "dark"
+            )
+        except Exception:
+            pass
 
         popup_header = ctk.CTkFrame(
             popup,
@@ -1427,6 +1450,10 @@ class App:
 
     def _abrir_detalhe_historico(self, execucao):
         win=ctk.CTkToplevel(self.app); win.title("Histórico — SM AutoLab"); win.geometry("650x470"); win.resizable(False,False); win.transient(self.app)
+        try:
+            aplicar_backdrop_sistema(win, "acrylic", dark=ctk.get_appearance_mode().lower() == "dark")
+        except Exception:
+            pass
         ctk.CTkLabel(win,text=execucao.get("inicio",""),text_color=self.TEXT,font=("Segoe UI",18,"bold")).pack(anchor="w",padx=18,pady=(16,2))
         self._preencher_detalhe_pasta(win,execucao)
 
@@ -1587,6 +1614,13 @@ class App:
         win.minsize(900, 600)
         win.configure(fg_color=self.BG)
         win.transient(self.app)
+        try:
+            aplicar_backdrop_sistema(
+                win, "mica_alt",
+                dark=ctk.get_appearance_mode().lower() == "dark"
+            )
+        except Exception:
+            pass
         win.protocol("WM_DELETE_WINDOW", self._planilha_fechar_pela_janela)
         # Restaurar rascunho após a janela existir para que o diálogo tenha parent válido.
         try:
@@ -2736,6 +2770,13 @@ class App:
         win.resizable(True, True)
         win.transient(self.app)
         win.configure(bg=self._cor_fluente(self.BG))
+        try:
+            aplicar_backdrop_sistema(
+                win, "mica_alt",
+                dark=ctk.get_appearance_mode().lower() == "dark"
+            )
+        except Exception:
+            pass
         win.protocol("WM_DELETE_WINDOW", self._fechar_historico_planilha)
         try:
             self.app.update_idletasks()
