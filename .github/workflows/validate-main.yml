@@ -1,5 +1,7 @@
 name: Validate main for release
 
+# CI trigger validation
+
 on:
   push:
     branches:
