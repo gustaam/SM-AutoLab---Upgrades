@@ -1604,7 +1604,7 @@ class App:
         self._planilha_contador_label.pack(side="left", padx=(10,0))
         actions=ctk.CTkFrame(toolbar,fg_color="transparent"); actions.pack(side="right",padx=16,pady=9)
         ctk.CTkButton(actions,text="Limpar",command=self._planilha_limpar,width=80,height=36,corner_radius=7,fg_color=self.CARD,hover_color=("#FDECEC","#3A2424"),border_width=1,border_color=self.ERROR,text_color=self.ERROR,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
-        ctk.CTkButton(actions,text="Salvar e Sair",command=self._planilha_salvar_e_sair,width=115,height=36,corner_radius=7,fg_color=self.CARD,hover_color=("#F3F3F3","#3A3A3A"),border_width=1,border_color=self.BORDER,text_color=self.TEXT,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
+        ctk.CTkButton(actions,text="Salvar e Sair",command=self._planilha_salvar_e_sair,width=115,height=36,corner_radius=7,fg_color=self.CARD,hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,text_color=self.TEXT,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
         ctk.CTkButton(actions,text="Salvar e Iniciar",command=self._planilha_salvar_e_iniciar,width=150,height=46,corner_radius=7,fg_color=self.ACCENT,hover_color=self.ACCENT_HOVER,font=("Segoe UI",14,"bold")).pack(side="left",padx=4)
 
         body=ctk.CTkFrame(win,fg_color=self.BG,corner_radius=0)
@@ -2659,7 +2659,7 @@ class App:
         ctk.CTkButton(
             header, text="← Voltar", command=self._renderizar_calendario_arquivos,
             width=88, height=30, corner_radius=6, fg_color=self.CARD,
-            hover_color=("#F3F3F3", "#3A3A3A"), border_width=1,
+            hover_color=("#EAF4FC", "#263F50"), border_width=1,
             border_color=self.BORDER, text_color=self.TEXT, font=("Segoe UI", 10, "bold")
         ).pack(side="left")
         ctk.CTkLabel(
