@@ -12,6 +12,9 @@ from automacao import Automacao, AutomacaoError
 from config import CODE_COLUMN
 
 
+SM_AUTOLAB_EXECUCAO_29923 = "SM-AUTOLAB-EXECUCAO-PERFORMANCE-29923"
+
+
 class PlanilhaError(Exception):
     """Erro de leitura ou validação da planilha de códigos."""
 
@@ -26,11 +29,13 @@ class ResultadoCodigo:
 
 
 class Resultados:
-    """Acumula os resultados da execução dos códigos."""
+    """Acumula os resultados da execução dos códigos em O(1) para métricas."""
 
     def __init__(self, total=0):
         self.total_planejado = total
         self.itens = []
+        self._sucessos = 0
+        self._erros = 0
 
     def registrar_sucesso(self, numero, codigo):
         self.itens.append(
@@ -41,6 +46,7 @@ class Resultados:
                 horario=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
         )
+        self._sucessos += 1
 
     def registrar_erro(self, numero, codigo, erro):
         self.itens.append(
@@ -52,6 +58,7 @@ class Resultados:
                 horario=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
         )
+        self._erros += 1
 
     @property
     def processados(self):
@@ -59,11 +66,11 @@ class Resultados:
 
     @property
     def sucessos(self):
-        return sum(item.status == "Sucesso" for item in self.itens)
+        return self._sucessos
 
     @property
     def erros(self):
-        return sum(item.status == "Erro" for item in self.itens)
+        return self._erros
 
 
 def carregar_codigos(caminho, sheet):
