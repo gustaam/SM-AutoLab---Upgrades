@@ -765,10 +765,10 @@ class App:
                 width=210,
                 height=34,
                 corner_radius=8,
-                fg_color=self.CARD,
+                fg_color=("#E5F1FB", "#183B54") if modo == self._tema else self.CARD,
                 hover_color=("#EAF4FC", "#263F50"),
-                text_color=self.TEXT,
-                font=("Segoe UI", 11),
+                text_color=self.ACCENT if modo == self._tema else self.TEXT,
+                font=("Segoe UI", 11, "bold") if modo == self._tema else ("Segoe UI", 11),
                 anchor="w"
             )
             btn.pack(fill="x", padx=6, pady=2)
