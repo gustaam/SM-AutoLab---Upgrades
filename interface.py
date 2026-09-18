@@ -940,8 +940,8 @@ class App:
             alterado = valores_atuais() != valores_iniciais
             salvar_btn.configure(
                 state="normal" if alterado else "disabled",
-                fg_color=self.ACCENT if alterado else ("#E5E5E5", "#454C52"),
-                hover_color=self.ACCENT_HOVER if alterado else ("#E5E5E5", "#454C52"),
+                fg_color=self.ACCENT if alterado else self.BORDER,
+                hover_color=self.ACCENT_HOVER if alterado else self.BORDER,
                 text_color="#FFFFFF" if alterado else ("#8A8A8A", "#AEB4B9")
             )
 
