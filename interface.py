@@ -7,8 +7,6 @@ import threading
 import sys
 from datetime import datetime, timedelta
 from tkinter import filedialog, messagebox, Canvas, Frame, ttk, TclError, Entry
-from CTkToolTip import *
-
 import customtkinter as ctk
 
 from ui_platform import aplicar_backdrop_sistema, atualizar_backdrop_tema
