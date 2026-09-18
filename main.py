@@ -266,6 +266,8 @@ _STAGE7_TOOLTIP_MESSAGES = {
     "salvar e iniciar": "Salva a planilha e inicia a automação.",
     "limpar": "Limpa os dados preenchidos na planilha.",
     "voltar": "Volta para a visualização anterior.",
+    "↶": "Desfaz a última alteração.",
+    "↷": "Refaz a alteração desfeita.",
     "desfazer": "Desfaz a última alteração.",
     "refazer": "Refaz a alteração desfeita.",
     "←": "Volta para o mês anterior.",
