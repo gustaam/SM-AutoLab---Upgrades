@@ -3049,36 +3049,33 @@ class App:
             self._status_blink_fast = True
             cor_texto = self.INFO
             cor_pill = ("#E5F1FB", "#183B54")
+            cor_borda = ("#B7D7EF", "#2C5E7A")
         elif "parando" in low:
             self._status_text_base = "Parando"
             self._status_blink_fast = True
             cor_texto = self.WARNING
             cor_pill = ("#FFF4CE", "#4B3A1A")
+            cor_borda = ("#F0C36A", "#725B28")
         elif "erro" in low or "interromp" in low:
             self._status_text_base = "Atenção"
             self._status_blink_fast = True
             cor_texto = self.ERROR
             cor_pill = ("#FDE7E9", "#4B2529")
+            cor_borda = ("#F1A6AA", "#7A3D42")
         elif "finalizado" in low:
             self._status_text_base = "Finalizado"
             self._status_blink_fast = False
             cor_texto = self.SUCCESS
             cor_pill = ("#E7F5E7", "#21482A")
-            self.status_pill.configure(fg_color=cor_pill)
-            self.status_text.configure(text=self._status_text_base,text_color=cor_texto,font=("Segoe UI",13,"bold"))
-            modo=ctk.get_appearance_mode().lower()
-            canvas_bg=cor_pill[1] if modo=="dark" else cor_pill[0]
-            self.status_indicator.configure(bg=canvas_bg)
-            self._iniciar_pisca_status()
-            self._agendar_retorno_pronto()
-            return
+            cor_borda = ("#C5E4C8", "#37653E")
         else:
             self._status_text_base = "Pronto"
             self._status_blink_fast = False
             cor_texto = self.SUCCESS
             cor_pill = ("#E7F5E7", "#21482A")
+            cor_borda = ("#C5E4C8", "#37653E")
 
-        self.status_pill.configure(fg_color=cor_pill)
+        self.status_pill.configure(fg_color=cor_pill, border_color=cor_borda)
         self.status_text.configure(
             text=self._status_text_base,
             text_color=cor_texto,
