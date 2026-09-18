@@ -270,6 +270,8 @@ _STAGE7_TOOLTIP_MESSAGES = {
     "refazer": "Refaz a alteração desfeita.",
     "←": "Volta para o mês anterior.",
     "→": "Avança para o próximo mês.",
+    "‹": "Volta para o mês anterior.",
+    "›": "Avança para o próximo mês.",
     "×": "Exclui este item do histórico.",
     "claro": "Usa o tema claro.",
     "escuro": "Usa o tema escuro.",
@@ -295,7 +297,14 @@ def _stage7_tooltip_text(widget):
         raw = str(widget.cget("text")).replace("✓", "").strip()
     except Exception:
         return None
-    key = " ".join(raw.split()).rstrip("›").strip().casefold()
+    raw_compact = " ".join(raw.split()).strip()
+    if raw_compact in _STAGE7_TOOLTIP_MESSAGES:
+        return _STAGE7_TOOLTIP_MESSAGES[raw_compact]
+    key = raw_compact.casefold()
+    for symbol in ("▶", "■", "←", "→", "‹", "›"):
+        if key.startswith(symbol):
+            key = key[len(symbol):].strip()
+            break
     if not key:
         return None
     explicit = _STAGE7_TOOLTIP_MESSAGES.get(key)
