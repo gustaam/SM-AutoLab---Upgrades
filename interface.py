@@ -121,7 +121,8 @@ class App:
     def config_app(self):
         self.app.title("SM AutoLab")
         self.app.geometry("900x600")
-        self.app.resizable(False, False)
+        self.app.minsize(760, 590)
+        self.app.resizable(True, True)
         self.app.configure(fg_color=self.BG)
         self.app.protocol("WM_DELETE_WINDOW", self._fechar_aplicativo)
         self.app.bind("<Configure>", self._reposicionar_menus, add="+")
@@ -256,6 +257,8 @@ class App:
 
         config = self._card(top)
         config.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        self._stage7_top_layout = top
+        self._stage7_config_card = config
         self._section_title(config, "Planilhas")
 
         plan_buttons = ctk.CTkFrame(config, fg_color="transparent")
@@ -292,6 +295,7 @@ class App:
 
         progress = self._card(top)
         progress.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        self._stage7_progress_card = progress
         ph = ctk.CTkFrame(progress, fg_color="transparent")
         ph.pack(fill="x", padx=14, pady=(11, 5))
         ctk.CTkLabel(ph, text="Progresso", text_color=self.TEXT,
@@ -442,62 +446,7 @@ class App:
         )
         self.botao_iniciar.pack(side="left")
 
-        #DETALHES BOTÕES     
-        class details_buttons:     
-            CTkToolTip(
-                widget=self.botao_iniciar, 
-                delay= 0.5,
-                message= "Clique para iniciar!",
-                alpha= 0.80,
-                corner_radius= 20, follow= True, padding= (3,3),
-                x_offset= -45, y_offset= -45
-            )
-
-            CTkToolTip(
-                widget=self.botao_parar, 
-                delay= 0.5,
-                message= "Parar",
-                alpha= 0.80,
-                corner_radius= 20, follow= True, padding= (3,3), 
-                x_offset= -45, y_offset= -45
-            )
-
-        
-            CTkToolTip(
-                widget=self.tab_buttons["Atividade"], 
-                delay= 0.2,
-                message= "Atividade",
-                alpha= 0.80,
-                corner_radius= 20, follow= True, padding= (3,3), 
-                x_offset= -25, y_offset= -45
-            )    
-
-            CTkToolTip(
-                widget=self.tab_buttons["Não executados"], 
-                delay= 0.2,
-                message= "Não executados",
-                alpha= 0.80,
-                corner_radius= 20, follow= True, padding= (3,3), 
-                x_offset= -25, y_offset= -45
-            )    
-            CTkToolTip(
-                widget=self.tab_buttons["Histórico"], 
-                delay= 0.2,
-                message= "Histórico",
-                alpha= 0.80,
-                corner_radius= 20, follow= True, padding= (3,3), 
-                x_offset= -25, y_offset= -45
-            )    
-
-            CTkToolTip(
-                widget=self.botao_configuracoes, 
-                delay= 0.2,
-                message= "Configurações",
-                alpha= 0.80,
-                corner_radius= 20, follow= True, padding= (3,3), 
-                x_offset= -45, y_offset= -45
-            )
-
+        # Tooltips passam a ser gerenciados globalmente pela camada visual da Etapa 7.
         try:
             aplicar_backdrop_sistema(self.app, "mica", dark=ctk.get_appearance_mode().lower() == "dark")
         except Exception:
