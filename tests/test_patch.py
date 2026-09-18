@@ -165,6 +165,33 @@ class TestPatch(unittest.TestCase):
         self.assertFalse((root / "test_historico_ilimitado.py").exists())
 
 
+
+class PlanilhaStage5Tests(unittest.TestCase):
+    def test_stage5_integracao_e_marcador(self):
+        root = Path(__file__).resolve().parents[1]
+        main_content = (root / "main.py").read_text(encoding="utf-8")
+        interface_content = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("SM_AUTOLAB_PLANILHA_29919", main_content)
+        self.assertIn("def install_ui_planilha_29919", main_content)
+        self.assertIn("def _planilha_desenhar_cabecalho_linhas", interface_content)
+        self.assertIn("Virtualização do cabeçalho de linhas", interface_content)
+
+    def test_stage5_nao_cria_os_10_mil_itens_de_canvas_do_cabecalho(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "for i in range(10000):\n            y_text = i * row_height",
+            content,
+        )
+        self.assertIn('canvas.delete("rownum")', content)
+
+    def test_stage5_historico_tem_cache_por_assinatura(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _assinatura_historico_planilhas", content)
+        self.assertIn("_planilha_historico_cache_signature", content)
+
+
 class UIFixes29912Tests(unittest.TestCase):
     def test_ctrl_pressed_uses_control_mask(self):
         self.assertTrue(main._ctrl_pressed(SimpleNamespace(state=0x0004)))

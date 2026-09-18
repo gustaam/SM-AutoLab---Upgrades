@@ -1499,6 +1499,56 @@ def install_ui_dashboard_29917(App):
 
 
 
+
+# Planilha e Histórico — Stage 5.
+SM_AUTOLAB_PLANILHA_29919 = "SM-AUTOLAB-PLANILHA-HISTORICO-29919"
+
+
+def _planilha_stage5_exists(widget):
+    try:
+        return widget is not None and widget.winfo_exists()
+    except Exception:
+        return False
+
+
+def _planilha_stage5_repaint_row_header(self):
+    try:
+        if _planilha_stage5_exists(getattr(self, "_planilha_row_header", None)):
+            self._planilha_desenhar_cabecalho_linhas()
+    except Exception:
+        pass
+
+
+def install_ui_planilha_29919(App):
+    """Integra os acabamentos e otimizações da Etapa 5."""
+    if getattr(App, "_planilha_ui_29919_aplicado", False):
+        return
+    App._planilha_ui_29919_aplicado = True
+
+    original_open = App.abrir_planilha
+
+    def open_wrapper(self, *args, **kwargs):
+        result = original_open(self, *args, **kwargs)
+        try:
+            self.app.after_idle(lambda: _planilha_stage5_repaint_row_header(self))
+        except Exception:
+            _planilha_stage5_repaint_row_header(self)
+        return result
+
+    setattr(App, "abrir_planilha", open_wrapper)
+
+    original_theme = App._selecionar_tema
+
+    def theme_wrapper(self, *args, **kwargs):
+        result = original_theme(self, *args, **kwargs)
+        try:
+            self.app.after_idle(lambda: _planilha_stage5_repaint_row_header(self))
+        except Exception:
+            _planilha_stage5_repaint_row_header(self)
+        return result
+
+    setattr(App, "_selecionar_tema", theme_wrapper)
+
 # Microinterações discretas — Stage 4.
 SM_AUTOLAB_MICRO_29918 = "SM-AUTOLAB-MICRO-29918"
 
@@ -1888,6 +1938,7 @@ if __name__ == "__main__":
     install_ui_fluent_29916(App)
     install_ui_dashboard_29917(App)
     install_ui_micro_29918(App)
+    install_ui_planilha_29919(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()

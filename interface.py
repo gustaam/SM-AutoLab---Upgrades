@@ -84,6 +84,9 @@ class App:
         self._planilha_celula_ativa = None
         self._planilha_linhas_selecionadas = set()
         self._planilha_borda_widgets = []
+        # Cache de leitura do histórico para evitar I/O e JSON.loads repetidos.
+        self._planilha_historico_cache = None
+        self._planilha_historico_cache_signature = None
         self._tema = "system"
         self._menu_config = None
         self._menu_aparencia = None
@@ -1708,22 +1711,14 @@ class App:
         tree.bind("<Configure>", _ajustar_larguras_planilha, add="+")
         tree.bind("<Configure>", lambda _e: tree.after_idle(self._planilha_desenhar_borda), add="+")
 
-        # 10.000 cabeçalhos de linha independentes. O Canvas acompanha
-        # verticalmente a Treeview, mas nunca participa da edição das células.
+        # Virtualização do cabeçalho de linhas: o documento continua com
+        # 10.000 linhas lógicas, mas o Canvas desenha somente as linhas visíveis.
         row_height = 28
-        for i in range(10000):
-            y_text = i * row_height + (row_height // 2)
-            row_header.create_text(5, y_text, text=str(i + 1), anchor="w",
-                                   fill=row_header_text, font=("Segoe UI",8))
-            if i < 9999:
-                y_line = (i + 1) * row_height
-                row_header.create_line(0, y_line, 42, y_line, fill=row_header_line)
-        row_header.configure(scrollregion=(0, 0, 42, 10000 * row_height))
 
         def _sync_row_header(first, last):
             y.set(first, last)
             try:
-                row_header.yview_moveto(first)
+                self._planilha_desenhar_cabecalho_linhas(float(first))
             except Exception:
                 pass
             try:
@@ -1752,7 +1747,7 @@ class App:
             # transforma o número em uma célula editável.
             try:
                 first = float(tree.yview()[0])
-                total = max(len(tree.get_children()), 1)
+                total = 10000
                 row_index = int(first * total + (event.y / row_height))
                 row_index = max(0, min(row_index, total - 1))
                 iid = tree.get_children()[row_index]
@@ -1792,6 +1787,71 @@ class App:
         tree.bind("<Shift-Insert>",self._planilha_colar)
         self._planilha_tree=tree
         self._planilha_row_header=row_header
+        row_header.bind(
+            "<Configure>",
+            lambda _e: self._planilha_desenhar_cabecalho_linhas(),
+            add="+",
+        )
+        self._planilha_desenhar_cabecalho_linhas()
+
+    def _planilha_desenhar_cabecalho_linhas(self, first_fraction=None):
+        """Renderiza somente os números de linha visíveis na viewport."""
+        canvas = getattr(self, "_planilha_row_header", None)
+        tree = getattr(self, "_planilha_tree", None)
+        if canvas is None or tree is None:
+            return
+
+        try:
+            altura = max(int(canvas.winfo_height()), 28)
+        except Exception:
+            altura = 360
+
+        try:
+            fraction = (
+                float(first_fraction)
+                if first_fraction is not None
+                else float(tree.yview()[0])
+            )
+        except Exception:
+            fraction = 0.0
+
+        fraction = max(0.0, min(1.0, fraction))
+        row_height = 28
+        total_rows = 10000
+        inicio = max(0, min(total_rows - 1, int(fraction * total_rows + 0.0001)))
+        visiveis = max(1, int(altura / row_height) + 3)
+        fim = min(total_rows, inicio + visiveis)
+
+        modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
+        bg = "#252A2F" if modo_escuro else "#F7F7F7"
+        fg = "#AEB4B9" if modo_escuro else "#6B6B6B"
+        line = "#384148" if modo_escuro else "#EEEEEE"
+        border = "#465058" if modo_escuro else "#E0E0E0"
+
+        canvas.delete("rownum")
+        canvas.configure(bg=bg, highlightbackground=border)
+
+        for logical_row in range(inicio, fim):
+            y0 = (logical_row - inicio) * row_height
+            canvas.create_text(
+                5,
+                y0 + row_height // 2,
+                text=str(logical_row + 1),
+                anchor="w",
+                fill=fg,
+                font=("Segoe UI", 8),
+                tags=("rownum",),
+            )
+            canvas.create_line(
+                0,
+                y0 + row_height,
+                42,
+                y0 + row_height,
+                fill=line,
+                tags=("rownum",),
+            )
+
+        canvas.create_line(0, 0, 42, 0, fill=border, tags=("rownum",))
 
     def _planilha_limpar_borda(self):
         for w in getattr(self, "_planilha_borda_widgets", []):
@@ -2201,23 +2261,54 @@ class App:
         validos.sort(key=lambda item: str(item.get("saved_at", "")))
         return validos
 
+    def _assinatura_historico_planilhas(self):
+        try:
+            stat = self._planilha_historico_arquivo.stat()
+            return (int(stat.st_mtime_ns), int(stat.st_size))
+        except OSError:
+            return None
+
+    def _invalidar_cache_historico_planilhas(self):
+        self._planilha_historico_cache = None
+        self._planilha_historico_cache_signature = None
+
     def _carregar_historico_planilhas(self):
         self._garantir_pasta_planilha()
-        if not self._planilha_historico_arquivo.exists():
+        assinatura = self._assinatura_historico_planilhas()
+        if assinatura is None:
+            self._invalidar_cache_historico_planilhas()
             return []
+
+        if (
+            self._planilha_historico_cache is not None
+            and self._planilha_historico_cache_signature == assinatura
+        ):
+            return list(self._planilha_historico_cache)
+
         try:
-            data = json.loads(self._planilha_historico_arquivo.read_text(encoding="utf-8"))
+            data = json.loads(
+                self._planilha_historico_arquivo.read_text(encoding="utf-8")
+            )
             itens = data.get("items", []) if isinstance(data, dict) else []
             if not isinstance(itens, list):
+                self._invalidar_cache_historico_planilhas()
                 return []
+
             filtrados = self._filtrar_arquivos_60_dias(itens)
             if filtrados != itens:
                 try:
                     self._salvar_historico_planilhas(filtrados)
+                    return list(filtrados)
                 except Exception:
                     pass
-            return filtrados
+
+            self._planilha_historico_cache = list(filtrados)
+            self._planilha_historico_cache_signature = (
+                self._assinatura_historico_planilhas() or assinatura
+            )
+            return list(filtrados)
         except Exception:
+            self._invalidar_cache_historico_planilhas()
             return []
 
     def _salvar_historico_planilhas(self, itens):
@@ -2225,8 +2316,15 @@ class App:
         validos = self._filtrar_arquivos_60_dias(itens)
         payload = {"version": 3, "items": validos}
         tmp = self._planilha_historico_arquivo.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
         tmp.replace(self._planilha_historico_arquivo)
+        self._planilha_historico_cache = list(validos)
+        self._planilha_historico_cache_signature = (
+            self._assinatura_historico_planilhas()
+        )
 
     def _registrar_historico_planilha(self, cells, timestamp=None):
         cells = {str(k): str(v) for k, v in cells.items() if str(v) != ""}
