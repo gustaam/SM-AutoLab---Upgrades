@@ -178,7 +178,7 @@ class App:
             command=self._fixar_menu_configuracoes,
             width=128,
             height=40,
-            corner_radius=7,
+            corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             border_width=1,
@@ -257,14 +257,14 @@ class App:
         plan_buttons.pack(fill="x", padx=14, pady=(14, 10))
         self.botao_planilha = ctk.CTkButton(
             plan_buttons, text="Abrir", command=self.abrir_planilha,
-            width=118, height=32, corner_radius=6,
+            width=118, height=32, corner_radius=8,
             fg_color=self.ACCENT, hover_color=self.ACCENT_HOVER,
             font=("Segoe UI", 12, "bold")
         )
         self.botao_planilha.pack(side="left", padx=(0, 8))
         self.botao_historico_planilha = ctk.CTkButton(
             plan_buttons, text="Arquivos", command=self.abrir_historico_planilha,
-            width=92, height=32, corner_radius=6,
+            width=92, height=32, corner_radius=8,
             fg_color=self.CARD, hover_color=("#EAF4FC", "#263F50"),
             border_width=1, border_color=self.BORDER, text_color=self.TEXT,
             font=("Segoe UI", 12, "bold")
@@ -325,7 +325,7 @@ class App:
         self._section_title(activity_card, "Acompanhamento")
 
         # Fluent-inspired tab row, like the reference image.
-        tabs = ctk.CTkFrame(activity_card, fg_color=("#F3F3F3", "#343A40"), corner_radius=7)
+        tabs = ctk.CTkFrame(activity_card, fg_color=("#F3F3F3", "#343A40"), corner_radius=8)
         tabs.pack(pady=(5, 5), padx=14)
 
         self.tab_buttons = {}
@@ -333,9 +333,9 @@ class App:
             btn = ctk.CTkButton(
                 tabs, text=name, command=lambda n=name: self._selecionar_aba(n),
                 width={"Atividade": 92, "Não executados": 122, "Histórico": 92}[name],
-                height=30, corner_radius=6,
+                height=30, corner_radius=8,
                 fg_color=("#E5F1FB", "#183B54") if name == "Atividade" else "transparent",
-                hover_color="#EDEDED",
+                hover_color=("#E8F2FC", "#204965"),
                 text_color=self.TEXT, font=("Segoe UI", 11, "bold")
             )
             btn.pack(side="left", padx=2, pady=2)
@@ -350,7 +350,7 @@ class App:
 
         # Activity tab
         self.atividade = ctk.CTkTextbox(
-            self.aba_atividade, height=90, corner_radius=7,
+            self.aba_atividade, height=90, corner_radius=8,
             fg_color=("#FAFAFA", "#252A2F"), border_width=1, border_color=self.BORDER,
             text_color=self.TEXT, font=("Consolas", 10), wrap="word"
         )
@@ -372,7 +372,7 @@ class App:
 
         self.erros_frame = ctk.CTkScrollableFrame(
             self.aba_erros, height=80, fg_color=("#FAFAFA", "#252A2F"),
-            corner_radius=7, border_width=1, border_color=self.BORDER
+            corner_radius=8, border_width=1, border_color=self.BORDER
         )
         self.erros_frame.pack(fill="both", expand=True)
         self._limpar_erros_visuais(salvar=False)
@@ -389,7 +389,7 @@ class App:
         ).pack(side="left")
         self.botao_limpar_historico = ctk.CTkButton(
             history_header, text="Limpar histórico", command=self._limpar_historico,
-            width=108, height=28, corner_radius=6,
+            width=108, height=28, corner_radius=8,
             fg_color=self.CARD, hover_color=("#FDE7E9", "#4B2529"),
             border_width=1, border_color=self.BORDER, text_color=self.ERROR,
             font=("Segoe UI", 11, "bold")
@@ -398,7 +398,7 @@ class App:
 
         self.historico_lista = ctk.CTkScrollableFrame(
             self.aba_historico, fg_color=("#FAFAFA", "#252A2F"),
-            corner_radius=7, border_width=1, border_color=self.BORDER
+            corner_radius=8, border_width=1, border_color=self.BORDER
         )
         self.historico_lista.pack(fill="both", expand=True)
 
@@ -890,7 +890,7 @@ class App:
             text_color=self.TEXT, font=("Segoe UI", 11, "bold")
         ).pack(anchor="w", padx=14, pady=(12, 4))
         site_entry = ctk.CTkEntry(
-            form, height=36, corner_radius=6,
+            form, height=36, corner_radius=8,
             fg_color=self.CARD, border_color=self.BORDER,
             text_color=self.TEXT, font=("Segoe UI", 11)
         )
@@ -902,7 +902,7 @@ class App:
             text_color=self.TEXT, font=("Segoe UI", 11, "bold")
         ).pack(anchor="w", padx=14, pady=(0, 4))
         user_entry = ctk.CTkEntry(
-            form, height=36, corner_radius=6,
+            form, height=36, corner_radius=8,
             fg_color=self.CARD, border_color=self.BORDER,
             text_color=self.TEXT, font=("Segoe UI", 11)
         )
@@ -914,7 +914,7 @@ class App:
             text_color=self.TEXT, font=("Segoe UI", 11, "bold")
         ).pack(anchor="w", padx=14, pady=(0, 4))
         pass_entry = ctk.CTkEntry(
-            form, height=36, corner_radius=6,
+            form, height=36, corner_radius=8,
             fg_color=self.CARD, border_color=self.BORDER,
             text_color=self.TEXT, font=("Segoe UI", 11),
         )
@@ -1014,7 +1014,7 @@ class App:
             command=popup.destroy,
             width=110,
             height=40,
-            corner_radius=7,
+            corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             border_width=1,
@@ -1083,7 +1083,7 @@ class App:
             width=44,
             height=44,
             corner_radius=22,
-            fg_color=("#F3F3F3", "#3A3A3A"),
+            fg_color=("#F3F8FC", "#243D4B"),
             text_color=accent,
             font=("Segoe UI", icon_font, "bold")
         ).pack(side="left", padx=(0, 12))
@@ -1393,7 +1393,7 @@ class App:
         count=len(self._hist_grid.winfo_children())
         row=count//6; col=count%6
         self._hist_grid.grid_columnconfigure(tuple(range(6)),weight=1)
-        tile=ctk.CTkFrame(self._hist_grid,fg_color=("#FFFFFF", "#2D3338"),corner_radius=7,border_width=1,border_color=self.BORDER,width=92,height=78)
+        tile=ctk.CTkFrame(self._hist_grid,fg_color=("#FFFFFF", "#2D3338"),corner_radius=8,border_width=1,border_color=self.BORDER,width=92,height=78)
         tile.grid(row=row,column=col,padx=3,pady=3,sticky="nsew")
         tile.grid_propagate(False)
         inicio=execucao.get("inicio",""); status=execucao.get("status",""); erros=int(execucao.get("erros",0) or 0)
@@ -1409,7 +1409,7 @@ class App:
         def abrir(_e=None):
             selecionar(); self._abrir_detalhe_historico(execucao)
         def enter(_e=None):
-            tile.configure(border_color=self.ACCENT, fg_color=("#F3F8FC", "#243D4B"))
+            tile.configure(border_color=self.ACCENT_HOVER, fg_color=("#EAF4FC", "#263F50"))
         def leave(_e=None):
             # keep selection highlight if selected; otherwise restore neutral
             if tile.cget("border_color") not in (self.ACCENT,):
@@ -1612,29 +1612,38 @@ class App:
         style=ttk.Style(win)
         try: style.theme_use("vista")
         except TclError: pass
-        style.configure("SM.Treeview", font=("Segoe UI",9), rowheight=28, background="#FFFFFF", fieldbackground="#FFFFFF", borderwidth=1, relief="solid", foreground="#242424")
+        modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+        tree_bg = "#2D3338" if modo_escuro else "#FFFFFF"
+        tree_header = "#343A40" if modo_escuro else "#F5F5F5"
+        tree_fg = "#F2F4F5" if modo_escuro else "#242424"
+        tree_border = "#465058" if modo_escuro else "#E0E0E0"
+        tree_selected = "#1B3C53" if modo_escuro else "#EAF4FF"
+        row_header_bg = "#252A2F" if modo_escuro else "#F7F7F7"
+        row_header_text = "#AEB4B9" if modo_escuro else "#6B6B6B"
+        row_header_line = "#384148" if modo_escuro else "#EEEEEE"
+        style.configure("SM.Treeview", font=("Segoe UI",9), rowheight=28, background=tree_bg, fieldbackground=tree_bg, borderwidth=1, relief="solid", foreground=tree_fg)
         style.map(
             "SM.Treeview",
-            background=[("selected", "#FFFFFF"), ("focus", "#FFFFFF"), ("!focus", "#FFFFFF")],
-            foreground=[("selected", "#242424"), ("focus", "#242424"), ("!focus", "#242424")]
+            background=[("selected", tree_selected), ("focus", tree_bg), ("!focus", tree_bg)],
+            foreground=[("selected", tree_fg), ("focus", tree_fg), ("!focus", tree_fg)]
         )
-        style.configure("SM.Treeview.Heading", font=("Segoe UI",11,"bold"), relief="solid", borderwidth=1, background="#F3F3F3", foreground="#242424")
+        style.configure("SM.Treeview.Heading", font=("Segoe UI",11,"bold"), relief="solid", borderwidth=1, background=tree_header, foreground=tree_fg)
 
         # A numeração das linhas é um cabeçalho lateral separado da grade.
         # Ela não pertence às células da planilha, não pode ser editada e
         # permanece fixa durante a rolagem horizontal, como no Excel/Google Sheets.
-        row_header_frame = ctk.CTkFrame(body, fg_color="#FFFFFF", corner_radius=0)
+        row_header_frame = ctk.CTkFrame(body, fg_color=tree_bg, corner_radius=0)
         row_header_frame.grid_rowconfigure(1, weight=1)
         row_header_frame.grid_columnconfigure(0, weight=1)
         row_header_top = Canvas(
-            row_header_frame, width=42, height=28, bg="#F3F3F3",
-            highlightthickness=1, highlightbackground="#D9D9D9", bd=0
+            row_header_frame, width=42, height=28, bg=tree_header,
+            highlightthickness=1, highlightbackground=tree_border, bd=0
         )
-        row_header_top.create_line(0, 27, 42, 27, fill="#D9D9D9")
+        row_header_top.create_line(0, 27, 42, 27, fill=tree_border)
         row_header_top.grid(row=0, column=0, sticky="ew")
         row_header = Canvas(
-            row_header_frame, width=42, bg="#F7F7F7", highlightthickness=1,
-            highlightbackground="#D9D9D9", bd=0
+            row_header_frame, width=42, bg=row_header_bg, highlightthickness=1,
+            highlightbackground=tree_border, bd=0
         )
         row_header.grid(row=1, column=0, sticky="nsew")
 
@@ -1664,10 +1673,10 @@ class App:
         for i in range(10000):
             y_text = i * row_height + (row_height // 2)
             row_header.create_text(5, y_text, text=str(i + 1), anchor="w",
-                                   fill="#6B6B6B", font=("Segoe UI",8))
+                                   fill=row_header_text, font=("Segoe UI",8))
             if i < 9999:
                 y_line = (i + 1) * row_height
-                row_header.create_line(0, y_line, 42, y_line, fill="#EEEEEE")
+                row_header.create_line(0, y_line, 42, y_line, fill=row_header_line)
         row_header.configure(scrollregion=(0, 0, 42, 10000 * row_height))
 
         def _sync_row_header(first, last):
@@ -2697,13 +2706,13 @@ class App:
             actions = ctk.CTkFrame(card, fg_color="transparent")
             actions.pack(side="right", padx=8, pady=6)
             ctk.CTkButton(
-                actions, text="Abrir", width=70, height=30, corner_radius=6,
+                actions, text="Abrir", width=70, height=30, corner_radius=8,
                 fg_color=self.ACCENT, hover_color=self.ACCENT_HOVER,
                 text_color="#FFFFFF", font=("Segoe UI", 10, "bold"),
                 command=lambda it=item: self._abrir_snapshot_historico(it)
             ).pack(side="left", padx=(0, 5))
             ctk.CTkButton(
-                actions, text="×", width=30, height=30, corner_radius=6,
+                actions, text="×", width=30, height=30, corner_radius=8,
                 fg_color=self.CARD, hover_color=("#FDECEC", "#3A2424"),
                 border_width=1, border_color=self.ERROR, text_color=self.ERROR,
                 font=("Segoe UI", 14, "bold"), command=lambda it=item: self._excluir_historico_planilha(it)
@@ -2736,7 +2745,7 @@ class App:
         self._arquivos_contador_janela.pack(side="left", padx=(10, 0))
         ctk.CTkButton(
             header, text="Limpar histórico", command=self._limpar_historico_planilhas,
-            width=125, height=32, corner_radius=7, fg_color=self.CARD,
+            width=125, height=32, corner_radius=8, fg_color=self.CARD,
             hover_color=("#FDECEC", "#3A2424"), border_width=1, border_color=self.ERROR,
             text_color=self.ERROR, font=("Segoe UI", 10, "bold")
         ).pack(side="right")

@@ -801,6 +801,8 @@ def _fluent_aplicar_estilo_widget(widget, card_radius=10):
             widget.configure(height=10, corner_radius=5)
         elif isinstance(widget, ctk.CTkTextbox):
             widget.configure(corner_radius=9)
+        elif isinstance(widget, ctk.CTkEntry):
+            widget.configure(corner_radius=8)
     except Exception:
         pass
 
