@@ -204,6 +204,55 @@ class AuditoriaStage6Tests(unittest.TestCase):
             self.assertIn(marker, content)
 
 
+class ResponsivoTooltipsStage7Tests(unittest.TestCase):
+    def test_stage7_marcador_integracao_e_boot(self):
+        root = Path(__file__).resolve().parents[1]
+        main_content = (root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("SM_AUTOLAB_RESPONSIVO_29921", main_content)
+        self.assertIn("def install_ui_responsivo_29921", main_content)
+        self.assertIn("install_ui_responsivo_29921(App)", main_content)
+        self.assertIn("UI_RADIUS_SM", main_content)
+
+    def test_stage7_tooltips_cobrem_acoes_principais_e_navegacao(self):
+        self.assertEqual(
+            main._stage7_tooltip_text(SimpleNamespace(cget=lambda key: "▶  Iniciar")),
+            "Inicia a automação com os códigos selecionados.",
+        )
+        self.assertEqual(
+            main._stage7_tooltip_text(SimpleNamespace(cget=lambda key: "‹")),
+            "Volta para o mês anterior.",
+        )
+        self.assertEqual(
+            main._stage7_tooltip_text(SimpleNamespace(cget=lambda key: "↶")),
+            "Executa: ↶.",
+        )
+        self.assertEqual(
+            main._stage7_tooltip_text(SimpleNamespace(cget=lambda key: "ABC123")),
+            "Clique para copiar este código.",
+        )
+
+    def test_stage7_layout_e_janela_sao_redimensionaveis(self):
+        root = Path(__file__).resolve().parents[1]
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('self.app.minsize(760, 590)', interface)
+        self.assertIn('self.app.resizable(True, True)', interface)
+        self.assertIn('self._stage7_top_layout = top', interface)
+        self.assertIn('self._stage7_config_card = config', interface)
+        self.assertIn('self._stage7_progress_card = progress', interface)
+        self.assertIn("Tooltips passam a ser gerenciados globalmente", interface)
+        self.assertNotIn("#DETALHES BOTÕES", interface)
+
+    def test_stage7_normaliza_prefixos_de_botoes(self):
+        self.assertEqual(
+            main._stage7_tooltip_text(SimpleNamespace(cget=lambda key: "■  Parar")),
+            "Interrompe a automação com parada segura após o código atual.",
+        )
+        self.assertEqual(
+            main._stage7_tooltip_text(SimpleNamespace(cget=lambda key: "✓  Claro")),
+            "Usa o tema claro.",
+        )
+
+
 class PlanilhaStage5Tests(unittest.TestCase):
     def test_stage5_integracao_e_marcador(self):
         root = Path(__file__).resolve().parents[1]
