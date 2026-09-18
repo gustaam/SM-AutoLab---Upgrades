@@ -204,6 +204,23 @@ class AuditoriaStage6Tests(unittest.TestCase):
             self.assertIn(marker, content)
 
 
+class PlanilhaPerformanceStage8Tests(unittest.TestCase):
+    def test_stage8_povoamento_incremental_da_grade(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("self._planilha_povoamento_job", content)
+        self.assertIn("self._planilha_povoamento_proxima_linha", content)
+        self.assertIn("for i in range(300)", content)
+        self.assertIn("fim = min(10000, inicio + 500)", content)
+        self.assertIn("tree.after(1, _povoar_lote)", content)
+        self.assertIn("self._planilha_povoamento_concluido = True", content)
+
+    def test_stage8_preserva_cancelamento_do_povoamento(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("self._planilha_tree.after_cancel(self._planilha_povoamento_job)", content)
+
+
 class ResponsivoTooltipsStage7Tests(unittest.TestCase):
     def test_stage7_marcador_integracao_e_boot(self):
         root = Path(__file__).resolve().parents[1]
