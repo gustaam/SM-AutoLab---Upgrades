@@ -566,5 +566,53 @@ class UpdateDiscoveryTests(unittest.TestCase):
             self.assertIsNone(atualizacao._load_release_manifest(release))
 
 
+
+class GradePerformanceStage9Tests(unittest.TestCase):
+    def test_stage9_marker_and_integration(self):
+        self.assertEqual(main.SM_AUTOLAB_GRADE_29922, "SM-AUTOLAB-GRADE-PERFORMANCE-29922")
+        class AppStub:
+            pass
+        main.install_ui_grade_29922(AppStub)
+        self.assertTrue(AppStub._grade_ui_29922_aplicado)
+        self.assertEqual(AppStub._grade_ui_29922_marker, main.SM_AUTOLAB_GRADE_29922)
+        self.assertIs(AppStub._planilha_desenhar_borda, main._stage9_desenhar_borda)
+
+    def test_stage9_row_header_reuses_canvas_items(self):
+        class Canvas:
+            def __init__(self):
+                self.next_id = 1
+                self.calls = []
+            def winfo_height(self): return 84
+            def configure(self, **kwargs): self.calls.append(("configure", kwargs))
+            def create_text(self, *args, **kwargs): i=self.next_id; self.next_id+=1; self.calls.append(("create_text",i)); return i
+            def create_line(self, *args, **kwargs): i=self.next_id; self.next_id+=1; self.calls.append(("create_line",i)); return i
+            def coords(self, *args): self.calls.append(("coords", args))
+            def itemconfigure(self, *args, **kwargs): self.calls.append(("itemconfigure", args, kwargs))
+        class Tree:
+            def yview(self): return (0.0, 0.01)
+        class AppStub:
+            _planilha_row_header = Canvas()
+            _planilha_tree = Tree()
+        app=AppStub()
+        main._stage9_desenhar_cabecalho_linhas(app)
+        created=sum(1 for c in app._planilha_row_header.calls if c[0] in ("create_text","create_line"))
+        main._stage9_desenhar_cabecalho_linhas(app)
+        created_again=sum(1 for c in app._planilha_row_header.calls if c[0] in ("create_text","create_line"))
+        self.assertEqual(created_again, created)
+
+    def test_stage9_border_cleanup_hides_instead_of_destroying(self):
+        class FrameStub:
+            def __init__(self): self.hidden=0
+            def place_forget(self): self.hidden += 1
+        class AppStub:
+            _planilha_borda_widgets=[FrameStub(),FrameStub()]
+        main._stage9_limpar_borda(AppStub)
+        self.assertEqual([w.hidden for w in AppStub._planilha_borda_widgets], [1,1])
+
+    def test_stage9_boot_contains_installer(self):
+        source=Path(main.__file__).read_text(encoding="utf-8")
+        self.assertIn("install_ui_grade_29922(App)", source)
+
+
 if __name__ == "__main__":
     unittest.main()
