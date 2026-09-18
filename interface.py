@@ -3083,6 +3083,7 @@ class App:
             text_color=cor_texto,
             font=("Segoe UI", 13, "bold")
         )
+        self.status_label.configure(text_color=cor_texto)
         modo = ctk.get_appearance_mode().lower()
         canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
         self.status_indicator.configure(bg=canvas_bg)
