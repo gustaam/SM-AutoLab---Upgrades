@@ -146,11 +146,11 @@ class TestPatch(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         build = (root / "build_windows.bat").read_text(encoding="utf-8")
         self.assertIn(
-            "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_auditoria_29920",
+            "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_responsivo_29921, install_ui_auditoria_29920",
             build,
         )
         self.assertIn(
-            "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_auditoria_29920(App); _validar_base_aplicacao()",
+            "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); _validar_base_aplicacao()",
             build,
         )
         self.assertNotIn(
