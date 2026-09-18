@@ -325,7 +325,8 @@ class App:
         self._section_title(activity_card, "Acompanhamento")
 
         # Fluent-inspired tab row, like the reference image.
-        tabs = ctk.CTkFrame(activity_card, fg_color=("#F3F3F3", "#343A40"), corner_radius=8)
+        tabs = ctk.CTkFrame(activity_card, fg_color=("#F3F3F3", "#343A40"), corner_radius=8,
+                           border_width=1, border_color=self.BORDER)
         tabs.pack(pady=(5, 5), padx=14)
 
         self.tab_buttons = {}
@@ -1415,6 +1416,10 @@ class App:
             if tile.cget("border_color") not in (self.ACCENT,):
                 tile.configure(border_color=self.BORDER, fg_color=("#FFFFFF", "#2D3338"))
         for w in (tile,icon):
+            try:
+                w.configure(cursor="hand2")
+            except Exception:
+                pass
             w.bind("<Enter>", enter); w.bind("<Leave>", leave); w.bind("<Button-1>", selecionar); w.bind("<Double-1>", abrir)
         tile.bind("<Double-1>", abrir)
 
@@ -2998,6 +3003,22 @@ class App:
         v = tuple(round(a[i] + (b[i] - a[i]) * fator) for i in range(3))
         return "#" + "".join(f"{x:02X}" for x in v)
 
+    def _parar_pisca_status(self, manter_estado=True):
+        try:
+            job = getattr(self, "_status_blink_job", None)
+            if job is not None:
+                self.app.after_cancel(job)
+            self._status_blink_job = None
+
+            if manter_estado and getattr(self, "status_indicator", None) is not None:
+                modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
+                self.status_indicator.configure(bg=canvas_bg)
+                self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
+                self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
+        except Exception:
+            self._status_blink_job = None
+
     def _executar_pisca_status(self):
         try:
             import math
@@ -3096,7 +3117,10 @@ class App:
         modo = ctk.get_appearance_mode().lower()
         canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
         self.status_indicator.configure(bg=canvas_bg)
-        self._iniciar_pisca_status()
+        if self._status_blink_fast:
+            self._iniciar_pisca_status()
+        else:
+            self._parar_pisca_status()
 
     def atualizar_progresso(self, processados, total, sucessos, erros, codigo):
         if self._closing:

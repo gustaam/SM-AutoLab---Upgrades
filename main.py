@@ -796,7 +796,7 @@ def _fluent_aplicar_estilo_widget(widget, card_radius=10):
         elif isinstance(widget, ctk.CTkButton):
             altura = int(widget.cget("height") or 32)
             raio = 10 if altura >= 40 else 8
-            widget.configure(corner_radius=raio)
+            widget.configure(corner_radius=raio, cursor="hand2")
         elif isinstance(widget, ctk.CTkProgressBar):
             widget.configure(height=10, corner_radius=5)
         elif isinstance(widget, ctk.CTkTextbox):
