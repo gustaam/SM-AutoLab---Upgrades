@@ -79,7 +79,7 @@ if errorlevel 1 (
     goto :erro
 )
 
-%PYTHON% -c "from interface import App; from patch import aplicar_patch_ui; from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912; aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+%PYTHON% -c "from interface import App; from patch import aplicar_patch_ui; from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916; aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
 if errorlevel 1 (
     echo ERRO: falha na integracao das camadas da base.
     goto :erro
