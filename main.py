@@ -1881,7 +1881,7 @@ def _stage9_desenhar_borda(self):
         self._planilha_borda_widgets = widgets
     segmentos = ((x, y, w, 2), (x, y + h - 2, w, 2), (x, y, 2, h), (x + w - 2, y, 2, h))
     while len(widgets) < 4:
-        widgets.append(Frame(tree, bd=0, highlightthickness=0, relief="flat"))
+        widgets.append(tk.Frame(tree, bd=0, highlightthickness=0, relief="flat"))
     for frame, (px, py, pw, ph) in zip(widgets, segmentos):
         try:
             frame.configure(width=max(int(pw), 1), height=max(int(ph), 1), bg=cor)
