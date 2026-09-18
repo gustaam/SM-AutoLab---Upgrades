@@ -1708,12 +1708,47 @@ class App:
             return "break"
         row_header.bind("<Button-1>", _clicar_cabecalho)
 
-        for i in range(10000):
-            vals=[self._planilha_data.get(f"{i},0","") or "",self._planilha_data.get(f"{i},1","") or "",self._planilha_data.get(f"{i},2","") or ""]
-            tree.insert("", "end", iid=str(i), values=vals, tags=("even" if i % 2 == 0 else "odd",))
         tree.focus("")
         tree.tag_configure("even", background="#FFFFFF")
         tree.tag_configure("odd", background="#FBFBFB")
+
+        # Etapa 8: povoamento incremental; a primeira viewport aparece antes
+        # de inserir o restante das 10.000 linhas.
+        self._planilha_povoamento_job = None
+        self._planilha_povoamento_concluido = False
+        self._planilha_povoamento_proxima_linha = 0
+        row_values = [
+            (
+                self._planilha_data.get(f"{i},0", "") or "",
+                self._planilha_data.get(f"{i},1", "") or "",
+                self._planilha_data.get(f"{i},2", "") or "",
+            )
+            for i in range(10000)
+        ]
+
+        def _povoar_lote():
+            inicio = self._planilha_povoamento_proxima_linha
+            fim = min(10000, inicio + 500)
+            try:
+                for i in range(inicio, fim):
+                    tree.insert("", "end", iid=str(i), values=row_values[i],
+                                tags=("even" if i % 2 == 0 else "odd",))
+                self._planilha_povoamento_proxima_linha = fim
+                if fim >= 10000:
+                    self._planilha_povoamento_concluido = True
+                    self._planilha_povoamento_job = None
+                    self._planilha_atualizar_contador()
+                    self._planilha_desenhar_cabecalho_linhas()
+                    return
+                self._planilha_povoamento_job = tree.after(1, _povoar_lote)
+            except Exception:
+                self._planilha_povoamento_job = None
+
+        for i in range(300):
+            tree.insert("", "end", iid=str(i), values=row_values[i],
+                        tags=("even" if i % 2 == 0 else "odd",))
+        self._planilha_povoamento_proxima_linha = 300
+        self._planilha_povoamento_job = tree.after(1, _povoar_lote)
         self._planilha_atualizar_contador()
         tree.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")
         tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula, add="+")
@@ -3350,6 +3385,14 @@ class App:
             try:self.app.after_cancel(self._status_finalizado_job)
             except Exception:pass
             self._status_finalizado_job=None
+
+        if getattr(self, "_planilha_povoamento_job", None) is not None:
+            try:
+                if self._planilha_tree is not None:
+                    self._planilha_tree.after_cancel(self._planilha_povoamento_job)
+            except Exception:
+                pass
+            self._planilha_povoamento_job = None
 
         for job_attr in (
             "_fluent_accent_job",
