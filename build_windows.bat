@@ -79,7 +79,7 @@ if errorlevel 1 (
     goto :erro
 )
 
-%PYTHON% -c "from interface import App; from patch import aplicar_patch_ui; from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_responsivo_29921, install_ui_auditoria_29920; aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+%PYTHON% -c "from interface import App; from patch import aplicar_patch_ui; from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_grade_29922, install_ui_responsivo_29921, install_ui_auditoria_29920; aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
 if errorlevel 1 (
     echo ERRO: falha na integracao das camadas da base.
     goto :erro
