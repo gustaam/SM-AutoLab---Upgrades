@@ -350,7 +350,7 @@ class App:
         self.atividade = ctk.CTkTextbox(
             self.aba_atividade, height=90, corner_radius=7,
             fg_color=("#FAFAFA", "#252A2F"), border_width=1, border_color=self.BORDER,
-            text_color=self.SUBTEXT, font=("Consolas", 10), wrap="word"
+            text_color=self.TEXT, font=("Consolas", 10), wrap="word"
         )
         self.atividade.pack(fill="both", expand=True)
         self.atividade.configure(state="disabled")
