@@ -44,6 +44,7 @@ _configurar_dpi_windows()
 
 from interface import App
 from patch import aplicar_patch_ui
+from execution_center_29924 import SM_AUTOLAB_EXECUTION_29924, install_ui_execution_center_29924
 
 
 class StartupSplash:
@@ -2320,6 +2321,7 @@ if __name__ == "__main__":
     install_ui_grade_29922(App)
     install_ui_responsivo_29921(App)
     install_ui_auditoria_29920(App)
+    install_ui_execution_center_29924(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
