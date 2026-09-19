@@ -53,8 +53,7 @@ PATCH_MARKERS = (
     "_SOURCE_PATCH_AJUSTES", "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS", "_NS_PATCH_AJUSTES", "PATCH_297_MARKER",
     "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER", "_historico_tem_erro",
     "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299",
-    "_planilha_selecionar_tudo_2991", "_planilha_copiar_2991", "_planilha_arrastar_selecao_2991",
-    "_planilha_iniciar_digitacao_2991", "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910",
+    "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910",
     "_ensure_selection_state_29910", "def aplicar_patch_ui",
 )
 
@@ -230,7 +229,8 @@ def validate(root: Path) -> None:
             "setter(2)",
         ),
     )
-    require_markers("interface.py", interface, ("def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "_planilha_povoamento_job", "fim = min(10000, inicio + 500)"))
+    require_markers("interface.py", interface, ("def abrir_planilha(self, dados_iniciais=None):", "self._planilha_implementacao = \"grade-final-29922\"", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "_planilha_povoamento_job", "fim = min(10000, inicio + 500)", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")"))
+
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
     stage12_test = read_text(root, "tests/test_stage12.py")
     require_markers("tests/test_stage12.py", stage12_test, ("class Windows11NativeStage12Tests", "SM_AUTOLAB_WINDOWS_NATIVE_29925", "install_ui_windows11_native_29925", "SystemParametersInfoW", "SetWindowTheme"))
