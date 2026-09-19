@@ -282,7 +282,7 @@ def validate(root: Path) -> None:
         fail("build_windows.bat não usa a integração consolidada")
     if "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_grade_29922, install_ui_responsivo_29921, install_ui_auditoria_29920" not in build:
         fail("build_windows.bat não usa o mesmo fluxo de integração do CI")
-    if "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); _validar_base_aplicacao()" not in build:
+    if "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); install_ui_execution_center_29924(App); _validar_base_aplicacao()" not in build:
         fail("build_windows.bat não executa o fluxo consolidado completo")
     for marker in BUILD_MARKERS:
         if marker not in build:
