@@ -487,7 +487,7 @@ def _stage7_tooltip_text(widget):
     # literalmente em "None" e nunca criar tooltip para texto vazio.
     if raw is None:
         return None
-    raw_compact = " ".join(str(raw).split()).strip()
+    raw_compact = " ".join(str(raw).replace("✓", "").split()).strip()
     if not raw_compact or raw_compact.casefold() == "none":
         return None
 
