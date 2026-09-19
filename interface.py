@@ -467,7 +467,14 @@ class App:
                 app_y = self.app.winfo_rooty()
                 bx = self.botao_configuracoes.winfo_rootx() - app_x
                 by = self.botao_configuracoes.winfo_rooty() - app_y + self.botao_configuracoes.winfo_height() + 4
-                self._menu_config.place(x=max(0, bx - 40), y=max(0, by))
+                menu_width = self._menu_config.winfo_width() or 218
+                app_width = self.app.winfo_width()
+                # Ancoragem direta: o menu começa exatamente abaixo do
+                # botão Configurações, sem deslocamento arbitrário.
+                menu_x = bx
+                if menu_x + menu_width > app_width - 6:
+                    menu_x = max(6, app_width - menu_width - 6)
+                self._menu_config.place(x=int(menu_x), y=max(0, by))
                 self._menu_config.lift()
 
             if self._menu_aparencia is not None and self._menu_aparencia.winfo_exists():
