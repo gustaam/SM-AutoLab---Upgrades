@@ -2054,6 +2054,13 @@ def _stage9_get_grid_state(self):
     if not isinstance(state, dict):
         state = {"widgets": [], "selection_widgets": [], "bbox": None}
         self._stage9_grid_state = state
+
+    # Mantém o nome histórico usado pela camada de compatibilidade/testes,
+    # mas reutiliza a mesma coleção de widgets, sem destruir os objetos.
+    legacy = getattr(self, "_planilha_borda_widgets", None)
+    if isinstance(legacy, list) and not state["selection_widgets"]:
+        state["selection_widgets"] = legacy
+    self._planilha_borda_widgets = state["selection_widgets"]
     return state
 
 
@@ -2179,12 +2186,16 @@ def _stage9_limpar_borda(self):
     """Oculta a moldura de seleção e as sobreposições reutilizáveis."""
     state = _stage9_get_grid_state(self)
 
-    for widget in state.get("selection_widgets", []):
+    widgets = state.get("selection_widgets", [])
+    for widget in widgets:
         try:
             widget.place_forget()
         except Exception:
             pass
 
+    # Mantém a referência pública histórica apontando para os widgets
+    # reutilizáveis, preservando o contrato de limpeza da grade.
+    self._planilha_borda_widgets = widgets
     self._stage9_borda_bbox = None
 
 
