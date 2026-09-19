@@ -46,9 +46,10 @@ class PlanilhaOpenPathTests(unittest.TestCase):
 
     def test_ctrl_v_tem_fallback_local_global_e_virtual(self):
         interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('tree.bind("<Control-KeyPress-v>", self._planilha_colar_teclado, add="+")', interface)
-        self.assertIn('tree.bind("<Control-KeyPress-V>", self._planilha_colar_teclado, add="+")', interface)
-        self.assertIn('tree.bind("<<Paste>>", self._planilha_colar_teclado, add="+")', interface)
+        self.assertIn('tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")', interface)
+        self.assertIn('tree.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")', interface)
+        self.assertIn('tree.bind("<<Paste>>", self._planilha_atalho_colar, add="+")', interface)
+        self.assertIn("def _planilha_colar_teclado(self, event=None):", interface)
         self.assertIn('self.app.bind_all(\n                "<Control-KeyPress-v>"', interface)
         self.assertIn('self.app.bind_all(\n                "<Control-KeyPress-V>"', interface)
         self.assertIn("def _planilha_foco_pertence_a_grade(self):", interface)
