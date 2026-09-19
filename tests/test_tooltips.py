@@ -44,6 +44,15 @@ class TooltipRegressionTests(unittest.TestCase):
         self.assertIn("_abrir_aparencia_por_clique", block)
         self.assertIn('bind("<Button-1>", _abrir_aparencia_por_clique', block)
 
+    def test_menu_aparencia_abre_por_hover(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _mostrar_menu_configuracoes")
+        end = source.index("def _mostrar_menu_aparencia", start)
+        block = source[start:end]
+        self.assertIn("_abrir_aparencia_por_hover", block)
+        self.assertIn("_garantir_menu_aparencia_aberto", block)
+        self.assertIn('bind("<Enter>", _abrir_aparencia_por_hover', block)
+
     def test_tooltip_cobre_filhos_internos_do_ctkbutton(self):
         source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
         start = source.index("class _SMAutoLabTooltip:")
