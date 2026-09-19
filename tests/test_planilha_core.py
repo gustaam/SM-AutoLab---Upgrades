@@ -1,6 +1,6 @@
 import unittest
 
-from planilha_core import (
+from interface import (
     MAX_COLS,
     MAX_ROWS,
     apply_paste,

@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from windows11_native_29925 import (
+from interface import (
     SM_AUTOLAB_WINDOWS_NATIVE_29925,
     _material_for_window,
 )
@@ -60,7 +60,7 @@ class Windows11NativeStage12Tests(unittest.TestCase):
 
     def test_native_layer_has_accessibility_and_dwm_paths(self):
         source = (
-            Path(__file__).resolve().parents[1] / "windows11_native_29925.py"
+            Path(__file__).resolve().parents[1] / "interface.py"
         ).read_text(encoding="utf-8")
         self.assertIn("SystemParametersInfoW", source)
         self.assertIn("DwmSetWindowAttribute", source)
