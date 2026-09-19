@@ -1847,7 +1847,11 @@ class App:
             try:
                 first = float(tree.yview()[0])
                 total = 10000
-                row_index = int(first * total + (event.y / row_height))
+                viewport_height = max(1, int(row_header.winfo_height()))
+                viewport_rows = max(1, (viewport_height + row_height - 1) // row_height)
+                scrollable_rows = max(0, total - viewport_rows)
+                first_row = min(scrollable_rows, int(first * scrollable_rows + 0.0001))
+                row_index = first_row + int(event.y / row_height)
                 row_index = max(0, min(row_index, total - 1))
                 iid = str(row_index)
                 tree.focus(iid)
