@@ -297,9 +297,9 @@ def validate_architecture(root: Path) -> None:
         fail("referência ao atualizador separado detectada")
 
     if not re.search(r'DEFAULT_PORTAL_USUARIO\s*=\s*""', config):
-        fail("usuário padrão não está vazio em config.py")
+        fail("usuário padrão não está vazio em app.py")
     if not re.search(r'DEFAULT_PORTAL_SENHA\s*=\s*""', config):
-        fail("senha padrão não está vazia em config.py")
+        fail("senha padrão não está vazia em app.py")
     if re.search(r'"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"', interface):
         fail("valor de acesso literal encontrado em interface.py para PORTAL_USUARIO")
     if re.search(r'"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"', interface):
