@@ -247,8 +247,8 @@ def validate(root: Path) -> None:
             "setter(2)",
         ),
     )
-    require_markers("interface.py", interface, ("def abrir_planilha(self, dados_iniciais=None):", "self._planilha_implementacao = \"grade-final-29922\"",
-        "SM_AUTOLAB_GRADE_29922", "def _planilha_desenhar_grade", "def _planilha_stage9_get_grid_state", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "_planilha_povoamento_job", "fim = min(10000, inicio + 500)", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")"))
+    require_markers("interface.py", interface, ("def abrir_planilha(self, dados_iniciais=None):", "self._planilha_implementacao = \"grade-virtual-29926\"",
+        "SM_AUTOLAB_GRADE_29922", "SM_AUTOLAB_GRADE_VIRTUAL_29926", "def _planilha_desenhar_grade", "def _planilha_stage9_get_grid_state", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "tree=VirtualGridTree(", "value_provider=", "total_rows=10000", "self._planilha_povoamento_concluido = True", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")"))
 
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
     require_markers("planilha_core.py", planilha_core, (

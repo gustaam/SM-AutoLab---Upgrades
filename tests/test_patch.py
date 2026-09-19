@@ -207,21 +207,25 @@ class AuditoriaStage6Tests(unittest.TestCase):
         self.assertNotIn("install_ui_grade_29922(App)", content)
 
 
-class PlanilhaPerformanceStage8Tests(unittest.TestCase):
-    def test_stage8_povoamento_incremental_da_grade(self):
+class PlanilhaVirtualStage13Tests(unittest.TestCase):
+    def test_stage13_virtualizacao_substitui_povoamento_incremental(self):
         root = Path(__file__).resolve().parents[1]
-        content = (root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("self._planilha_povoamento_job", content)
-        self.assertIn("self._planilha_povoamento_proxima_linha", content)
-        self.assertIn("for i in range(300)", content)
-        self.assertIn("fim = min(10000, inicio + 500)", content)
-        self.assertIn("tree.after(1, _povoar_lote)", content)
-        self.assertIn("self._planilha_povoamento_concluido = True", content)
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn(
+            'self._planilha_implementacao = "grade-virtual-29926"',
+            interface,
+        )
+        self.assertIn("tree=VirtualGridTree(", interface)
+        self.assertNotIn("for i in range(300):", interface)
+        self.assertNotIn("fim = min(10000, inicio + 500)", interface)
+        self.assertNotIn("tree=ttk.Treeview(body", interface)
+        self.assertIn("self._planilha_povoamento_concluido = True", interface)
 
-    def test_stage8_preserva_cancelamento_do_povoamento(self):
+    def test_stage13_preserva_cancelamento_compatibilidade_sem_job_de_10_mil_itens(self):
         root = Path(__file__).resolve().parents[1]
-        content = (root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("self._planilha_tree.after_cancel(self._planilha_povoamento_job)", content)
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("self._planilha_povoamento_job = None", interface)
+        self.assertIn("self._planilha_tree.after_cancel(self._planilha_povoamento_job)", interface)
 
 
 class ResponsivoTooltipsStage7Tests(unittest.TestCase):

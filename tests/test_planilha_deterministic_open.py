@@ -10,7 +10,8 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
         patch = (self.root / "patch.py").read_text(encoding="utf-8")
         self.assertIn("def abrir_planilha(self, dados_iniciais=None):", interface)
-        self.assertIn('self._planilha_implementacao = "grade-final-29922"', interface)
+        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', interface)
+        self.assertIn('tree=VirtualGridTree(', interface)
         self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', interface)
         self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
         self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
@@ -19,14 +20,18 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
         self.assertNotIn("App.abrir_planilha = _abrir_planilha_297", patch)
         self.assertNotIn("App.abrir_planilha = _abrir_planilha_2991", patch)
 
-    def test_povoamento_redesenha_grade_depois_de_cada_lote(self):
+    def test_virtualizacao_substitui_povoamento_incremental(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = interface.index("def _povoar_lote():")
-        end = interface.index("self._planilha_povoamento_job = tree.after(1, _povoar_lote)", start)
+        start = interface.index("def abrir_planilha")
+        end = interface.index("    def _planilha_stage9_get_grid_state", start)
         block = interface[start:end]
-        self.assertIn("self._planilha_desenhar_borda()", block)
-        self.assertIn("self._planilha_desenhar_cabecalho_linhas()", block)
-        self.assertIn("self._planilha_povoamento_proxima_linha = fim", block)
+        self.assertIn("VirtualGridTree(", block)
+        self.assertIn("value_provider=", block)
+        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', block)
+        self.assertNotIn("def _povoar_lote():", block)
+        self.assertNotIn("for i in range(300):", block)
+        self.assertNotIn("fim = min(10000, inicio + 500)", block)
+        self.assertNotIn("tree.insert(", block)
 
     def test_snapshot_historico_reutiliza_a_mesma_abertura(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")

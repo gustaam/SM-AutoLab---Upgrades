@@ -14,6 +14,7 @@ PRODUCTION_FILES = (
     "ui_platform.py",
     "planilha_core.py",
     "storage_safe.py",
+    "planilha_virtual_29926.py",
     "windows11_native_29925.py",
 )
 

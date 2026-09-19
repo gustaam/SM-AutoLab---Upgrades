@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox, Canvas, Frame, ttk, TclError, Entry
 import customtkinter as ctk
 
 from ui_platform import aplicar_backdrop_sistema, atualizar_backdrop_tema
+from planilha_virtual_29926 import VirtualGridTree, SM_AUTOLAB_GRADE_VIRTUAL_29926
 
 from storage_safe import atomic_write_json, read_json_with_backup
 
@@ -1773,11 +1774,29 @@ class App:
         )
         row_header.grid(row=1, column=0, sticky="nsew")
 
-        tree=ttk.Treeview(body,columns=("c1","c2","c3"),show="headings",selectmode="none",style="SM.Treeview")
-        tree.heading("c1",text="Qtd"); tree.heading("c2",text="Senha"); tree.heading("c3",text="Item")
-        tree.column("c1", width=70, minwidth=50, anchor="w", stretch=False)
-        tree.column("c2", width=160, minwidth=110, anchor="w", stretch=False)
-        tree.column("c3", width=770, minwidth=300, anchor="w", stretch=True)
+        tree=VirtualGridTree(
+            body,
+            columns=(
+                ("c1", "Qtd", 70, 50, "w", False),
+                ("c2", "Senha", 160, 110, "w", False),
+                ("c3", "Item", 770, 300, "w", True),
+            ),
+            total_rows=10000,
+            row_height=28,
+            header_height=28,
+            value_provider=lambda row: (
+                self._planilha_data.get(f"{row},0", "") or "",
+                self._planilha_data.get(f"{row},1", "") or "",
+                self._planilha_data.get(f"{row},2", "") or "",
+            ),
+            bg=tree_bg,
+            header_bg=tree_header,
+            fg=tree_fg,
+            header_fg=tree_fg,
+            border=tree_border,
+            even_bg="#FFFFFF" if not modo_escuro else "#2D3338",
+            odd_bg="#FBFBFB" if not modo_escuro else "#292F34",
+        )
 
         def _ajustar_larguras_planilha(_event=None):
             try:
@@ -1791,12 +1810,11 @@ class App:
             except Exception:
                 pass
         tree.bind("<Configure>", _ajustar_larguras_planilha, add="+")
-        tree.bind("<Configure>", lambda _e: tree.after_idle(self._planilha_desenhar_borda), add="+")
 
-        # Virtualização do cabeçalho de linhas: o documento continua com
-        # 10.000 linhas lógicas, mas o Canvas desenha somente as linhas visíveis.
-        row_height = 28
-
+        # Virtualização do cabeçalho de linhas: o cabeçalho continua enxuto e
+        # independente da quantidade total de registros lógicos.
+        # A grade virtual usa uma janela fixa de objetos Canvas para representar
+        # apenas a viewport lógica; os 10.000 registros continuam em _planilha_data.
         def _sync_row_header(first, last):
             y.set(first, last)
             try:
@@ -1807,6 +1825,7 @@ class App:
                 tree.after_idle(self._planilha_desenhar_borda)
             except Exception:
                 pass
+
         y=ttk.Scrollbar(body,orient="vertical",command=tree.yview)
         x=ttk.Scrollbar(body,orient="horizontal",command=tree.xview)
         tree.configure(yscrollcommand=_sync_row_header,xscrollcommand=x.set)
@@ -1825,15 +1844,13 @@ class App:
         row_header.bind("<MouseWheel>", _rolar_cabecalho)
 
         def _clicar_cabecalho(event):
-            # Clique no cabeçalho seleciona a linha correspondente, mas nunca
-            # transforma o número em uma célula editável.
             try:
                 first = float(tree.yview()[0])
                 total = 10000
                 row_index = int(first * total + (event.y / row_height))
                 row_index = max(0, min(row_index, total - 1))
-                iid = tree.get_children()[row_index]
-                tree.focus_set()
+                iid = str(row_index)
+                tree.focus(iid)
                 tree.see(iid)
                 self._planilha_linhas_selecionadas = {iid}
                 self._planilha_celula_ativa = (iid, 0)
@@ -1847,58 +1864,10 @@ class App:
         tree.tag_configure("even", background="#FFFFFF")
         tree.tag_configure("odd", background="#FBFBFB")
 
-        # Etapa 8: povoamento incremental; a primeira viewport aparece antes
-        # de inserir o restante das 10.000 linhas.
+        # Etapa 13: virtualização real; não há inserção gradual de 10.000 itens.
         self._planilha_povoamento_job = None
-        self._planilha_povoamento_concluido = False
-        self._planilha_povoamento_proxima_linha = 0
-        row_values = [
-            (
-                self._planilha_data.get(f"{i},0", "") or "",
-                self._planilha_data.get(f"{i},1", "") or "",
-                self._planilha_data.get(f"{i},2", "") or "",
-            )
-            for i in range(10000)
-        ]
-
-        def _povoar_lote():
-            inicio = self._planilha_povoamento_proxima_linha
-            fim = min(10000, inicio + 500)
-            try:
-                for i in range(inicio, fim):
-                    tree.insert("", "end", iid=str(i), values=row_values[i],
-                                tags=("even" if i % 2 == 0 else "odd",))
-                self._planilha_povoamento_proxima_linha = fim
-
-                # A grade virtualizada precisa ser redesenhada depois que os
-                # itens do lote realmente existem no Treeview. Isso elimina
-                # a condição em que a janela abre sem divisões/numeração.
-                try:
-                    self._planilha_desenhar_borda()
-                    self._planilha_desenhar_cabecalho_linhas()
-                except Exception:
-                    pass
-
-                if fim >= 10000:
-                    self._planilha_povoamento_concluido = True
-                    self._planilha_povoamento_job = None
-                    self._planilha_atualizar_contador()
-                    try:
-                        self._planilha_desenhar_borda()
-                        self._planilha_desenhar_cabecalho_linhas()
-                    except Exception:
-                        pass
-                    return
-                self._planilha_povoamento_job = tree.after(1, _povoar_lote)
-            except Exception:
-                self._planilha_povoamento_job = None
-
-        for i in range(300):
-            tree.insert("", "end", iid=str(i), values=row_values[i],
-                        tags=("even" if i % 2 == 0 else "odd",))
-        self._planilha_povoamento_proxima_linha = 300
-        self._planilha_povoamento_job = tree.after(1, _povoar_lote)
-        self._planilha_atualizar_contador()
+        self._planilha_povoamento_concluido = True
+        self._planilha_povoamento_proxima_linha = 10000
         self._planilha_celulas_selecionadas = set()
         self._planilha_drag_anchor = None
         self._planilha_drag_start_xy = None
@@ -1915,7 +1884,6 @@ class App:
         tree.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")
         tree.bind("<Delete>", self._planilha_atalho_excluir, add="+")
         tree.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")
-        # Ctrl+V: cobre tecla física, tecla em caixa alta e evento virtual do Tk.
         tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")
         tree.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")
         tree.bind("<<Paste>>", self._planilha_atalho_colar, add="+")
@@ -1931,8 +1899,8 @@ class App:
         tree.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
         self._planilha_tree=tree
         self._planilha_row_header=row_header
-        self._planilha_implementacao = "grade-final-29922"
-
+        self._planilha_implementacao = "grade-virtual-29926"
+        tree.refresh()
         # Fallback global: alguns ambientes Windows/Tk não entregam Ctrl+V ao
         # Treeview, mesmo com o binding local. Interceptamos somente enquanto
         # o foco estiver dentro da planilha, evitando afetar o restante do app.
@@ -2688,15 +2656,20 @@ class App:
         if not self._planilha_data:
             return
         if not messagebox.askyesno("Limpar planilha","Tem certeza que deseja limpar a planilha?",parent=self._planilha_window):return
-        self._planilha_push_undo(); self._planilha_redo=[]; self._planilha_data={}
-        tree=self._planilha_tree
-        if tree:
-            for iid in tree.get_children(): tree.item(iid,values=("","",""))
+        self._planilha_push_undo()
+        self._planilha_redo=[]
+        self._planilha_data={}
+        self._planilha_atualizar_grade()
+        self._planilha_atualizar_contador()
         self._planilha_marcar_alteracao()
 
     def _planilha_atualizar_grade(self):
         tree=self._planilha_tree
         if not tree:return
+        refresh=getattr(tree, "refresh", None)
+        if callable(refresh):
+            refresh()
+            return
         for iid in tree.get_children():
             i=int(iid); vals=[self._planilha_data.get(f"{i},{c}","") for c in range(3)]; tree.item(iid,values=vals,tags=("even" if i % 2 == 0 else "odd",))
 
