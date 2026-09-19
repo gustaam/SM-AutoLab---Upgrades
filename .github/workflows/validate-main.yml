@@ -32,7 +32,11 @@ jobs:
 
       - name: Validar versão e arquitetura consolidada
         shell: pwsh
-        run: python scripts/validate_architecture.py
+        run: |
+          python scripts/validate_architecture.py
+          if ($LASTEXITCODE -ne 0) { throw "Falha na validação da arquitetura." }
+          python scripts/validate_version.py VERSION
+          if ($LASTEXITCODE -ne 0) { throw "Falha na validação de VERSION." }
 
       - name: Instalar dependências
         shell: pwsh

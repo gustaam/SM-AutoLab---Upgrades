@@ -48,7 +48,7 @@ jobs:
           $tagCommit = (git rev-parse HEAD).Trim()
           if ($tagCommit -ne $mainCommit) { throw "A tag deve apontar exatamente para o commit atual da main. Tag: $tagCommit; main: $mainCommit" }
 
-      - name: Validar tag e arquitetura consolidada
+      - name: Validar tag, versão e arquitetura consolidada
         shell: pwsh
         run: |
           $tag = $env:RELEASE_TAG
@@ -56,6 +56,9 @@ jobs:
           $version = (Get-Content VERSION -Raw).Trim()
           if ($version -ne $tagVersion) { throw "VERSION ($version) não corresponde à tag ($tag)." }
           python scripts/validate_architecture.py
+          if ($LASTEXITCODE -ne 0) { throw "Falha na validação da arquitetura." }
+          python scripts/validate_version.py VERSION
+          if ($LASTEXITCODE -ne 0) { throw "Falha na validação de VERSION." }
 
       - name: Instalar dependências
         shell: pwsh

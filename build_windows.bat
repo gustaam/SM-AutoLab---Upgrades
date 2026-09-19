@@ -50,7 +50,9 @@ echo.
 echo Validando versao e arquitetura consolidada...
 %PYTHON% scripts\validate_architecture.py
 if errorlevel 1 goto :erro
-echo Validacao de arquitetura: OK
+%PYTHON% scripts\validate_version.py VERSION
+if errorlevel 1 goto :erro
+echo Validacao de arquitetura e versao: OK
 echo.
 
 %PYTHON% -m pip install pip==26.2.1
