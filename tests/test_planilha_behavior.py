@@ -69,6 +69,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
             "1,0": "2", "1,1": "DEF", "1,2": "Outro",
         }
         app._planilha_celulas_selecionadas = {(0, 0), (0, 1), (0, 2)}
+        app._planilha_linhas_selecionadas = {"0"}
         app._planilha_celula_ativa = ("1", 0)
 
         captured = {"text": None}
