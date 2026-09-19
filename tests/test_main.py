@@ -1,8 +1,89 @@
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import main
 
+# tests/test_config_menu_position.py
+
+class ConfigMenuPositionTests(unittest.TestCase):
+    def test_menu_configuracoes_e_ancorado_abaixo_do_botao(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _reposicionar_menus")
+        end = source.index("def _fixar_menu_configuracoes", start)
+        block = source[start:end]
+        self.assertIn("menu_x = bx", block)
+        self.assertNotIn("bx - 40", block)
+        self.assertIn("self._menu_config.place_configure(", block)
+
+
+# tests/test_dashboard.py
+
+class DashboardStage3Tests(unittest.TestCase):
+    def test_dashboard_stage3_marker_and_entry_point(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("SM_AUTOLAB_DASHBOARD_29917", source)
+        self.assertIn("def install_ui_dashboard_29917", source)
+        self.assertIn("install_ui_dashboard_29917(App)", source)
+        self.assertIn('setattr(App, "_selecionar_tema", theme_wrapper)', source)
+
+    def test_dashboard_clamp_is_safe(self):
+        self.assertEqual(main._dashboard_clamp(-1), 0.0)
+        self.assertEqual(main._dashboard_clamp(0), 0.0)
+        self.assertEqual(main._dashboard_clamp(0.42), 0.42)
+        self.assertEqual(main._dashboard_clamp(2), 1.0)
+        self.assertEqual(main._dashboard_clamp("invalido"), 0.0)
+
+    def test_dashboard_layer_is_visual_only(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "main.py").read_text(encoding="utf-8")
+        stage = source.split("SM_AUTOLAB_DASHBOARD_29917", 1)[1].split('if __name__ == "__main__":', 1)[0]
+        self.assertNotIn("threading.Thread", stage)
+
+
+# tests/test_saved_sheet_counter.py
+
+class SavedSheetCounterTests(unittest.TestCase):
+    def test_home_counter_conta_apenas_senhas_da_planilha_atual(self):
+        class FakeLabel:
+            def __init__(self):
+                self.text = None
+            def configure(self, **kwargs):
+                self.text = kwargs.get("text")
+            def winfo_manager(self):
+                return "pack"
+            def pack_configure(self, **kwargs):
+                pass
+            def pack_forget(self):
+                self.text = None
+
+        class AppStub:
+            arquivos_contador_label = FakeLabel()
+            _planilha_data = {
+                "0,0": "10",
+                "0,1": "senha-1",
+                "0,2": "item",
+                "1,1": "senha-2",
+                "2,0": "20",
+            }
+            _planilha_arquivo = SimpleNamespace(exists=lambda: False)
+
+        main._home_counter(AppStub)
+        self.assertEqual(AppStub.arquivos_contador_label.text, "2 Códigos salvos")
+
+
+# tests/test_status_indicator.py
+
+class StatusIndicatorTests(unittest.TestCase):
+    def test_pronto_mantem_pulso_verde(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('self._status_text_base == "Pronto"', source)
+        self.assertIn("self._iniciar_pisca_status()", source)
+
+
+# tests/test_tooltips.py
 
 class TooltipRegressionTests(unittest.TestCase):
     class _FakeButton:
@@ -80,7 +161,3 @@ class TooltipRegressionTests(unittest.TestCase):
         self.assertIn('child.bind("<Leave>"', block)
         self.assertIn("HIDE_GRACE_MS", block)
         self.assertIn("_pointer_inside_button", block)
-
-
-if __name__ == "__main__":
-    unittest.main()

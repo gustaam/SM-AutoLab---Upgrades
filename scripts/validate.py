@@ -22,9 +22,8 @@ REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "patch.py", "requirements.txt",
     "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate.py",
-    "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py",
-    "tests/test_validate_executable.py", "tests/test_storage_safe.py", "tests/test_validate_quality.py",
-    "tests/test_stage12.py", "tests/test_stage13.py",
+    "tests/test_patch.py", "tests/test_main.py", "tests/test_planilha.py",
+    "tests/test_app.py", "tests/test_validation.py",
 )
 
 OBSOLETE_PATHS = (
@@ -36,6 +35,12 @@ OBSOLETE_PATHS = (
     ".github/workflows/_fix_patch_b_import.yml",
     "automacao.py", "atualizacao.py", "planilha_core.py", "planilha_virtual_29926.py", "storage_safe.py",
     "ui_platform.py", "windows11_native_29925.py",
+    "tests/test_config_menu_position.py", "tests/test_dashboard.py", "tests/test_planilha_behavior.py",
+    "tests/test_planilha_core.py", "tests/test_planilha_deterministic_open.py", "tests/test_planilha_grid.py",
+    "tests/test_planilha_open_path.py", "tests/test_saved_sheet_counter.py", "tests/test_stage10.py",
+    "tests/test_stage12.py", "tests/test_stage13.py", "tests/test_status_indicator.py",
+    "tests/test_storage_safe.py", "tests/test_tooltips.py", "tests/test_validate_executable.py",
+    "tests/test_validate_quality.py", "tests/test_validate_version.py",
 )
 
 LEGACY_IMPORTS = (
@@ -274,10 +279,13 @@ def validate_architecture(root: Path) -> None:
         "def rectangle_selection", "def parse_paste_text", "def apply_paste",
         "def clear_cells", "def undo_state", "def redo_state",
     ))
-    stage12_test = read_text(root, "tests/test_stage12.py")
-    require_markers("tests/test_stage12.py", stage12_test, ("class Windows11NativeStage12Tests", "SM_AUTOLAB_WINDOWS_NATIVE_29925", "install_ui_windows11_native_29925", "SystemParametersInfoW", "SetWindowTheme"))
-    stage13_test = read_text(root, "tests/test_stage13.py")
-    require_markers("tests/test_stage13.py", stage13_test, ("class VirtualGridStage13Tests", "SM_AUTOLAB_GRADE_VIRTUAL_29926", "VirtualGridTree", "visible_row_range"))
+    planilha_test = read_text(root, "tests/test_planilha.py")
+    require_markers("tests/test_planilha.py", planilha_test, (
+        "class Windows11NativeStage12Tests", "SM_AUTOLAB_WINDOWS_NATIVE_29925",
+        "install_ui_windows11_native_29925", "SystemParametersInfoW", "SetWindowTheme",
+        "class VirtualGridStage13Tests", "SM_AUTOLAB_GRADE_VIRTUAL_29926",
+        "VirtualGridTree", "visible_row_range",
+    ))
     validate_dependencies(root)
     validate_workflow_pins(root)
     validate_workflow_security(root)

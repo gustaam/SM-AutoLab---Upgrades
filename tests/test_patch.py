@@ -161,9 +161,20 @@ class TestPatch(unittest.TestCase):
 
     def test_arquivos_de_teste_auxiliares_foram_consolidados(self):
         root = Path(__file__).resolve().parent
-        self.assertFalse((root / "test_atualizacao.py").exists())
-        self.assertFalse((root / "test_ui_correcoes_29912.py").exists())
-        self.assertFalse((root / "test_historico_ilimitado.py").exists())
+        for name in (
+            "test_main.py", "test_planilha.py", "test_app.py", "test_validation.py",
+        ):
+            self.assertTrue((root / name).exists())
+        for name in (
+            "test_atualizacao.py", "test_ui_correcoes_29912.py", "test_historico_ilimitado.py",
+            "test_config_menu_position.py", "test_dashboard.py", "test_planilha_behavior.py",
+            "test_planilha_core.py", "test_planilha_deterministic_open.py", "test_planilha_grid.py",
+            "test_planilha_open_path.py", "test_saved_sheet_counter.py", "test_stage10.py",
+            "test_stage12.py", "test_stage13.py", "test_status_indicator.py", "test_storage_safe.py",
+            "test_tooltips.py", "test_validate_executable.py", "test_validate_quality.py",
+            "test_validate_version.py",
+        ):
+            self.assertFalse((root / name).exists())
 
 
 
