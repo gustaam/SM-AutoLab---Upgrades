@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from planilha_virtual_29926 import (
+from interface import (
     SM_AUTOLAB_GRADE_VIRTUAL_29926,
     visible_row_range,
 )
@@ -53,7 +53,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
 
     def test_virtual_grid_refreshes_a_bounded_pool(self):
         root = Path(__file__).resolve().parents[1]
-        source = (root / "planilha_virtual_29926.py").read_text(encoding="utf-8")
+        source = (root / "interface.py").read_text(encoding="utf-8")
         refresh_start = source.index("def _refresh_visible")
         refresh_end = source.index(
             "    def _update_scroll_callbacks",
