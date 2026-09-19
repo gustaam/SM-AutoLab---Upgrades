@@ -208,7 +208,7 @@ def validate(root: Path) -> None:
         "def install_ui_responsivo_29921",
         "def install_ui(App)",
         "SM_AUTOLAB_GRADE_VIRTUAL_29926", "from planilha_virtual_29926 import SM_AUTOLAB_GRADE_VIRTUAL_29926",
-        "SM_AUTOLAB_WINDOWS_NATIVE_29925", "from windows11_native_29925 import install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
+        "from windows11_native_29925 import install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
