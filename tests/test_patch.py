@@ -122,11 +122,13 @@ class TestPatch(unittest.TestCase):
         self.assertNotRegex(interface, r'"PORTAL_USUARIO"\s*=\s*"[^"\r\n]+"')
         self.assertNotRegex(interface, r'"PORTAL_SENHA"\s*=\s*"[^"\r\n]+"')
 
-    def test_automacao_usa_imports_explicitos(self):
+    def test_automacao_usa_configuracao_consolidada(self):
         root = Path(__file__).resolve().parents[1]
         automacao = (root / "app.py").read_text(encoding="utf-8")
         self.assertNotIn("from config import *", automacao)
-        self.assertIn("from config import (", automacao)
+        self.assertNotIn("from config import", automacao)
+        self.assertIn('DEFAULT_PORTAL_USUARIO = ""', automacao)
+        self.assertIn('DEFAULT_PORTAL_SENHA = ""', automacao)
         for symbol in (
             "ALERT_TIMEOUT", "CODE_INPUT_XPATH", "CONFIRM_BUTTON_XPATH",
             "ELEMENT_TIMEOUT", "INPUT_DELAY", "LOGIN_BUTTON_XPATH",
