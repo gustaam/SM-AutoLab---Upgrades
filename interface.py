@@ -327,7 +327,8 @@ class App:
 
         activity_card = self._card(main)
         activity_card.pack(fill="x", pady=(0, 6))
-        activity_card.configure(height=205)
+        # Área de acompanhamento mais alta para manter as pastas do histórico visíveis.
+        activity_card.configure(height=285)
         activity_card.pack_propagate(False)
         self._section_title(activity_card, "Acompanhamento")
 
