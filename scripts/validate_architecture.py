@@ -20,7 +20,7 @@ REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
     "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat",
-    "scripts/validate_architecture.py", "scripts/validate_executable.py", "scripts/validate_version.py", "planilha_core.py", "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py", "tests/test_validate_executable.py", "windows11_native_29925.py", "tests/test_stage12.py",
+    "scripts/validate_architecture.py", "scripts/validate_executable.py", "scripts/validate_version.py", "planilha_core.py", "storage_safe.py", "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py", "tests/test_validate_executable.py", "tests/test_storage_safe.py", "windows11_native_29925.py", "tests/test_stage12.py",
 )
 
 OBSOLETE_PATHS = (

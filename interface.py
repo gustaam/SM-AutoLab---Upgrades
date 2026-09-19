@@ -11,6 +11,8 @@ import customtkinter as ctk
 
 from ui_platform import aplicar_backdrop_sistema, atualizar_backdrop_tema
 
+from storage_safe import atomic_write_json, read_json_with_backup
+
 from planilha_core import (
     MAX_ROWS,
     apply_paste,
@@ -1247,7 +1249,7 @@ class App:
         try:
             if not self._historico_arquivo.exists():
                 return
-            dados = json.loads(self._historico_arquivo.read_text(encoding="utf-8"))
+            dados = read_json_with_backup(self._historico_arquivo, {})
             execucoes = dados.get("historico_execucoes", [])
             erros = dados.get("erros", [])
             tema = dados.get("tema", "system")
@@ -1270,9 +1272,7 @@ class App:
                 "tema": self._tema,
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
-            tmp = self._historico_arquivo.with_suffix(".tmp")
-            tmp.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
-            tmp.replace(self._historico_arquivo)
+            atomic_write_json(self._historico_arquivo, dados)
         except Exception:
             pass
 
@@ -1617,7 +1617,7 @@ class App:
         if not self._planilha_arquivo.exists():
             return {}
         try:
-            data=json.loads(self._planilha_arquivo.read_text(encoding="utf-8"))
+            data=read_json_with_backup(self._planilha_arquivo, {})
             cells=data.get("cells", {}) if isinstance(data, dict) else {}
             return {str(k): str(v) for k,v in cells.items() if str(v) != ""}
         except Exception:
@@ -1628,9 +1628,7 @@ class App:
         if cells is None:
             cells=self._planilha_data
         payload={"version":1,"updated_at":datetime.now().isoformat(timespec="seconds"),"cells":cells}
-        tmp=self._planilha_arquivo.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(self._planilha_arquivo)
+        atomic_write_json(self._planilha_arquivo, payload)
 
     def _planilha_tem_alteracoes(self):
         return self._planilha_data != self._planilha_salva_data
@@ -1639,9 +1637,7 @@ class App:
         try:
             self._garantir_pasta_planilha()
             payload={"version":1,"updated_at":datetime.now().isoformat(timespec="seconds"),"cells":dict(self._planilha_data)}
-            tmp=self._planilha_rascunho_arquivo.with_suffix(".tmp")
-            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-            tmp.replace(self._planilha_rascunho_arquivo)
+            atomic_write_json(self._planilha_rascunho_arquivo, payload)
         except Exception:
             pass
 
@@ -1653,7 +1649,7 @@ class App:
     def _planilha_carregar_rascunho(self):
         if not self._planilha_rascunho_arquivo.exists(): return None
         try:
-            data=json.loads(self._planilha_rascunho_arquivo.read_text(encoding="utf-8"))
+            data=read_json_with_backup(self._planilha_rascunho_arquivo, None)
             cells=data.get("cells",{}) if isinstance(data,dict) else {}
             return {str(k):str(v) for k,v in cells.items() if str(v)!=""} if isinstance(cells,dict) else None
         except Exception: return None
@@ -2861,9 +2857,7 @@ class App:
             return list(self._planilha_historico_cache)
 
         try:
-            data = json.loads(
-                self._planilha_historico_arquivo.read_text(encoding="utf-8")
-            )
+            data = read_json_with_backup(self._planilha_historico_arquivo, {})
             itens = data.get("items", []) if isinstance(data, dict) else []
             if not isinstance(itens, list):
                 self._invalidar_cache_historico_planilhas()
@@ -2890,12 +2884,7 @@ class App:
         self._garantir_pasta_planilha()
         validos = self._filtrar_arquivos_60_dias(itens)
         payload = {"version": 3, "items": validos}
-        tmp = self._planilha_historico_arquivo.with_suffix(".tmp")
-        tmp.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8"
-        )
-        tmp.replace(self._planilha_historico_arquivo)
+        atomic_write_json(self._planilha_historico_arquivo, payload)
         self._planilha_historico_cache = list(validos)
         self._planilha_historico_cache_signature = (
             self._assinatura_historico_planilhas()
@@ -2942,7 +2931,7 @@ class App:
         if not self._planilha_arquivo.exists():
             return
         try:
-            data = json.loads(self._planilha_arquivo.read_text(encoding="utf-8"))
+            data = read_json_with_backup(self._planilha_arquivo, {})
             cells = data.get("cells", {}) if isinstance(data, dict) else {}
             updated_at = data.get("updated_at") if isinstance(data, dict) else None
             if not isinstance(cells, dict) or not cells or not updated_at:
@@ -2951,9 +2940,7 @@ class App:
             if salvo.date() < datetime.now().date():
                 self._registrar_historico_planilha(cells, salvo)
                 payload = {"version": 1, "updated_at": datetime.now().isoformat(timespec="seconds"), "cells": {}}
-                tmp = self._planilha_arquivo.with_suffix(".tmp")
-                tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-                tmp.replace(self._planilha_arquivo)
+                atomic_write_json(self._planilha_arquivo, payload)
         except Exception:
             pass
 

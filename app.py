@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+from storage_safe import atomic_write_json, read_json_with_backup
 
 from automacao import Automacao, AutomacaoError
 from config import CODE_COLUMN
@@ -97,20 +98,14 @@ def caminho_checkpoint(planilha_path, sheet):
 
 def salvar_checkpoint(planilha_path, sheet, proximo_indice):
     c = caminho_checkpoint(planilha_path, sheet)
-    t = c.with_suffix(c.suffix + ".tmp")
-    t.write_text(
-        json.dumps(
-            {
-                "planilha": str(Path(planilha_path).resolve()),
-                "sheet": sheet,
-                "proximo_indice": proximo_indice,
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
+    atomic_write_json(
+        c,
+        {
+            "planilha": str(Path(planilha_path).resolve()),
+            "sheet": sheet,
+            "proximo_indice": proximo_indice,
+        },
     )
-    t.replace(c)
 
 
 def ler_checkpoint(planilha_path, sheet):
@@ -118,7 +113,7 @@ def ler_checkpoint(planilha_path, sheet):
     if not c.exists():
         return None
     try:
-        d = json.loads(c.read_text(encoding="utf-8"))
+        d = read_json_with_backup(c, {})
         if d.get("planilha") != str(Path(planilha_path).resolve()) or d.get("sheet") != sheet:
             return None
         x = int(d.get("proximo_indice", 0))
@@ -155,9 +150,7 @@ def salvar_checkpoint_interno(codigos, proximo_indice):
         "proximo_indice": int(proximo_indice),
         "updated_at": datetime.now().isoformat(timespec="seconds"),
     }
-    t = c.with_suffix(c.suffix + ".tmp")
-    t.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    t.replace(c)
+    atomic_write_json(c, payload)
 
 
 def ler_checkpoint_interno(codigos):
