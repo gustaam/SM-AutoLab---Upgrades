@@ -667,7 +667,31 @@ class App:
             anchor="w"
         )
         aparencia.pack(fill="x", padx=7, pady=(8, 3))
+        self._menu_aparencia_btn = aparencia
 
+        # Usa a posição real do cursor na janela para que o hover funcione
+        # independentemente de o ponteiro estar sobre o frame, texto ou
+        # qualquer widget interno do CTkButton.
+        def _hover_global_config(event=None):
+            try:
+                if self._menu_config is None or not self._menu_config.winfo_exists():
+                    return
+                self._menu_config.update_idletasks()
+                self._garantir_menu_aparencia_aberto_se_hover(event)
+            except Exception:
+                pass
+
+        try:
+            self._config_hover_binding = self.app.bind(
+                "<Motion>",
+                _hover_global_config,
+                add="+",
+            )
+        except Exception:
+            self._config_hover_binding = None
+
+        # Compatibilidade com o binding direto do botão, além da detecção
+        # global acima.
         # Aparência funciona como submenu em cascata: passar o mouse pela
         # opção já abre o submenu; o clique continua funcionando como alternativa.
         def _abrir_aparencia_por_hover(_event=None):
@@ -723,6 +747,25 @@ class App:
         # Explicit close/toggle: clicking Configurações again closes the menu.
         self.app.update_idletasks()
         self._reposicionar_menus()
+
+    def _garantir_menu_aparencia_aberto_se_hover(self, event=None):
+        menu = getattr(self, "_menu_config", None)
+        aparencia = getattr(self, "_menu_aparencia_btn", None)
+        if menu is None or aparencia is None:
+            return
+        try:
+            if not menu.winfo_exists() or not aparencia.winfo_exists():
+                return
+            x = self.app.winfo_pointerx() - menu.winfo_rootx()
+            y = self.app.winfo_pointery() - menu.winfo_rooty()
+            ay = aparencia.winfo_y()
+            ah = aparencia.winfo_height()
+            ax = aparencia.winfo_x()
+            aw = aparencia.winfo_width()
+            if ax <= x < ax + aw and ay <= y < ay + ah:
+                self._garantir_menu_aparencia_aberto()
+        except Exception:
+            pass
 
     def _garantir_menu_aparencia_aberto(self):
         self._cancelar_fechar_menus()
@@ -846,6 +889,14 @@ class App:
 
     def _fechar_menus(self):
         self._menu_close_job = None
+        hover_binding = getattr(self, "_config_hover_binding", None)
+        if hover_binding:
+            try:
+                self.app.unbind("<Motion>", hover_binding)
+            except Exception:
+                pass
+        self._config_hover_binding = None
+        self._menu_aparencia_btn = None
         for attr in ("_menu_aparencia", "_menu_config"):
             menu = getattr(self, attr, None)
             if menu is not None:
