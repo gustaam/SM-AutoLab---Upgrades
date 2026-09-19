@@ -44,8 +44,19 @@ class Windows11NativeStage12Tests(unittest.TestCase):
         validate = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
         release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
-        for source in (main, build, validate, release):
-            self.assertIn("install_ui_windows11_native_29925", source)
+        self.assertIn("install_ui_windows11_native_29925", main)
+        self.assertIn(
+            "from interface import App; from main import install_ui, _validar_base_aplicacao",
+            build,
+        )
+        self.assertIn(
+            "from interface import App; from main import install_ui, _validar_base_aplicacao",
+            validate,
+        )
+        self.assertIn(
+            "from interface import App; from main import install_ui, _validar_base_aplicacao",
+            release,
+        )
 
     def test_native_layer_has_accessibility_and_dwm_paths(self):
         source = (
