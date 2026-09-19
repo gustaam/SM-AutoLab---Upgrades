@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   tag:
@@ -50,7 +51,8 @@ jobs:
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "VERSION=$version"
 
-      - name: Não sobrescrever tag existente
+      - name: Verificar release publicada
+        id: release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -58,19 +60,28 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          response="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --include 2>&1)"
+          response="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" 2>&1)"
           status=$?
           set -e
           if [ $status -eq 0 ]; then
-            echo "A tag ${RELEASE_TAG} já existe; nenhuma alteração será feita."
+            release_commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq '.sha')"
+            if [ -z "$release_commit" ]; then
+              echo "Release ${RELEASE_TAG} existe, mas seu commit não pôde ser obtido." >&2
+              exit 1
+            fi
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "A release ${RELEASE_TAG} já está publicada; nenhuma alteração será feita."
             exit 0
           fi
-          if ! grep -qE 'HTTP/[0-9.]+ 404 ' <<< "$response"; then
+          if ! grep -q '"status": "404"' <<< "$response" && ! grep -qE 'HTTP/[0-9.]+ 404 ' <<< "$response"; then
             echo "$response" >&2
             exit 1
           fi
+          echo "published=false" >> "$GITHUB_OUTPUT"
 
-      - name: Criar tag exata da main validada
+      - name: Alinhar tag ao commit validado
+        id: tag
+        if: steps.release.outputs.published != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -78,12 +89,38 @@ jobs:
           VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
-            -f "ref=refs/tags/${RELEASE_TAG}" \
-            -f "sha=${VALIDATED_SHA}"
-          created_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq '.object.sha')"
-          if [ "$created_sha" != "$VALIDATED_SHA" ]; then
-            echo "A tag criada não aponta para o commit validado." >&2
+          set +e
+          tag_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq '.object.sha' 2>/dev/null)"
+          status=$?
+          set -e
+          if [ $status -ne 0 ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/tags/${RELEASE_TAG}" \
+              -f "sha=${VALIDATED_SHA}"
+            echo "Tag ${RELEASE_TAG} criada."
+          elif [ "$tag_sha" != "$VALIDATED_SHA" ]; then
+            echo "Tag existente aponta para $tag_sha; release ainda não publicada, alinhando para $VALIDATED_SHA."
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG}" \
+              -f "sha=${VALIDATED_SHA}" \
+              -F "force=true"
+          else
+            echo "Tag ${RELEASE_TAG} já aponta para o commit validado."
+          fi
+
+          final_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq '.object.sha')"
+          if [ "$final_sha" != "$VALIDATED_SHA" ]; then
+            echo "A tag ${RELEASE_TAG} não aponta para o commit validado." >&2
             exit 1
           fi
-          echo "Tag ${RELEASE_TAG} criada apontando para ${VALIDATED_SHA}."
+          echo "Tag ${RELEASE_TAG} -> ${VALIDATED_SHA}"
+
+      - name: Disparar workflow da release
+        if: steps.release.outputs.published != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --ref "${RELEASE_TAG}" -f "release_tag=${RELEASE_TAG}"
+          echo "Workflow de release disparado para ${RELEASE_TAG}."
