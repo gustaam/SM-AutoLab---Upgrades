@@ -1099,7 +1099,9 @@ def install_ui_29912(App):
 
     App._planilha_salvar_e_sair = save_exit_wrapper
 
-    # App.abrir_planilha não é sobrescrito por camadas históricas.\n\n    original_save_start = getattr(App, "_planilha_salvar_e_iniciar", None)
+    # App.abrir_planilha não é sobrescrito por camadas históricas.
+
+    original_save_start = getattr(App, "_planilha_salvar_e_iniciar", None)
     if original_save_start is not None:
         def save_start_wrapper(self, *args, **kwargs):
             result = original_save_start(self, *args, **kwargs)
