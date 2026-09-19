@@ -20,7 +20,7 @@ REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
     "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat",
-    "scripts/validate_architecture.py", "tests/test_patch.py",
+    "scripts/validate_architecture.py", "tests/test_patch.py", "execution_center_29924.py", "tests/test_stage11.py",
 )
 
 OBSOLETE_PATHS = (
@@ -197,6 +197,7 @@ def validate(root: Path) -> None:
     patch = contents["patch.py"]
     build = contents["build_windows.bat"]
     tests = contents["tests/test_patch.py"]
+    stage11_test = read_text(root, "tests/test_stage11.py")
 
     require_markers("main.py", main, (
         "from patch import aplicar_patch_ui", "def install_ui_29912", "def install_ui_fluent_29916", "class StartupSplash",
@@ -205,7 +206,7 @@ def validate(root: Path) -> None:
         "SM_AUTOLAB_AUDITORIA_29920", "def _configurar_dpi_windows",
         "def install_ui_auditoria_29920", "SM_AUTOLAB_RESPONSIVO_29921",
         "def install_ui_responsivo_29921",
-        "SM_AUTOLAB_GRADE_29922", "def install_ui_grade_29922",
+        "SM_AUTOLAB_GRADE_29922", "def install_ui_grade_29922", "SM_AUTOLAB_EXECUTION_29924", "def install_ui_execution_center_29924",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
@@ -232,6 +233,7 @@ def validate(root: Path) -> None:
     )
     require_markers("interface.py", interface, ("def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "_planilha_povoamento_job", "fim = min(10000, inicio + 500)"))
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
+    require_markers("tests/test_stage11.py", stage11_test, ("class ExecutionCenterStage11Tests", "SM_AUTOLAB_EXECUTION_29924", "format_execution_center", "install_ui_execution_center_29924"))
     validate_dependencies(root)
     validate_workflow_pins(root)
     validate_workflow_security(root)
