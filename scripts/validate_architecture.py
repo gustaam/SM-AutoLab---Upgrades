@@ -19,8 +19,7 @@ REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "config.py", "patch.py", "requirements.txt",
-    "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate_architecture.py",
-    "scripts/validate_executable.py", "scripts/validate_version.py", "scripts/validate_quality.py",
+    "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate.py",
     "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py",
     "tests/test_validate_executable.py", "tests/test_storage_safe.py", "tests/test_validate_quality.py",
     "tests/test_stage12.py", "tests/test_stage13.py",
@@ -33,6 +32,7 @@ OBSOLETE_PATHS = (
     "patch_2991.py", "patch_29910.py", "patch_ui.py", "tests/test_atualizacao.py",
     "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py", ".etapa-b-trigger",
     ".github/workflows/_fix_patch_b_import.yml",
+    "scripts/validate_architecture.py", "scripts/validate_executable.py", "scripts/validate_version.py", "scripts/validate_quality.py",
     "automacao.py", "atualizacao.py", "planilha_core.py", "planilha_virtual_29926.py", "storage_safe.py",
     "ui_platform.py", "windows11_native_29925.py",
 )
