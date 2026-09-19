@@ -82,7 +82,11 @@ class TestPatch(unittest.TestCase):
             self.assertNotIn("from patch_base import", content)
             self.assertNotIn("from patch_arquivos import", content)
             self.assertNotIn("from patch_ajustes import", content)
-        self.assertIn("from patch import aplicar_patch_ui", build)
+        self.assertIn(
+            "from interface import App; from main import install_ui, _validar_base_aplicacao",
+            build,
+        )
+        self.assertIn("install_ui(App); _validar_base_aplicacao()", build)
 
     def test_artifacts_temporarios_da_etapa_b_nao_existirem(self):
         root = Path(__file__).resolve().parents[1]
@@ -286,7 +290,8 @@ class PlanilhaStage5Tests(unittest.TestCase):
             "for i in range(10000):\n            y_text = i * row_height",
             content,
         )
-        self.assertIn('canvas.delete("rownum")', content)
+        self.assertIn("state = getattr(self, "_stage9_row_header_state", None)", content)
+        self.assertIn('canvas.create_text(5, 0, anchor="w"', content)
 
     def test_stage5_historico_tem_cache_por_assinatura(self):
         root = Path(__file__).resolve().parents[1]
@@ -613,12 +618,12 @@ class GradePerformanceStage9Tests(unittest.TestCase):
             def place_forget(self): self.hidden += 1
         class AppStub:
             _planilha_borda_widgets=[FrameStub(),FrameStub()]
-        # O método canônico é chamado diretamente na classe base.
-        AppStub._planilha_stage9_get_grid_state = lambda self: {
-            "widgets": [], "selection_widgets": self._planilha_borda_widgets, "bbox": None
+        app = AppStub()
+        app._planilha_stage9_get_grid_state = lambda: {
+            "widgets": [], "selection_widgets": app._planilha_borda_widgets, "bbox": None
         }
-        main.App._planilha_limpar_borda(AppStub)
-        self.assertEqual([w.hidden for w in AppStub._planilha_borda_widgets], [1,1])
+        main.App._planilha_limpar_borda(app)
+        self.assertEqual([w.hidden for w in app._planilha_borda_widgets], [1,1])
 
     def test_stage9_boot_usa_a_entrada_unica(self):
         source=Path(main.__file__).read_text(encoding="utf-8")
