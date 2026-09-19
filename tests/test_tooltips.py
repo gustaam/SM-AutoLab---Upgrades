@@ -53,6 +53,14 @@ class TooltipRegressionTests(unittest.TestCase):
         self.assertIn("_garantir_menu_aparencia_aberto", block)
         self.assertIn('bind("<Enter>", _abrir_aparencia_por_hover', block)
 
+    def test_historico_de_erros_tem_tooltip(self):
+        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+        self.assertIn('"histórico de erros":', source)
+
+    def test_iniciar_preserva_legenda(self):
+        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+        self.assertIn('text="▶  Iniciar"', source)
+
     def test_tooltip_cobre_filhos_internos_do_ctkbutton(self):
         source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
         start = source.index("class _SMAutoLabTooltip:")
