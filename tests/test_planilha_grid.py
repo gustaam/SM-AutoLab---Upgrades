@@ -34,17 +34,17 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
         self.assertNotIn("_planilha_soltar_selecao_2991", patch)
 
     def test_grade_e_reutilizavel_e_nao_percorre_10000_linhas_para_desenho(self):
-        source = (self.root / "main.py").read_text(encoding="utf-8")
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _planilha_desenhar_grade")
-        end = source.index("def _planilha_desenhar_borda", start)
+        end = source.index("    def _planilha_stage9_get_visible_rows", start)
         block = source[start:end]
-        self.assertIn("_stage9_get_visible_rows(tree)", block)
+        self.assertIn("_planilha_stage9_get_visible_rows(tree)", block)
         self.assertNotIn("range(10000)", block)
 
     def test_selecao_multipla_tem_moldura_por_celula_em_selecoes_pequenas(self):
-        source = (self.root / "main.py").read_text(encoding="utf-8")
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _planilha_desenhar_borda")
-        end = source.index("    def _planilha_stage9_get_grid_state", start)
+        end = source.index("    def _planilha_desenhar_grade", start)
         block = source[start:end]
         self.assertIn("len(normalized) <= 250", block)
         self.assertIn("segmentos.extend", block)
