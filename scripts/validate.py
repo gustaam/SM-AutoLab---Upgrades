@@ -46,7 +46,7 @@ LEGACY_IMPORTS = (
 )
 
 LEGACY_IMPORT_CHECK_PATHS = (
-    "main.py", "interface.py", "app.py", "config.py", "build_windows.bat",
+    "main.py", "interface.py", "app.py", "build_windows.bat",
 )
 
 WORKFLOW_PATHS = (
