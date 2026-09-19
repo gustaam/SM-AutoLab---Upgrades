@@ -288,7 +288,7 @@ def validate(root: Path) -> None:
         fail("build_windows.bat não executa o fluxo consolidado completo")
 
     release = read_text(root, ".github/workflows/release.yml")
-    release_flow = "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); install_ui_execution_center_29924(App); _validar_base_aplicacao()"
+    release_flow = "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); install_ui_execution_center_29924(App); install_ui_windows11_native_29925(App); _validar_base_aplicacao()"
     if release_flow not in release:
         fail("release.yml não executa o mesmo fluxo consolidado completo da validação da main")
     for marker in BUILD_MARKERS:
