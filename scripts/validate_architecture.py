@@ -20,7 +20,7 @@ REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
     "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat",
-    "scripts/validate_architecture.py", "tests/test_patch.py", "windows11_native_29925.py", "tests/test_stage12.py",
+    "scripts/validate_architecture.py", "tests/test_patch.py", "tests/test_planilha_open_path.py", "windows11_native_29925.py", "tests/test_stage12.py",
 )
 
 OBSOLETE_PATHS = (
@@ -209,6 +209,23 @@ def validate(root: Path) -> None:
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
     require_markers("main.py", main, UI_MARKERS)
+
+    # A planilha tem uma única implementação de abertura e uma única camada
+    # final de interação. Overrides históricos não podem voltar ao runtime.
+    if interface.count("    def abrir_planilha(self, dados_iniciais=None):") != 1:
+        fail("interface.py deve conter exatamente uma implementação de abrir_planilha")
+    for legacy in (
+        "App.abrir_planilha = _abrir_planilha_297",
+        "App.abrir_planilha = _abrir_planilha_2991",
+        "App.abrir_planilha = open_planilha_wrapper",
+        "App._planilha_clicar_celula = _planilha_clicar_celula_2991",
+        "App._planilha_arrastar_selecao = _planilha_arrastar_selecao_2991",
+        "App._planilha_soltar_selecao = _planilha_soltar_selecao_2991",
+        "def _abrir_planilha_2991",
+        "def _abrir_planilha_297",
+    ):
+        if legacy in patch or legacy in main:
+            fail(f"override legado da planilha detectado: {legacy}")
     require_markers(
         "main.py",
         main,
