@@ -768,6 +768,15 @@ class App:
         self.app.update_idletasks()
         self._reposicionar_menus()
 
+        # Ao entrar no submenu, cancelamos o fechamento pendente para que ele
+        # permaneça aberto enquanto o usuário escolhe o modo.
+        for _widget in self._iterar_descendentes_ui(sub):
+            try:
+                _widget.bind("<Enter>", lambda _event=None: self._cancelar_fechar_menus(), add="+")
+                _widget.bind("<Leave>", lambda _event=None: self._agendar_fechar_menus(), add="+")
+            except Exception:
+                pass
+
     def _entrar_mudar_feegow(self, _event=None):
         if self._menu_aparencia is not None:
             try:
@@ -798,9 +807,16 @@ class App:
             self._menu_close_job = None
 
     def _agendar_fechar_menus(self, _event=None):
-        # Menus are explicit click-to-open/click-to-close controls.
-        # No delayed hover destruction is used.
+        # Fecha o submenu somente depois de uma pequena tolerância, permitindo
+        # mover o ponteiro de Aparência até as opções sem fechar o menu.
         self._cancelar_fechar_menus()
+        try:
+            self._menu_close_job = self.app.after(
+                220,
+                self._fechar_menus,
+            )
+        except Exception:
+            self._menu_close_job = None
 
     def _fechar_menus(self):
         self._menu_close_job = None
