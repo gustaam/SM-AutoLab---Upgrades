@@ -671,13 +671,33 @@ def _ctrl_pressed(event=None):
 
 
 def _home_counter(self):
-    """Exibe exclusivamente a quantidade de senhas salvas na planilha persistida."""
+    """Exibe a quantidade de células preenchidas na coluna Senha da planilha atual."""
     label = getattr(self, "arquivos_contador_label", None)
     if label is None:
         return
 
+    total = 0
     try:
-        total = max(0, int(self._count_saved_passwords() or 0))
+        cells = getattr(self, "_planilha_data", None)
+        if isinstance(cells, dict) and cells:
+            total = sum(
+                1
+                for key, value in cells.items()
+                if str(value).strip() != ""
+                and str(key).split(",")[-1].strip() == "1"
+            )
+        elif getattr(self, "_planilha_arquivo", None) is not None and self._planilha_arquivo.exists():
+            payload = __import__("json").loads(
+                self._planilha_arquivo.read_text(encoding="utf-8")
+            )
+            cells = payload.get("cells", {}) if isinstance(payload, dict) else {}
+            if isinstance(cells, dict):
+                total = sum(
+                    1
+                    for key, value in cells.items()
+                    if str(value).strip() != ""
+                    and str(key).split(",")[-1].strip() == "1"
+                )
     except Exception:
         total = 0
 
