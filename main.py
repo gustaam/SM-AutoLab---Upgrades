@@ -2075,18 +2075,8 @@ def install_ui_planilha_29919(App):
         return
     App._planilha_ui_29919_aplicado = True
 
-    original_open = App.abrir_planilha
-
-    def open_wrapper(self, *args, **kwargs):
-        result = original_open(self, *args, **kwargs)
-        try:
-            self.app.after_idle(lambda: _planilha_stage5_repaint_row_header(self))
-        except Exception:
-            _planilha_stage5_repaint_row_header(self)
-        return result
-
-    setattr(App, "abrir_planilha", open_wrapper)
-
+    # A abertura da planilha permanece exclusivamente no método base.
+    # O repintado da grade é sincronizado pela camada 29922 e pelo povoamento.
     original_theme = App._selecionar_tema
 
     def theme_wrapper(self, *args, **kwargs):
