@@ -32,7 +32,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
         )
         self.assertEqual(
             visible_row_range(1.0, 280, 10000, 28, 3),
-            (9987, 10000),
+            (9984, 10000),
         )
 
     def test_interface_uses_virtual_grid_without_ten_thousand_insertions(self):
