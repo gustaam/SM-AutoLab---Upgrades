@@ -46,3 +46,4 @@ As correções de interface históricas permanecem reunidas em `patch.py`, que m
 Os antigos `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` tiveram seus conteúdos preservados integralmente em fontes internas `_SOURCE_PATCH_BASE`, `_SOURCE_PATCH_ARQUIVOS` e `_SOURCE_PATCH_AJUSTES`, executadas nos namespaces `_NS_PATCH_BASE`, `_NS_PATCH_ARQUIVOS` e `_NS_PATCH_AJUSTES`. Isso preserva a resolução de nomes e a sequência de monkey-patches sem manter módulos externos separados.
 
 `atualizacao.py` é o motor integrado de atualização do próprio executável.
+
