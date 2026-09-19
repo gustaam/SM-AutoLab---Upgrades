@@ -35,6 +35,12 @@ OBSOLETE_PATHS = (
     ".github/workflows/_fix_patch_b_import.yml",
     "automacao.py", "atualizacao.py", "planilha_core.py", "planilha_virtual_29926.py", "storage_safe.py",
     "ui_platform.py", "windows11_native_29925.py",
+    "tests/test_config_menu_position.py", "tests/test_dashboard.py", "tests/test_planilha_behavior.py",
+    "tests/test_planilha_core.py", "tests/test_planilha_deterministic_open.py", "tests/test_planilha_grid.py",
+    "tests/test_planilha_open_path.py", "tests/test_saved_sheet_counter.py", "tests/test_stage10.py",
+    "tests/test_stage12.py", "tests/test_stage13.py", "tests/test_status_indicator.py",
+    "tests/test_storage_safe.py", "tests/test_tooltips.py", "tests/test_validate_executable.py",
+    "tests/test_validate_quality.py", "tests/test_validate_version.py",
 )
 
 LEGACY_IMPORTS = (
