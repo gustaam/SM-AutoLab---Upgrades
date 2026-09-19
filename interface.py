@@ -8,9 +8,11 @@ from datetime import datetime, timedelta
 from tkinter import messagebox, Canvas, Frame, ttk, Entry
 import customtkinter as ctk
 
-
-from app import (ler_checkpoint, salvar_checkpoint, principal, principal_interno, ler_checkpoint_interno, salvar_checkpoint_interno, excluir_checkpoint_interno)
-
+from app import (
+    ler_checkpoint, salvar_checkpoint, principal, principal_interno,
+    ler_checkpoint_interno, salvar_checkpoint_interno, excluir_checkpoint_interno,
+    carregar_configuracoes, salvar_configuracoes, restaurar_configuracoes,
+)
 
 import hashlib
 import json
@@ -37,12 +39,10 @@ MANIFEST_ASSET_NAMES = {
     "sm.autolab.release.manifest.json",
 }
 
-
 def _normalize_asset_name(value: str) -> str:
     """Normaliza nomes para aceitar diferenças de separador e capitalização."""
     text = str(value or "").strip().lower()
     return re.sub(r"[\s._-]+", "", text)
-
 
 def _version_tuple(value: str) -> tuple[int, ...]:
     """Converte versões numéricas em tupla sem truncar componentes."""
@@ -54,7 +54,6 @@ def _version_tuple(value: str) -> tuple[int, ...]:
         parts.pop()
     return tuple(parts)
 
-
 def current_version(base: Path | None = None) -> str:
     base = base or Path(getattr(__import__("sys"), "_MEIPASS", Path(__file__).resolve().parent))
     try:
@@ -65,7 +64,6 @@ def current_version(base: Path | None = None) -> str:
         pass
     return ""
 
-
 def fetch_releases(timeout: int = 8) -> list[dict]:
     request = urllib.request.Request(
         API_RELEASES,
@@ -75,11 +73,9 @@ def fetch_releases(timeout: int = 8) -> list[dict]:
         data = json.loads(response.read().decode("utf-8"))
     return data if isinstance(data, list) else []
 
-
 def _is_manifest_asset(asset: dict) -> bool:
     name = _normalize_asset_name(str(asset.get("name", "")))
     return name in {_normalize_asset_name(item) for item in MANIFEST_ASSET_NAMES}
-
 
 def _release_asset_by_name(assets: list[dict], expected_name: str) -> dict | None:
     expected = _normalize_asset_name(expected_name)
@@ -93,7 +89,6 @@ def _release_asset_by_name(assets: list[dict], expected_name: str) -> dict | Non
         ),
         None,
     )
-
 
 def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
     assets = release.get("assets") or []
@@ -133,7 +128,6 @@ def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
     if asset_digest and manifest_digest and manifest_digest != asset_digest:
         return None
     return manifest
-
 
 def find_update(timeout: int = 8) -> dict | None:
     current = current_version()
@@ -182,7 +176,6 @@ def find_update(timeout: int = 8) -> dict | None:
         "release_url": release.get("html_url") or "",
     }
 
-
 def download_file(url: str, destination: Path, expected_sha256: str = "") -> None:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     hasher = hashlib.sha256()
@@ -200,7 +193,6 @@ def download_file(url: str, destination: Path, expected_sha256: str = "") -> Non
             pass
         raise RuntimeError("A verificação SHA-256 da atualização falhou.")
 
-
 def _escape_cmd_path(value: str) -> str:
     """Escapa caracteres especiais para uso em arquivo .cmd sem expansão de variáveis."""
     return (
@@ -214,7 +206,6 @@ def _escape_cmd_path(value: str) -> str:
         .replace("!", "^^!")
     )
 
-
 def _sanitize_pyinstaller_environment(environ: dict[str, str] | None = None) -> dict[str, str]:
     """Remove o estado interno herdado do PyInstaller antes do reinício."""
     source = dict(os.environ if environ is None else environ)
@@ -224,13 +215,11 @@ def _sanitize_pyinstaller_environment(environ: dict[str, str] | None = None) -> 
         if not key.upper().startswith("_PYI_") and key.upper() != "_MEIPASS2"
     }
 
-
 def _prepare_independent_restart_environment(environ: dict[str, str] | None = None) -> dict[str, str]:
     """Prepara o ambiente para que a nova onefile seja tratada como instância independente."""
     env = _sanitize_pyinstaller_environment(environ)
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     return env
-
 
 def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, str]:
     script_dir = downloaded.parent
@@ -265,7 +254,6 @@ rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
         return True, ""
     except OSError as exc:
         return False, str(exc)
-
 
 def launch_updater(update: dict) -> tuple[bool, str]:
     if os.name != "nt":
@@ -303,16 +291,13 @@ def launch_updater(update: dict) -> tuple[bool, str]:
             pass
         return False, str(exc)
 
-
 if __name__ == "__main__":
     print("SM AutoLab pronto.")
-
 
 from typing import Iterable, Mapping, Sequence
 
 MAX_ROWS = 10_000
 MAX_COLS = 3
-
 
 def rectangle_selection(start: Sequence[int], end: Sequence[int]) -> set[tuple[int, int]]:
     """Retorna todas as células dentro de um retângulo inclusivo."""
@@ -326,7 +311,6 @@ def rectangle_selection(start: Sequence[int], end: Sequence[int]) -> set[tuple[i
         for col in range(lo_c, hi_c + 1)
         if 0 <= row < MAX_ROWS and 0 <= col < MAX_COLS
     }
-
 
 def non_empty_cells(cells: Mapping[str, object] | None) -> set[tuple[int, int]]:
     """Converte o armazenamento esparso em células preenchidas válidas."""
@@ -342,11 +326,9 @@ def non_empty_cells(cells: Mapping[str, object] | None) -> set[tuple[int, int]]:
             result.add((row, col))
     return result
 
-
 def filled_row_count(cells: Mapping[str, object] | None) -> int:
     """Conta quantas linhas possuem ao menos uma célula preenchida."""
     return len({row for row, _ in non_empty_cells(cells)})
-
 
 def extract_column(cells: Mapping[str, object] | None, column: int = 1) -> list[str]:
     """Extrai valores não vazios de uma coluna, na ordem das linhas."""
@@ -363,7 +345,6 @@ def extract_column(cells: Mapping[str, object] | None, column: int = 1) -> list[
             items.append((row, text))
     items.sort(key=lambda item: item[0])
     return [text for _, text in items]
-
 
 def parse_paste_text(text: object) -> list[list[str]]:
     """Interpreta texto copiado de planilhas, com TAB ou separadores por espaço."""
@@ -394,7 +375,6 @@ def parse_paste_text(text: object) -> list[list[str]]:
     while rows and all(value == "" for value in rows[-1]):
         rows.pop()
     return rows
-
 
 def apply_paste(
     cells: Mapping[str, object] | None,
@@ -430,7 +410,6 @@ def apply_paste(
                 result.pop(key, None)
     return result, changed
 
-
 def clear_cells(
     cells: Mapping[str, object] | None,
     selected: Iterable[Sequence[int]],
@@ -451,7 +430,6 @@ def clear_cells(
             changed = True
     return result, changed
 
-
 def undo_state(
     undo: Sequence[Mapping[str, object]],
     redo: Sequence[Mapping[str, object]],
@@ -465,7 +443,6 @@ def undo_state(
     new_redo.append({str(key): str(value) for key, value in current.items()})
     new_current = {str(key): str(value) for key, value in undo[-1].items()}
     return new_undo, new_redo, new_current
-
 
 def redo_state(
     undo: Sequence[Mapping[str, object]],
@@ -481,22 +458,18 @@ def redo_state(
     new_current = {str(key): str(value) for key, value in redo[-1].items()}
     return new_undo, new_redo, new_current
 
-
 import math
 import tkinter as tk
 from collections.abc import Callable, Iterable
 from typing import Any
-
 
 SM_AUTOLAB_GRADE_VIRTUAL_29926 = "SM-AUTOLAB-GRADE-VIRTUAL-29926"
 DEFAULT_TOTAL_ROWS = 10000
 DEFAULT_ROW_HEIGHT = 28
 DEFAULT_OVERSCAN = 3
 
-
 def _clamp_fraction(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
-
 
 def visible_row_range(
     first_fraction: float,
@@ -522,7 +495,6 @@ def visible_row_range(
     if end - start < pool_size:
         start = max(0, end - pool_size)
     return start, end
-
 
 class VirtualGridTree(tk.Frame):
     """API mínima compatível com a planilha usando um pool fixo de Canvas."""
@@ -1128,14 +1100,12 @@ __all__ = [
     "visible_row_range",
 ]
 
-
 import ctypes
 import os
 import sys
 from ctypes import wintypes
 
 import customtkinter as ctk
-
 
 SM_AUTOLAB_WINDOWS_NATIVE_29925 = "SM-AUTOLAB-WINDOWS-NATIVE-29925"
 
@@ -1168,14 +1138,12 @@ _NATIVE_CONTROL_CLASSES = frozenset(
     }
 )
 
-
 class _HIGHCONTRAST(ctypes.Structure):
     _fields_ = [
         ("cbSize", wintypes.UINT),
         ("dwFlags", wintypes.DWORD),
         ("lpszDefaultScheme", wintypes.LPWSTR),
     ]
-
 
 def _windows11_available():
     if os.name != "nt":
@@ -1185,7 +1153,6 @@ def _windows11_available():
     except (AttributeError, OSError, TypeError, ValueError):
         return False
 
-
 def _windows11_backdrops_available():
     if not _windows11_available():
         return False
@@ -1193,7 +1160,6 @@ def _windows11_backdrops_available():
         return int(sys.getwindowsversion().build) >= 22621
     except (AttributeError, OSError, TypeError, ValueError):
         return False
-
 
 def _high_contrast_enabled():
     if not _windows11_available():
@@ -1221,7 +1187,6 @@ def _high_contrast_enabled():
     except (AttributeError, OSError, TypeError, ValueError):
         return False
 
-
 def _set_dwm_attribute(hwnd, attribute, value):
     try:
         dwmapi = ctypes.WinDLL("dwmapi", use_last_error=True)
@@ -1242,8 +1207,6 @@ def _set_dwm_attribute(hwnd, attribute, value):
         return int(result) == 0
     except (AttributeError, OSError, TypeError, ValueError):
         return False
-
-
 
 def aplicar_backdrop_sistema(window, material="mica", dark=None):
     """Aplica Mica/Mica Alt/Acrylic via DWM; retorna False quando indisponível."""
@@ -1267,7 +1230,6 @@ def aplicar_backdrop_sistema(window, material="mica", dark=None):
     _set_dwm_attribute(hwnd, 20, dark_value)
     _set_dwm_attribute(hwnd, 33, ctypes.c_int(DWMWCP_ROUND))
     return ok
-
 
 def atualizar_backdrop_tema(window, dark: bool):
     """Atualiza somente o modo claro/escuro do backdrop existente."""
@@ -1325,13 +1287,11 @@ def _set_native_frame(hwnd, *, dark, high_contrast, material=None):
 
     return changed
 
-
 def _widget_hwnd(widget):
     try:
         return int(widget.winfo_id())
     except Exception:
         return None
-
 
 def _native_class_name(hwnd):
     if hwnd is None or os.name != "nt":
@@ -1346,7 +1306,6 @@ def _native_class_name(hwnd):
         return buffer.value[:length].lower()
     except (AttributeError, OSError, TypeError, ValueError):
         return ""
-
 
 def _set_window_theme(hwnd, dark, high_contrast):
     if hwnd is None or os.name != "nt" or high_contrast:
@@ -1369,7 +1328,6 @@ def _set_window_theme(hwnd, dark, high_contrast):
     except (AttributeError, OSError, TypeError, ValueError):
         return False
 
-
 def _walk_widgets(widget):
     yield widget
     try:
@@ -1378,7 +1336,6 @@ def _walk_widgets(widget):
         children = ()
     for child in children:
         yield from _walk_widgets(child)
-
 
 def _get_toplevels(root):
     result = [root]
@@ -1398,7 +1355,6 @@ def _get_toplevels(root):
     except Exception:
         pass
     return result
-
 
 def _material_for_window(window, root):
     if window is root:
@@ -1433,7 +1389,6 @@ def _material_for_window(window, root):
         return "mica_alt"
 
     return "mica_alt"
-
 
 def _native_apply_window(window, root, dark, high_contrast):
     hwnd = _widget_hwnd(window)
@@ -1473,7 +1428,6 @@ def _native_apply_window(window, root, dark, high_contrast):
 
     window._sm_windows11_native_signature = signature
 
-
 def _native_apply_controls(root, dark, high_contrast):
     for widget in _walk_widgets(root):
         hwnd = _widget_hwnd(widget)
@@ -1485,7 +1439,6 @@ def _native_apply_controls(root, dark, high_contrast):
             continue
         _set_window_theme(hwnd, dark, high_contrast)
         widget._sm_windows11_control_signature = signature
-
 
 def _stage12_refresh(self, force=False):
     if getattr(self, "_closing", False):
@@ -1514,7 +1467,6 @@ def _stage12_refresh(self, force=False):
             _native_apply_window(window, root, dark, high_contrast)
         _native_apply_controls(root, dark, high_contrast)
 
-
 def _stage12_watch(self):
     if getattr(self, "_closing", False):
         return
@@ -1529,7 +1481,6 @@ def _stage12_watch(self):
         )
     except Exception:
         self._windows11_native_watch_job = None
-
 
 def install_ui_windows11_native_29925(App):
     """Camada nativa Windows 11 sobre Tk/CustomTkinter, sem trocar o núcleo funcional."""
@@ -1581,14 +1532,12 @@ def install_ui_windows11_native_29925(App):
 
     App._fechar_aplicativo = close_wrapper
 
-
 __all__ = [
     "SM_AUTOLAB_WINDOWS_NATIVE_29925",
     "_high_contrast_enabled",
     "_material_for_window",
     "install_ui_windows11_native_29925",
 ]
-
 
 def _ler_versao_aplicativo():
     """Lê a versão embutida no executável/projeto."""
@@ -1602,12 +1551,10 @@ def _ler_versao_aplicativo():
         pass
     return "desconhecida"
 
-
 APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
 ARQUIVOS_DIAS = 60
 SM_AUTOLAB_GRADE_29922 = "SM-AUTOLAB-GRADE-PERFORMANCE-29922"
-
 
 class App:
     # Fluent 2 palettes. Dark mode usa um grafite próximo ao chrome moderno
@@ -2507,7 +2454,7 @@ class App:
         self._fechar_menus()
 
         try:
-            from config import carregar_configuracoes, salvar_configuracoes
+
             dados = carregar_configuracoes()
         except Exception:
             dados = {
@@ -2624,7 +2571,7 @@ class App:
 
         def restaurar():
             try:
-                from config import restaurar_configuracoes
+
                 novos = restaurar_configuracoes()
                 site_entry.delete(0, "end")
                 site_entry.insert(0, novos["SITE_URL"])
@@ -2642,7 +2589,7 @@ class App:
 
         def salvar():
             try:
-                from config import salvar_configuracoes
+
                 salvar_configuracoes(
                     site_entry.get(),
                     user_entry.get(),
@@ -2714,7 +2661,6 @@ class App:
         )
         salvar_btn.pack(side="left")
         atualizar_estado_salvar()
-
 
     def _selecionar_aba(self, nome):
         for frame in (self.aba_atividade, self.aba_erros, self.aba_historico):
@@ -4330,7 +4276,6 @@ class App:
     def _extrair_codigos_planilha(self):
         """Retorna todos os códigos preenchidos na segunda coluna (Senha)."""
         return extract_column(self._planilha_data, column=1)
-
 
     def _filtrar_arquivos_60_dias(self, itens):
         agora = datetime.now()
