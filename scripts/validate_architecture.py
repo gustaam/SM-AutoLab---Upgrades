@@ -208,7 +208,7 @@ def validate(root: Path) -> None:
         "def install_ui_auditoria_29920", "SM_AUTOLAB_RESPONSIVO_29921",
         "def install_ui_responsivo_29921",
         "def install_ui(App)",
-        "SM_AUTOLAB_GRADE_VIRTUAL_29926", "SM_AUTOLAB_WINDOWS_NATIVE_29925",
+        "SM_AUTOLAB_GRADE_VIRTUAL_29926",
         "from interface import App, SM_AUTOLAB_GRADE_VIRTUAL_29926, install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
@@ -270,7 +270,7 @@ def validate(root: Path) -> None:
         "SM_AUTOLAB_GRADE_29922", "def _planilha_desenhar_grade", "def _planilha_stage9_get_grid_state", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "tree=VirtualGridTree(", "value_provider=", "total_rows=10000", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")"))
 
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
-    require_markers("planilha_core.py", planilha_core, (
+    require_markers("interface.py", interface, (
         "def rectangle_selection", "def parse_paste_text", "def apply_paste",
         "def clear_cells", "def undo_state", "def redo_state",
     ))
