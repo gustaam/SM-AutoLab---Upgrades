@@ -33,7 +33,8 @@ def visible_row_range(
     fraction = _clamp_fraction(first_fraction)
     viewport_rows = max(1, math.ceil(max(1, int(viewport_height)) / row_height))
     pool_size = viewport_rows + overscan * 2
-    logical_top = min(total_rows - 1, int(fraction * total_rows + 1e-7))
+    scrollable_rows = max(0, total_rows - viewport_rows)
+    logical_top = min(scrollable_rows, int(fraction * scrollable_rows + 1e-7))
     start = max(0, logical_top - overscan)
     end = min(total_rows, start + pool_size)
     if end - start < pool_size:
@@ -576,19 +577,22 @@ class VirtualGridTree(tk.Frame):
             return None
 
     def identify_row(self, y: int | float) -> str:
+        """Identifica a linha usando coordenadas relativas ao Canvas da grade.
+        Os bindings de mouse da planilha são instalados no Canvas interno; por
+        isso event.y já começa em 0 no topo da primeira linha. O cabeçalho
+        horizontal pertence a outro Canvas e não deve ser descontado aqui.
+        """
         try:
-            body_y = float(y) - self._header_height
-            if body_y < 0:
-                return ""
-            logical_y = float(self._canvas.canvasy(body_y))
+            logical_y = float(self._canvas.canvasy(float(y)))
             row = int(logical_y // self._row_height)
             return str(row) if 0 <= row < self._total_rows else ""
         except (TypeError, ValueError, tk.TclError):
             return ""
 
     def identify_column(self, x: int | float) -> str:
+        """Identifica a coluna usando coordenadas relativas ao Canvas da grade."""
         try:
-            canvas_x = float(self._canvas.canvasx(x))
+            canvas_x = float(self._canvas.canvasx(float(x)))
         except (TypeError, ValueError, tk.TclError):
             return ""
         for idx, (name, _text, _width, _minwidth, _anchor, _stretch) in enumerate(self._columns, start=1):

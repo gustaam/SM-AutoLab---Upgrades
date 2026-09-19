@@ -22,7 +22,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
             row_height=28,
             overscan=3,
         )
-        self.assertEqual((start, end), (4997, 5013))
+        self.assertEqual((start, end), (4992, 5008))
         self.assertLess(end - start, 100)
 
     def test_visible_range_clamps_at_document_edges(self):
@@ -63,6 +63,15 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("visible_row_range(", refresh)
         self.assertIn("for offset, slot in enumerate(self._pool):", refresh)
         self.assertNotIn("range(self._total_rows)", refresh)
+
+    def test_mouse_hit_testing_uses_canvas_coordinates_without_header_offset(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "planilha_virtual_29926.py").read_text(encoding="utf-8")
+        identify_start = source.index("    def identify_row")
+        identify_end = source.index("    def identify_column", identify_start)
+        identify = source[identify_start:identify_end]
+        self.assertIn("canvasy(float(y))", identify)
+        self.assertNotIn("body_y = float(y) - self._header_height", identify)
 
     def test_main_build_and_validation_keep_single_ui_entry(self):
         root = Path(__file__).resolve().parents[1]
