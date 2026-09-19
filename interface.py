@@ -42,6 +42,7 @@ def _ler_versao_aplicativo():
 APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
 ARQUIVOS_DIAS = 60
+SM_AUTOLAB_GRADE_29922 = "SM-AUTOLAB-GRADE-PERFORMANCE-29922"
 
 
 class App:
@@ -1996,106 +1997,295 @@ class App:
         )
         self._planilha_desenhar_cabecalho_linhas()
 
+    def _planilha_stage9_get_grid_state(self):
+        state = getattr(self, "_stage9_grid_state", None)
+        if not isinstance(state, dict):
+            state = {"widgets": [], "selection_widgets": [], "bbox": None}
+            self._stage9_grid_state = state
+        legacy = getattr(self, "_planilha_borda_widgets", None)
+        if isinstance(legacy, list) and not state["selection_widgets"]:
+            state["selection_widgets"] = legacy
+        self._planilha_borda_widgets = state["selection_widgets"]
+        return state
+
+    @staticmethod
+    def _planilha_stage9_reuse_frames(tree, storage, amount):
+        while len(storage) < amount:
+            storage.append(
+                Frame(tree, bd=0, highlightthickness=0, relief="flat")
+            )
+        return storage
+
+    @staticmethod
+    def _planilha_stage9_get_visible_rows(tree, limit=40):
+        rows = []
+        try:
+            first = tree.identify_row(1)
+            if not first:
+                children = tree.get_children("")
+                first = children[0] if children else None
+            current = first
+            for _ in range(limit):
+                if not current:
+                    break
+                rows.append(current)
+                current = tree.next(current)
+        except Exception:
+            return []
+        return rows
+
     def _planilha_desenhar_cabecalho_linhas(self, first_fraction=None):
-        """Renderiza somente os números de linha visíveis na viewport."""
+        """Reutiliza itens Canvas do cabeçalho em vez de recriá-los a cada rolagem."""
         canvas = getattr(self, "_planilha_row_header", None)
         tree = getattr(self, "_planilha_tree", None)
         if canvas is None or tree is None:
             return
-
         try:
             altura = max(int(canvas.winfo_height()), 28)
         except Exception:
             altura = 360
-
         try:
-            fraction = (
-                float(first_fraction)
-                if first_fraction is not None
-                else float(tree.yview()[0])
-            )
+            fraction = float(first_fraction) if first_fraction is not None else float(tree.yview()[0])
         except Exception:
             fraction = 0.0
-
         fraction = max(0.0, min(1.0, fraction))
         row_height = 28
-        total_rows = 10000
+        total_rows = MAX_ROWS
         inicio = max(0, min(total_rows - 1, int(fraction * total_rows + 0.0001)))
         visiveis = max(1, int(altura / row_height) + 3)
         fim = min(total_rows, inicio + visiveis)
-
         modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
         bg = "#252A2F" if modo_escuro else "#F7F7F7"
         fg = "#AEB4B9" if modo_escuro else "#6B6B6B"
         line = "#384148" if modo_escuro else "#EEEEEE"
         border = "#465058" if modo_escuro else "#E0E0E0"
-
-        canvas.delete("rownum")
         canvas.configure(bg=bg, highlightbackground=border)
 
-        for logical_row in range(inicio, fim):
-            y0 = (logical_row - inicio) * row_height
-            canvas.create_text(
-                5,
-                y0 + row_height // 2,
-                text=str(logical_row + 1),
-                anchor="w",
-                fill=fg,
-                font=("Segoe UI", 8),
-                tags=("rownum",),
+        state = getattr(self, "_stage9_row_header_state", None)
+        if not isinstance(state, dict):
+            state = {"items": []}
+            self._stage9_row_header_state = state
+        items = state["items"]
+        quantidade = max(0, fim - inicio)
+        while len(items) < quantidade:
+            items.append(
+                (
+                    canvas.create_text(
+                        5, 0, anchor="w", fill=fg,
+                        font=("Segoe UI", 8), tags=("rownum",)
+                    ),
+                    canvas.create_line(
+                        0, 0, 42, 0, fill=line, tags=("rownum",)
+                    ),
+                )
             )
-            canvas.create_line(
-                0,
-                y0 + row_height,
-                42,
-                y0 + row_height,
-                fill=line,
-                tags=("rownum",),
-            )
-
-        canvas.create_line(0, 0, 42, 0, fill=border, tags=("rownum",))
+        for pos, logical_row in enumerate(range(inicio, fim)):
+            y0 = pos * row_height
+            text_id, line_id = items[pos]
+            canvas.coords(text_id, 5, y0 + row_height // 2)
+            canvas.itemconfigure(text_id, text=str(logical_row + 1), fill=fg, state="normal")
+            canvas.coords(line_id, 0, y0 + row_height, 42, y0 + row_height)
+            canvas.itemconfigure(line_id, fill=line, state="normal")
+        for text_id, line_id in items[quantidade:]:
+            canvas.itemconfigure(text_id, state="hidden")
+            canvas.itemconfigure(line_id, state="hidden")
+        top_line = state.get("top_line")
+        if top_line is None:
+            top_line = canvas.create_line(0, 0, 42, 0, fill=border, tags=("rownum",))
+            state["top_line"] = top_line
+        else:
+            canvas.coords(top_line, 0, 0, 42, 0)
+        canvas.itemconfigure(top_line, fill=border, state="normal")
 
     def _planilha_limpar_borda(self):
-        for w in getattr(self, "_planilha_borda_widgets", []):
+        """Oculta a moldura de seleção e as sobreposições reutilizáveis."""
+        state = self._planilha_stage9_get_grid_state()
+        widgets = state.get("selection_widgets", [])
+        for widget in widgets:
             try:
-                w.destroy()
+                widget.place_forget()
             except Exception:
                 pass
-        self._planilha_borda_widgets = []
+        self._planilha_borda_widgets = widgets
+        self._stage9_borda_bbox = None
 
     def _planilha_desenhar_borda(self):
-        tree = self._planilha_tree
+        tree = getattr(self, "_planilha_tree", None)
         if tree is None:
             return
-        self._planilha_limpar_borda()
+
+        state = self._planilha_stage9_get_grid_state()
+        selection_widgets = state.setdefault("selection_widgets", [])
+
+        try:
+            self._planilha_desenhar_grade()
+        except Exception:
+            pass
+
+        cells = getattr(self, "_planilha_celulas_selecionadas", set()) or set()
+        normalized = set()
+        for cell in cells:
+            try:
+                normalized.add((int(cell[0]), int(cell[1])))
+            except Exception:
+                continue
+
         alvo = getattr(self, "_planilha_celula_ativa", None)
-        if not alvo:
+        if alvo:
+            try:
+                normalized.add((int(alvo[0]), int(alvo[1])))
+            except Exception:
+                pass
+
+        if not normalized:
+            self._planilha_limpar_borda()
             return
-        iid, col_index = alvo
-        bbox = tree.bbox(iid, f"#{int(col_index)+1}")
-        if not bbox:
+
+        draw_cells = normalized if len(normalized) <= 250 else set()
+        boxes = []
+        if draw_cells:
+            for row, col in sorted(draw_cells):
+                try:
+                    bbox = tree.bbox(str(row), f"#{col + 1}")
+                except Exception:
+                    bbox = None
+                if bbox:
+                    boxes.append(bbox)
+
+        active_box = None
+        if alvo:
+            try:
+                active_box = tree.bbox(str(alvo[0]), f"#{int(alvo[1]) + 1}")
+            except Exception:
+                active_box = None
+
+        if not boxes and active_box:
+            boxes = [active_box]
+        if not boxes:
+            self._planilha_limpar_borda()
             return
-        x, y, w, h = bbox
+
+        x0 = min(box[0] for box in boxes)
+        y0 = min(box[1] for box in boxes)
+        x1 = max(box[0] + box[2] for box in boxes)
+        y1 = max(box[1] + box[3] for box in boxes)
+
         cor = self.ACCENT[0] if isinstance(self.ACCENT, tuple) else self.ACCENT
-        segmentos = (
-            (x, y, w, 2),
-            (x, y+h-2, w, 2),
-            (x, y, 2, h),
-            (x+w-2, y, 2, h),
-        )
-        for px, py, pw, ph in segmentos:
-            frame = Frame(
-                tree,
-                width=max(int(pw),1),
-                height=max(int(ph),1),
-                bg=cor,
-                bd=0,
-                highlightthickness=0,
-                relief="flat"
+        segmentos = []
+        for bbox in boxes:
+            x, y, w, h = bbox
+            segmentos.extend(
+                (
+                    (x, y, w, 2),
+                    (x, y + h - 2, w, 2),
+                    (x, y, 2, h),
+                    (x + w - 2, y, 2, h),
+                )
             )
-            frame.place(x=int(px), y=int(py))
-            frame.lift()
-            self._planilha_borda_widgets.append(frame)
+        segmentos.extend(
+            (
+                (x0, y0, x1 - x0, 3),
+                (x0, y1 - 3, x1 - x0, 3),
+                (x0, y0, 3, y1 - y0),
+                (x1 - 3, y0, 3, y1 - y0),
+            )
+        )
+
+        self._planilha_stage9_reuse_frames(tree, selection_widgets, len(segmentos))
+        for frame, (x, y, w, h) in zip(selection_widgets, segmentos):
+            try:
+                frame.configure(width=max(int(w), 1), height=max(int(h), 1), bg=cor)
+                frame.place(x=int(x), y=int(y))
+                frame.lift()
+            except Exception:
+                pass
+        for frame in selection_widgets[len(segmentos):]:
+            try:
+                frame.place_forget()
+            except Exception:
+                pass
+
+        self._stage9_borda_bbox = (
+            str(alvo[0]) if alvo else None,
+            int(alvo[1]) if alvo else None,
+            int(x0),
+            int(y0),
+            int(x1 - x0),
+            int(y1 - y0),
+            len(normalized),
+        )
+
+    def _planilha_desenhar_grade(self):
+        tree = getattr(self, "_planilha_tree", None)
+        if tree is None:
+            return
+        state = self._planilha_stage9_get_grid_state()
+        widgets = state["widgets"]
+
+        modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
+        cor_linha = "#414850" if modo_escuro else "#D9DEE3"
+        linhas = self._planilha_stage9_get_visible_rows(tree)
+        if not linhas:
+            for widget in widgets:
+                try:
+                    widget.place_forget()
+                except Exception:
+                    pass
+            state["bbox"] = None
+            return
+
+        segmentos = []
+        primeira = linhas[0]
+        try:
+            bboxes = [tree.bbox(primeira, f"#{col}") for col in (1, 2, 3)]
+        except Exception:
+            bboxes = []
+
+        if len(bboxes) == 3 and all(bboxes):
+            x_positions = [
+                bboxes[0][0],
+                bboxes[1][0],
+                bboxes[2][0],
+                bboxes[2][0] + bboxes[2][2],
+            ]
+            top_y = bboxes[0][1]
+            last_box = tree.bbox(linhas[-1], "#1")
+            bottom_y = last_box[1] + last_box[3] if last_box else top_y
+            for x in x_positions:
+                segmentos.append((x, top_y, 1, max(1, bottom_y - top_y)))
+
+        for iid in linhas:
+            bbox = tree.bbox(iid, "#1")
+            if not bbox:
+                continue
+            x, y, w, h = bbox
+            try:
+                right_box = tree.bbox(iid, "#3")
+                right = right_box[0] + right_box[2] if right_box else tree.winfo_width()
+            except Exception:
+                right = tree.winfo_width()
+            segmentos.append((x, y + h - 1, max(1, right - x), 1))
+
+        self._planilha_stage9_reuse_frames(tree, widgets, len(segmentos))
+        for frame, (x, y, w, h) in zip(widgets, segmentos):
+            try:
+                frame.configure(width=max(int(w), 1), height=max(int(h), 1), bg=cor_linha)
+                frame.place(x=int(x), y=int(y))
+                frame.lower()
+            except Exception:
+                pass
+        for frame in widgets[len(segmentos):]:
+            try:
+                frame.place_forget()
+            except Exception:
+                pass
+
+        state["bbox"] = (
+            int(bboxes[0][0]),
+            int(bboxes[0][1]),
+            int(bboxes[-1][0] + bboxes[-1][2] - bboxes[0][0]),
+            int(bottom_y - bboxes[0][1]),
+        )
 
     def _planilha_definir_selecao(self, cells, active=None):
         """Mantém seleção de células em um único estado canônico."""
