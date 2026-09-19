@@ -32,6 +32,7 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
         self.assertNotIn("for i in range(300):", block)
         self.assertNotIn("fim = min(10000, inicio + 500)", block)
         self.assertNotIn("tree.insert(", block)
+        self.assertNotIn("_planilha_povoamento_", interface)
 
     def test_snapshot_historico_reutiliza_a_mesma_abertura(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
