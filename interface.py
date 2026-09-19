@@ -1889,7 +1889,13 @@ class App:
         self._planilha_povoamento_proxima_linha = 300
         self._planilha_povoamento_job = tree.after(1, _povoar_lote)
         self._planilha_atualizar_contador()
+        self._planilha_celulas_selecionadas = set()
+        self._planilha_drag_anchor = None
+        self._planilha_drag_start_xy = None
+        self._planilha_dragging = False
         tree.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")
+        tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")
+        tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")
         tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula, add="+")
         tree.bind("<Return>",self._planilha_editar_selecao)
         tree.bind("<Control-z>",lambda e:self._planilha_desfazer())
@@ -1908,6 +1914,7 @@ class App:
         tree.bind("<Shift-Insert>",self._planilha_colar)
         self._planilha_tree=tree
         self._planilha_row_header=row_header
+        self._planilha_implementacao = "grade-final-29922"
 
         # Primeira repintura após a viewport estar realmente montada.
         try:
@@ -2027,18 +2034,132 @@ class App:
             frame.lift()
             self._planilha_borda_widgets.append(frame)
 
+    def _planilha_definir_selecao(self, cells, active=None):
+        """Mantém seleção de células em um único estado canônico."""
+        normalized = set()
+        for cell in cells or ():
+            try:
+                row, col = int(cell[0]), int(cell[1])
+            except Exception:
+                continue
+            if 0 <= row < 10000 and 0 <= col < 3:
+                normalized.add((row, col))
+
+        self._planilha_celulas_selecionadas = normalized
+        self._planilha_linhas_selecionadas = {str(row) for row, _ in normalized}
+
+        if active is not None:
+            self._planilha_celula_ativa = (str(int(active[0])), int(active[1]))
+        elif normalized:
+            row, col = min(normalized)
+            self._planilha_celula_ativa = (str(row), col)
+        else:
+            self._planilha_celula_ativa = None
+
+        try:
+            self._planilha_desenhar_borda()
+        except Exception:
+            pass
+
+    def _planilha_retangulo_selecao(self, inicio, fim):
+        r1, c1 = int(inicio[0]), int(inicio[1])
+        r2, c2 = int(fim[0]), int(fim[1])
+        lo_r, hi_r = sorted((r1, r2))
+        lo_c, hi_c = sorted((c1, c2))
+        return {
+            (row, col)
+            for row in range(lo_r, hi_r + 1)
+            for col in range(lo_c, hi_c + 1)
+            if 0 <= row < 10000 and 0 <= col < 3
+        }
+
     def _planilha_clicar_celula(self, event):
         tree = self._planilha_tree
         if tree is None:
             return "break"
+
         row = tree.identify_row(event.y)
-        col = tree.identify_column(event.x)
-        if not row or col not in ("#1", "#2", "#3"):
+        col_id = tree.identify_column(event.x)
+        if not row or col_id not in ("#1", "#2", "#3"):
             return "break"
-        self._planilha_celula_ativa = (row, int(col[1:])-1)
-        self._planilha_linhas_selecionadas = {row}
+
+        current = (int(row), int(col_id[1:]) - 1)
+        selected = set(getattr(self, "_planilha_celulas_selecionadas", set()) or ())
+        active = getattr(self, "_planilha_celula_ativa", None)
+
+        ctrl = bool(getattr(event, "state", 0) & 0x0004)
+        shift = bool(getattr(event, "state", 0) & 0x0001)
+
+        if ctrl:
+            if current in selected:
+                selected.remove(current)
+            else:
+                selected.add(current)
+            self._planilha_definir_selecao(selected, active=current)
+
+        elif shift and active:
+            self._planilha_definir_selecao(
+                self._planilha_retangulo_selecao(active, current),
+                active=current,
+            )
+        else:
+            self._planilha_definir_selecao({current}, active=current)
+
+        self._planilha_drag_anchor = current
+        self._planilha_drag_start_xy = (event.x, event.y)
+        self._planilha_dragging = False
+        self._planilha_fechar_edicao()
         tree.focus_set()
-        self._planilha_desenhar_borda()
+        return "break"
+
+    def _planilha_arrastar_selecao(self, event):
+        tree = self._planilha_tree
+        anchor = getattr(self, "_planilha_drag_anchor", None)
+        if tree is None or anchor is None:
+            return "break"
+
+        row = tree.identify_row(event.y)
+        col_id = tree.identify_column(event.x)
+        if not row or col_id not in ("#1", "#2", "#3"):
+            return "break"
+
+        start_x, start_y = getattr(
+            self, "_planilha_drag_start_xy", (event.x, event.y)
+        )
+        if (
+            not getattr(self, "_planilha_dragging", False)
+            and abs(event.x - start_x) < 4
+            and abs(event.y - start_y) < 4
+        ):
+            return "break"
+
+        current = (int(row), int(col_id[1:]) - 1)
+        self._planilha_dragging = True
+        self._planilha_definir_selecao(
+            self._planilha_retangulo_selecao(anchor, current),
+            active=current,
+        )
+        return "break"
+
+    def _planilha_soltar_selecao(self, event):
+        tree = self._planilha_tree
+        anchor = getattr(self, "_planilha_drag_anchor", None)
+        if tree is None or anchor is None:
+            return "break"
+
+        row = tree.identify_row(event.y)
+        col_id = tree.identify_column(event.x)
+        if row and col_id in ("#1", "#2", "#3"):
+            current = (int(row), int(col_id[1:]) - 1)
+            if getattr(self, "_planilha_dragging", False):
+                cells = self._planilha_retangulo_selecao(anchor, current)
+            else:
+                cells = {(int(row), int(col_id[1:]) - 1)}
+            self._planilha_definir_selecao(cells, active=current)
+
+        self._planilha_drag_anchor = None
+        self._planilha_drag_start_xy = None
+        self._planilha_dragging = False
         return "break"
 
     def _planilha_duplo_clique_celula(self, event):
@@ -2057,8 +2178,18 @@ class App:
         return "break"
 
     def _planilha_selecionar_tudo(self):
-        if self._planilha_tree:
-            self._planilha_linhas_selecionadas = set(self._planilha_tree.get_children())
+        tree = self._planilha_tree
+        if tree:
+            cells = set()
+            for row in range(10000):
+                for col in range(3):
+                    try:
+                        value = tree.item(str(row), "values")[col]
+                    except Exception:
+                        value = ""
+                    if str(value).strip() != "":
+                        cells.add((row, col))
+            self._planilha_definir_selecao(cells)
         return "break"
 
     def _planilha_atualizar_contador(self):
