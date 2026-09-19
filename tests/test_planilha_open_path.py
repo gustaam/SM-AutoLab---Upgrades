@@ -24,7 +24,7 @@ class PlanilhaOpenPathTests(unittest.TestCase):
 
 
     def test_atalhos_de_edicao_da_grade_estao_robustos(self):
-        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         for binding in (
             'tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")',
             'tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")',
@@ -45,7 +45,7 @@ class PlanilhaOpenPathTests(unittest.TestCase):
         self.assertIn("def _planilha_tem_entry_em_foco", interface)
 
     def test_ctrl_v_tem_fallback_local_global_e_virtual(self):
-        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         self.assertIn('tree.bind("<Control-KeyPress-v>", self._planilha_colar_teclado, add="+")', interface)
         self.assertIn('tree.bind("<Control-KeyPress-V>", self._planilha_colar_teclado, add="+")', interface)
         self.assertIn('tree.bind("<<Paste>>", self._planilha_colar_teclado, add="+")', interface)
@@ -55,7 +55,7 @@ class PlanilhaOpenPathTests(unittest.TestCase):
         self.assertIn("def _planilha_colar_entry(self, event=None):", interface)
 
     def test_entry_da_edicao_tem_paste_proprio(self):
-        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = interface.index("def _planilha_editar_iid")
         end = interface.index("def _planilha_copiar", start)
         block = interface[start:end]
