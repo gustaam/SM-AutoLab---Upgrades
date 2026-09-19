@@ -190,13 +190,12 @@ def validate_architecture(root: Path) -> None:
             fail(f"arquivo/artefato obsoleto ainda presente: {relative}")
 
     contents = {relative: read_text(root, relative) for relative in (
-        "main.py", "interface.py", "app.py", "config.py", "patch.py", "build_windows.bat", "tests/test_patch.py",
+        "main.py", "interface.py", "app.py", "patch.py", "build_windows.bat", "tests/test_patch.py",
     )}
 
     main = contents["main.py"]
     interface = contents["interface.py"]
     app = contents["app.py"]
-    config = contents["config.py"]
     patch = contents["patch.py"]
     build = contents["build_windows.bat"]
     tests = contents["tests/test_patch.py"]
