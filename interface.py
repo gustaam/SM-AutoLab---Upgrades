@@ -1901,7 +1901,10 @@ class App:
         tree.bind("<Control-z>",lambda e:self._planilha_desfazer())
         tree.bind("<Control-a>",lambda e:self._planilha_selecionar_tudo())
         tree.bind("<Control-c>",self._planilha_copiar)
-        tree.bind("<Control-v>",self._planilha_colar)
+        # Ctrl+V: cobre o evento de tecla explícito e o evento virtual do Tk.
+        tree.bind("<Control-KeyPress-v>", self._planilha_colar_teclado, add="+")
+        tree.bind("<Control-KeyPress-V>", self._planilha_colar_teclado, add="+")
+        tree.bind("<<Paste>>", self._planilha_colar_teclado, add="+")
         def _planilha_botao_direito(event):
             row=tree.identify_row(event.y); col=tree.identify_column(event.x)
             if row and col in ("#1","#2","#3"):
@@ -1915,6 +1918,29 @@ class App:
         self._planilha_tree=tree
         self._planilha_row_header=row_header
         self._planilha_implementacao = "grade-final-29922"
+
+        # Fallback global: alguns ambientes Windows/Tk não entregam Ctrl+V ao
+        # Treeview, mesmo com o binding local. Interceptamos somente enquanto
+        # o foco estiver dentro da planilha, evitando afetar o restante do app.
+        if not getattr(self, "_planilha_paste_global_instalado", False):
+            self._planilha_paste_global_instalado = True
+
+            def _planilha_paste_global(event):
+                if self._planilha_foco_pertence_a_grade():
+                    return self._planilha_colar_teclado(event)
+                return None
+
+            self._planilha_paste_global_callback = _planilha_paste_global
+            self.app.bind_all(
+                "<Control-KeyPress-v>",
+                _planilha_paste_global,
+                add="+",
+            )
+            self.app.bind_all(
+                "<Control-KeyPress-V>",
+                _planilha_paste_global,
+                add="+",
+            )
 
         # Primeira repintura após a viewport estar realmente montada.
         try:
@@ -2255,7 +2281,12 @@ class App:
         vals=list(tree.item(iid,"values")); old=str(vals[col_index])
         entry=Entry(tree, bd=1, relief="solid", justify="left", font=("Segoe UI",11), highlightthickness=0)
         entry.insert(0,old); entry.place(x=x+1,y=y+1,width=max(w-2,40),height=max(h-2,24))
-        self._planilha_edit_entry=entry; entry.focus_set(); entry.select_range(0,"end")
+        self._planilha_edit_entry=entry
+        entry.focus_set()
+        entry.select_range(0,"end")
+        entry.bind("<Control-KeyPress-v>", self._planilha_colar_entry, add="+")
+        entry.bind("<Control-KeyPress-V>", self._planilha_colar_entry, add="+")
+        entry.bind("<<Paste>>", self._planilha_colar_entry, add="+")
         def finish(save=True):
             if self._planilha_edit_entry is not entry:return
             new=entry.get() if save else old
@@ -2282,6 +2313,68 @@ class App:
         if not rows:return "break"
         vals=["\t".join(map(str,tree.item(i,"values"))) for i in rows]
         self.app.clipboard_clear(); self.app.clipboard_append("\n".join(vals)); return "break"
+
+    def _planilha_foco_pertence_a_grade(self):
+        """Retorna True quando o foco atual está dentro da janela/grade da planilha."""
+        tree = getattr(self, "_planilha_tree", None)
+        if tree is None:
+            return False
+        try:
+            focused = self.app.focus_get()
+        except Exception:
+            focused = None
+        if focused is None:
+            return False
+
+        # A edição da célula usa um Entry filho do Treeview; nesse caso o
+        # foco continua pertencendo à planilha, mas o paste deve ser nativo.
+        current = focused
+        try:
+            tree_path = str(tree)
+            while current is not None:
+                if str(current) == tree_path:
+                    return True
+                parent_path = current.winfo_parent()
+                if not parent_path:
+                    break
+                current = current._nametowidget(parent_path)
+        except Exception:
+            try:
+                return str(focused).startswith(str(tree))
+            except Exception:
+                return False
+        return False
+
+    def _planilha_colar_entry(self, event=None):
+        """Fallback de Ctrl+V para o Entry usado na edição de uma célula."""
+        entry = getattr(self, "_planilha_edit_entry", None)
+        if entry is None:
+            return "break"
+        try:
+            value = self.app.clipboard_get()
+        except Exception:
+            try:
+                value = self.app.clipboard_get(type="PRIMARY")
+            except Exception:
+                return "break"
+        try:
+            entry.delete(0, "end")
+            entry.insert(0, str(value).replace("\r\n", "\n").replace("\r", "\n"))
+        except Exception:
+            return "break"
+        return "break"
+
+    def _planilha_colar_teclado(self, event=None):
+        """Handler redundante de teclado para tornar Ctrl+V independente do Tk."""
+        entry = getattr(self, "_planilha_edit_entry", None)
+        if entry is not None:
+            try:
+                focused = self.app.focus_get()
+            except Exception:
+                focused = None
+            if focused is entry:
+                return self._planilha_colar_entry(event)
+        return self._planilha_colar(event)
 
     def _planilha_colar(self,event=None):
         tree=self._planilha_tree
