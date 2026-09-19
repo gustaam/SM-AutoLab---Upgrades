@@ -8,14 +8,8 @@ PRODUCTION_FILES = (
     "main.py",
     "interface.py",
     "app.py",
-    "automacao.py",
+    "config.py",
     "patch.py",
-    "atualizacao.py",
-    "ui_platform.py",
-    "planilha_core.py",
-    "storage_safe.py",
-    "planilha_virtual_29926.py",
-    "windows11_native_29925.py",
 )
 
 
