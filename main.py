@@ -2049,13 +2049,142 @@ def _stage9_desenhar_cabecalho_linhas(self, first_fraction=None):
     canvas.itemconfigure(top_line, fill=border, state="normal")
 
 
+def _stage9_get_grid_state(self):
+    state = getattr(self, "_stage9_grid_state", None)
+    if not isinstance(state, dict):
+        state = {"widgets": [], "selection_widgets": [], "bbox": None}
+        self._stage9_grid_state = state
+    return state
+
+
+def _stage9_reuse_frames(tree, storage, amount):
+    while len(storage) < amount:
+        storage.append(
+            tk.Frame(
+                tree,
+                bd=0,
+                highlightthickness=0,
+                relief="flat",
+            )
+        )
+    return storage
+
+
+def _stage9_get_visible_rows(tree, limit=40):
+    """Obtém somente as linhas atualmente visíveis, sem percorrer as 10.000."""
+    rows = []
+    try:
+        first = tree.identify_row(1)
+        if not first:
+            children = tree.get_children("")
+            first = children[0] if children else None
+        current = first
+        for _ in range(limit):
+            if not current:
+                break
+            rows.append(current)
+            current = tree.next(current)
+    except Exception:
+        return []
+    return rows
+
+
+def _stage9_desenhar_grade(self):
+    tree = getattr(self, "_planilha_tree", None)
+    if tree is None:
+        return
+
+    state = _stage9_get_grid_state(self)
+    widgets = state["widgets"]
+
+    modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
+    cor_linha = "#414850" if modo_escuro else "#D9DEE3"
+
+    linhas = _stage9_get_visible_rows(tree)
+    if not linhas:
+        for widget in widgets:
+            try:
+                widget.place_forget()
+            except Exception:
+                pass
+        state["bbox"] = None
+        return
+
+    segmentos = []
+    primeira = linhas[0]
+
+    # Divisões verticais entre as colunas e nas extremidades da grade.
+    try:
+        bboxes = [
+            tree.bbox(primeira, f"#{col}")
+            for col in (1, 2, 3)
+        ]
+    except Exception:
+        bboxes = []
+
+    if len(bboxes) == 3 and all(bboxes):
+        x_positions = [
+            bboxes[0][0],
+            bboxes[1][0],
+            bboxes[2][0],
+            bboxes[2][0] + bboxes[2][2],
+        ]
+        top_y = bboxes[0][1]
+        last_box = tree.bbox(linhas[-1], "#1")
+        bottom_y = (
+            last_box[1] + last_box[3]
+            if last_box
+            else top_y
+        )
+        for x in x_positions:
+            segmentos.append((x, top_y, 1, max(1, bottom_y - top_y)))
+
+    # Divisões horizontais: somente nas linhas visíveis.
+    for iid in linhas:
+        bbox = tree.bbox(iid, "#1")
+        if not bbox:
+            continue
+        x, y, w, h = bbox
+        try:
+            right_box = tree.bbox(iid, "#3")
+            right = right_box[0] + right_box[2] if right_box else tree.winfo_width()
+        except Exception:
+            right = tree.winfo_width()
+        segmentos.append((x, y + h - 1, max(1, right - x), 1))
+
+    _stage9_reuse_frames(tree, widgets, len(segmentos))
+    for frame, (x, y, w, h) in zip(widgets, segmentos):
+        try:
+            frame.configure(width=max(int(w), 1), height=max(int(h), 1), bg=cor_linha)
+            frame.place(x=int(x), y=int(y))
+            frame.lower()
+        except Exception:
+            pass
+
+    for frame in widgets[len(segmentos):]:
+        try:
+            frame.place_forget()
+        except Exception:
+            pass
+
+    state["bbox"] = (
+        int(bboxes[0][0]),
+        int(bboxes[0][1]),
+        int(bboxes[-1][0] + bboxes[-1][2] - bboxes[0][0]),
+        int(bottom_y - bboxes[0][1]),
+    )
+
+
 def _stage9_limpar_borda(self):
-    """Oculta a moldura de seleção para que ela possa ser reutilizada."""
-    for widget in getattr(self, "_planilha_borda_widgets", []):
+    """Oculta a moldura de seleção e as sobreposições reutilizáveis."""
+    state = _stage9_get_grid_state(self)
+
+    for widget in state.get("selection_widgets", []):
         try:
             widget.place_forget()
         except Exception:
             pass
+
     self._stage9_borda_bbox = None
 
 
@@ -2063,44 +2192,120 @@ def _stage9_desenhar_borda(self):
     tree = getattr(self, "_planilha_tree", None)
     if tree is None:
         return
-    alvo = getattr(self, "_planilha_celula_ativa", None)
-    if not alvo:
-        _stage9_limpar_borda(self)
-        return
-    iid, col_index = alvo
+
+    state = _stage9_get_grid_state(self)
+    selection_widgets = state.setdefault("selection_widgets", [])
+
     try:
-        bbox = tree.bbox(iid, f"#{int(col_index) + 1}")
+        _stage9_desenhar_grade(self)
     except Exception:
-        bbox = None
-    if not bbox:
+        pass
+
+    cells = getattr(self, "_planilha_celulas_selecionadas", set()) or set()
+    normalized = set()
+    for cell in cells:
+        try:
+            normalized.add((int(cell[0]), int(cell[1])))
+        except Exception:
+            continue
+
+    alvo = getattr(self, "_planilha_celula_ativa", None)
+    if alvo:
+        try:
+            normalized.add((int(alvo[0]), int(alvo[1])))
+        except Exception:
+            pass
+
+    if not normalized:
         _stage9_limpar_borda(self)
         return
-    x, y, w, h = bbox
-    signature = (str(iid), int(col_index), int(x), int(y), int(w), int(h))
-    if getattr(self, "_stage9_borda_bbox", None) == signature:
-        return
-    cor = self.ACCENT[0] if isinstance(self.ACCENT, tuple) else self.ACCENT
-    widgets = getattr(self, "_planilha_borda_widgets", None)
-    if not isinstance(widgets, list):
-        widgets = []
-        self._planilha_borda_widgets = widgets
-    segmentos = ((x, y, w, 2), (x, y + h - 2, w, 2), (x, y, 2, h), (x + w - 2, y, 2, h))
-    while len(widgets) < 4:
-        widgets.append(tk.Frame(tree, bd=0, highlightthickness=0, relief="flat"))
-    for frame, (px, py, pw, ph) in zip(widgets, segmentos):
+
+    # Mostra cada célula selecionada quando a seleção é razoavelmente pequena.
+    # Para seleções grandes, desenha apenas a moldura externa para manter a
+    # resposta da grade estável.
+    draw_cells = normalized if len(normalized) <= 250 else set()
+
+    boxes = []
+    if draw_cells:
+        for row, col in sorted(draw_cells):
+            try:
+                bbox = tree.bbox(str(row), f"#{col + 1}")
+            except Exception:
+                bbox = None
+            if bbox:
+                boxes.append(bbox)
+
+    active_box = None
+    if alvo:
         try:
-            frame.configure(width=max(int(pw), 1), height=max(int(ph), 1), bg=cor)
-            frame.place(x=int(px), y=int(py))
+            active_box = tree.bbox(str(alvo[0]), f"#{int(alvo[1]) + 1}")
+        except Exception:
+            active_box = None
+
+    if not boxes and active_box:
+        boxes = [active_box]
+
+    if not boxes:
+        _stage9_limpar_borda(self)
+        return
+
+    x0 = min(box[0] for box in boxes)
+    y0 = min(box[1] for box in boxes)
+    x1 = max(box[0] + box[2] for box in boxes)
+    y1 = max(box[1] + box[3] for box in boxes)
+
+    cor = self.ACCENT[0] if isinstance(self.ACCENT, tuple) else self.ACCENT
+
+    segmentos = []
+    for bbox in boxes:
+        x, y, w, h = bbox
+        segmentos.extend(
+            (
+                (x, y, w, 2),
+                (x, y + h - 2, w, 2),
+                (x, y, 2, h),
+                (x + w - 2, y, 2, h),
+            )
+        )
+
+    # A moldura externa permanece sempre, mesmo para seleções grandes.
+    segmentos.extend(
+        (
+            (x0, y0, x1 - x0, 3),
+            (x0, y1 - 3, x1 - x0, 3),
+            (x0, y0, 3, y1 - y0),
+            (x1 - 3, y0, 3, y1 - y0),
+        )
+    )
+
+    _stage9_reuse_frames(tree, selection_widgets, len(segmentos))
+    for frame, (x, y, w, h) in zip(selection_widgets, segmentos):
+        try:
+            frame.configure(
+                width=max(int(w), 1),
+                height=max(int(h), 1),
+                bg=cor,
+            )
+            frame.place(x=int(x), y=int(y))
             frame.lift()
         except Exception:
             pass
-    for frame in widgets[4:]:
+
+    for frame in selection_widgets[len(segmentos):]:
         try:
             frame.place_forget()
         except Exception:
             pass
-    self._stage9_borda_bbox = signature
 
+    self._stage9_borda_bbox = (
+        str(getattr(alvo, "__getitem__", lambda _x: "")(0)) if alvo else None,
+        int(alvo[1]) if alvo else None,
+        int(x0),
+        int(y0),
+        int(x1 - x0),
+        int(y1 - y0),
+        len(normalized),
+    )
 
 def install_ui_grade_29922(App):
     """Etapa 9: reduz churn de widgets e itens durante scroll/seleção da grade."""
