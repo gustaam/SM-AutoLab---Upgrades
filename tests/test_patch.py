@@ -290,7 +290,7 @@ class PlanilhaStage5Tests(unittest.TestCase):
             "for i in range(10000):\n            y_text = i * row_height",
             content,
         )
-        self.assertIn("state = getattr(self, "_stage9_row_header_state", None)", content)
+        self.assertIn('state = getattr(self, "_stage9_row_header_state", None)', content)
         self.assertIn('canvas.create_text(5, 0, anchor="w"', content)
 
     def test_stage5_historico_tem_cache_por_assinatura(self):
