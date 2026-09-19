@@ -142,19 +142,15 @@ class TestPatch(unittest.TestCase):
         self.assertNotIn("def global_config_wrapper", main_content)
         self.assertIn('self.app.bind_all("<Button-1>", lambda event: _global_click(self, event), add="+")', main_content)
 
-    def test_build_manual_usa_mesmo_fluxo_de_integracao_do_ci(self):
+    def test_build_manual_usa_ponto_de_entrada_unico_da_ui(self):
         root = Path(__file__).resolve().parents[1]
         build = (root / "build_windows.bat").read_text(encoding="utf-8")
         self.assertIn(
-            "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_responsivo_29921, install_ui_auditoria_29920",
+            "from interface import App; from main import install_ui, _validar_base_aplicacao",
             build,
         )
         self.assertIn(
-            "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); install_ui_windows11_native_29925(App); _validar_base_aplicacao()",
-            build,
-        )
-        self.assertNotIn(
-            "from main import _validar_base_aplicacao; aplicar_patch_ui(App); _validar_base_aplicacao()",
+            "install_ui(App); _validar_base_aplicacao()",
             build,
         )
 
@@ -192,16 +188,19 @@ class AuditoriaStage6Tests(unittest.TestCase):
         self.assertIn("SetProcessDpiAwareness", content)
         self.assertIn("setter(2)", content)
 
-    def test_stage6_preserva_todas_as_camadas_no_boot(self):
+    def test_stage6_preserva_a_inicializacao_unificada(self):
         root = Path(__file__).resolve().parents[1]
         content = (root / "main.py").read_text(encoding="utf-8")
-        for marker in (
-            "install_ui_dashboard_29917(App)",
-            "install_ui_micro_29918(App)",
-            "install_ui_planilha_29919(App)",
-            "install_ui_auditoria_29920(App)",
-        ):
-            self.assertIn(marker, content)
+        self.assertIn("def install_ui(App):", content)
+        self.assertIn("install_ui_29912(App)", content)
+        self.assertIn("install_ui_fluent_29916(App)", content)
+        self.assertIn("install_ui_dashboard_29917(App)", content)
+        self.assertIn("install_ui_micro_29918(App)", content)
+        self.assertIn("install_ui_planilha_29919(App)", content)
+        self.assertIn("install_ui_responsivo_29921(App)", content)
+        self.assertIn("install_ui_auditoria_29920(App)", content)
+        self.assertIn("install_ui_windows11_native_29925(App)", content)
+        self.assertNotIn("install_ui_grade_29922(App)", content)
 
 
 class PlanilhaPerformanceStage8Tests(unittest.TestCase):
@@ -568,14 +567,19 @@ class UpdateDiscoveryTests(unittest.TestCase):
 
 
 class GradePerformanceStage9Tests(unittest.TestCase):
-    def test_stage9_marker_and_integration(self):
-        self.assertEqual(main.SM_AUTOLAB_GRADE_29922, "SM-AUTOLAB-GRADE-PERFORMANCE-29922")
-        class AppStub:
-            pass
-        main.install_ui_grade_29922(AppStub)
-        self.assertTrue(AppStub._grade_ui_29922_aplicado)
-        self.assertEqual(AppStub._grade_ui_29922_marker, main.SM_AUTOLAB_GRADE_29922)
-        self.assertIs(AppStub._planilha_desenhar_borda, main._stage9_desenhar_borda)
+    def test_stage9_marker_e_metodos_estao_na_implementacao_canonica(self):
+        root = Path(__file__).resolve().parents[1]
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+        main_source = (root / "main.py").read_text(encoding="utf-8")
+        self.assertEqual(
+            main.SM_AUTOLAB_GRADE_29922,
+            "SM-AUTOLAB-GRADE-PERFORMANCE-29922",
+        )
+        self.assertIn("def _planilha_desenhar_grade", interface)
+        self.assertIn("def _planilha_stage9_get_grid_state", interface)
+        self.assertIn("def _planilha_stage9_get_visible_rows", interface)
+        self.assertNotIn("def install_ui_grade_29922", main_source)
+        self.assertNotIn("def _stage9_desenhar_borda", main_source)
 
     def test_stage9_row_header_reuses_canvas_items(self):
         class Canvas:
@@ -584,8 +588,10 @@ class GradePerformanceStage9Tests(unittest.TestCase):
                 self.calls = []
             def winfo_height(self): return 84
             def configure(self, **kwargs): self.calls.append(("configure", kwargs))
-            def create_text(self, *args, **kwargs): i=self.next_id; self.next_id+=1; self.calls.append(("create_text",i)); return i
-            def create_line(self, *args, **kwargs): i=self.next_id; self.next_id+=1; self.calls.append(("create_line",i)); return i
+            def create_text(self, *args, **kwargs):
+                i=self.next_id; self.next_id+=1; self.calls.append(("create_text",i)); return i
+            def create_line(self, *args, **kwargs):
+                i=self.next_id; self.next_id+=1; self.calls.append(("create_line",i)); return i
             def coords(self, *args): self.calls.append(("coords", args))
             def itemconfigure(self, *args, **kwargs): self.calls.append(("itemconfigure", args, kwargs))
         class Tree:
@@ -594,9 +600,9 @@ class GradePerformanceStage9Tests(unittest.TestCase):
             _planilha_row_header = Canvas()
             _planilha_tree = Tree()
         app=AppStub()
-        main._stage9_desenhar_cabecalho_linhas(app)
+        main.App._planilha_desenhar_cabecalho_linhas(app)
         created=sum(1 for c in app._planilha_row_header.calls if c[0] in ("create_text","create_line"))
-        main._stage9_desenhar_cabecalho_linhas(app)
+        main.App._planilha_desenhar_cabecalho_linhas(app)
         created_again=sum(1 for c in app._planilha_row_header.calls if c[0] in ("create_text","create_line"))
         self.assertEqual(created_again, created)
 
@@ -606,12 +612,17 @@ class GradePerformanceStage9Tests(unittest.TestCase):
             def place_forget(self): self.hidden += 1
         class AppStub:
             _planilha_borda_widgets=[FrameStub(),FrameStub()]
-        main._stage9_limpar_borda(AppStub)
+        # O método canônico é chamado diretamente na classe base.
+        AppStub._planilha_stage9_get_grid_state = lambda self: {
+            "widgets": [], "selection_widgets": self._planilha_borda_widgets, "bbox": None
+        }
+        main.App._planilha_limpar_borda(AppStub)
         self.assertEqual([w.hidden for w in AppStub._planilha_borda_widgets], [1,1])
 
-    def test_stage9_boot_contains_installer(self):
+    def test_stage9_boot_usa_a_entrada_unica(self):
         source=Path(main.__file__).read_text(encoding="utf-8")
-        self.assertIn("install_ui_grade_29922(App)", source)
+        self.assertIn("install_ui(App)", source)
+        self.assertNotIn("install_ui_grade_29922(App)", source)
 
 
 if __name__ == "__main__":
