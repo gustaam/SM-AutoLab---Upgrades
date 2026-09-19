@@ -105,7 +105,7 @@ def _set_dwm_attribute(hwnd, attribute, value):
             ctypes.c_void_p,
             wintypes.DWORD,
         ]
-        setter.restype = ctypes.HRESULT
+        setter.restype = ctypes.c_long
         result = setter(
             wintypes.HWND(hwnd),
             wintypes.DWORD(attribute),
