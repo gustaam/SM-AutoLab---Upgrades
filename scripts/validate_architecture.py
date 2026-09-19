@@ -185,7 +185,7 @@ def validate(root: Path) -> None:
 
     contents = {relative: read_text(root, relative) for relative in (
         "main.py", "interface.py", "app.py", "automacao.py", "atualizacao.py", "patch.py", "config.py", "planilha_core.py",
-        "build_windows.bat", "tests/test_patch.py",
+        "build_windows.bat", "tests/test_patch.py", "planilha_virtual_29926.py",
     )}
 
     main = contents["main.py"]
@@ -197,6 +197,7 @@ def validate(root: Path) -> None:
     planilha_core = contents["planilha_core.py"]
     build = contents["build_windows.bat"]
     tests = contents["tests/test_patch.py"]
+    virtual = contents["planilha_virtual_29926.py"]
 
     require_markers("main.py", main, (
         "from patch import aplicar_patch_ui", "def install_ui_29912", "def install_ui_fluent_29916", "class StartupSplash",
@@ -207,11 +208,26 @@ def validate(root: Path) -> None:
         "def install_ui_responsivo_29921",
         "def install_ui(App)",
         "SM_AUTOLAB_GRADE_VIRTUAL_29926", "from planilha_virtual_29926 import SM_AUTOLAB_GRADE_VIRTUAL_29926",
-        "SM_AUTOLAB_WINDOWS_NATIVE_29925", "from windows11_native_29925 import SM_AUTOLAB_WINDOWS_NATIVE_29925, install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
+        "from windows11_native_29925 import install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
     require_markers("main.py", main, UI_MARKERS)
+
+    for legacy_grid in (
+        "ttk.Treeview(",
+        "ttk.Style(",
+        "_planilha_povoamento_",
+    ):
+        if legacy_grid in interface:
+            fail(f"estrutura legada da grade detectada em interface.py: {legacy_grid}")
+    for legacy_virtual in (
+        "def tag_configure(",
+        "def insert(",
+        "def event_generate(",
+    ):
+        if legacy_virtual in virtual:
+            fail(f"compatibilidade Treeview obsoleta em planilha_virtual_29926.py: {legacy_virtual}")
 
     # A planilha tem uma única implementação de abertura e uma única camada
     # final de interação. Overrides históricos não podem voltar ao runtime.
@@ -226,6 +242,7 @@ def validate(root: Path) -> None:
         "App._planilha_soltar_selecao = _planilha_soltar_selecao_2991",
         "def _abrir_planilha_2991",
         "def _abrir_planilha_297",
+        "def _install_planilha_context_menu",
     ):
         if legacy in patch or legacy in main:
             fail(f"override legado da planilha detectado: {legacy}")
@@ -249,7 +266,7 @@ def validate(root: Path) -> None:
         ),
     )
     require_markers("interface.py", interface, ("def abrir_planilha(self, dados_iniciais=None):", "self._planilha_implementacao = \"grade-virtual-29926\"",
-        "SM_AUTOLAB_GRADE_29922", "SM_AUTOLAB_GRADE_VIRTUAL_29926", "def _planilha_desenhar_grade", "def _planilha_stage9_get_grid_state", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "tree=VirtualGridTree(", "value_provider=", "total_rows=10000", "self._planilha_povoamento_concluido = True", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")"))
+        "SM_AUTOLAB_GRADE_29922", "def _planilha_desenhar_grade", "def _planilha_stage9_get_grid_state", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "tree=VirtualGridTree(", "value_provider=", "total_rows=10000", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")"))
 
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
     require_markers("planilha_core.py", planilha_core, (

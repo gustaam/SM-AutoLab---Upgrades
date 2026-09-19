@@ -93,7 +93,6 @@ class VirtualGridTree(tk.Frame):
             name: text
             for name, text, _width, _minwidth, _anchor, _stretch in self._columns
         }
-        self._tags: dict[str, dict[str, Any]] = {}
         self._focus_iid = ""
         self._refresh_job = None
         self._xscrollcommand = None
@@ -477,22 +476,6 @@ class VirtualGridTree(tk.Frame):
 
     config = configure
 
-    def tag_configure(self, tag: str, **kwargs: Any):
-        self._tags[tag] = dict(kwargs)
-
-    def insert(self, parent: str, index: str, iid: str | None = None, values: Iterable[Any] = (), tags: Iterable[str] = ()):
-        # Compatibility shim only. The virtual implementation never needs to
-        # insert 10.000 graphical items; the logical data source remains primary.
-        logical_iid = str(iid if iid is not None else "0")
-        if self._value_provider is None:
-            setattr(self, "_manual_values", getattr(self, "_manual_values", {}))
-            self._manual_values[logical_iid] = tuple(
-                "" if value is None else str(value) for value in values
-            )
-        self._focus_iid = logical_iid
-        self._schedule_refresh()
-        return logical_iid
-
     def get_children(self, item: str = "") -> tuple[str, ...]:
         try:
             first = float(self._canvas.yview()[0])
@@ -656,10 +639,6 @@ class VirtualGridTree(tk.Frame):
 
     def bind(self, sequence=None, func=None, add=None):
         return self._canvas.bind(sequence, func, add)
-
-    def event_generate(self, sequence, **kwargs: Any):
-        return self._canvas.event_generate(sequence, **kwargs)
-
 
 __all__ = [
     "SM_AUTOLAB_GRADE_VIRTUAL_29926",

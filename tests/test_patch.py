@@ -219,13 +219,17 @@ class PlanilhaVirtualStage13Tests(unittest.TestCase):
         self.assertNotIn("for i in range(300):", interface)
         self.assertNotIn("fim = min(10000, inicio + 500)", interface)
         self.assertNotIn("tree=ttk.Treeview(body", interface)
-        self.assertIn("self._planilha_povoamento_concluido = True", interface)
+        self.assertNotIn("_planilha_povoamento_", interface)
+        self.assertNotIn("povoar_lote", interface)
 
-    def test_stage13_preserva_cancelamento_compatibilidade_sem_job_de_10_mil_itens(self):
+    def test_stage13_nao_carrega_compatibilidade_da_grade_antiga(self):
         root = Path(__file__).resolve().parents[1]
         interface = (root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("self._planilha_povoamento_job = None", interface)
-        self.assertIn("self._planilha_tree.after_cancel(self._planilha_povoamento_job)", interface)
+        virtual = (root / "planilha_virtual_29926.py").read_text(encoding="utf-8")
+        self.assertNotIn("_planilha_povoamento_", interface)
+        self.assertNotIn("def tag_configure(", virtual)
+        self.assertNotIn("def insert(", virtual)
+        self.assertNotIn("def event_generate(", virtual)
 
 
 class ResponsivoTooltipsStage7Tests(unittest.TestCase):

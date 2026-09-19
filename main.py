@@ -43,7 +43,7 @@ _configurar_dpi_windows()
 
 from interface import App
 from patch import aplicar_patch_ui
-from windows11_native_29925 import SM_AUTOLAB_WINDOWS_NATIVE_29925, install_ui_windows11_native_29925
+from windows11_native_29925 import install_ui_windows11_native_29925
 from planilha_virtual_29926 import SM_AUTOLAB_GRADE_VIRTUAL_29926
 
 
