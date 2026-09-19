@@ -45,6 +45,7 @@ _configurar_dpi_windows()
 from interface import App
 from patch import aplicar_patch_ui
 from execution_center_29924 import SM_AUTOLAB_EXECUTION_29924, install_ui_execution_center_29924
+from windows11_native_29925 import SM_AUTOLAB_WINDOWS_NATIVE_29925, install_ui_windows11_native_29925
 
 
 class StartupSplash:
@@ -2322,6 +2323,7 @@ if __name__ == "__main__":
     install_ui_responsivo_29921(App)
     install_ui_auditoria_29920(App)
     install_ui_execution_center_29924(App)
+    install_ui_windows11_native_29925(App)
     _validar_base_aplicacao()
     run_splash()
     app = App()
