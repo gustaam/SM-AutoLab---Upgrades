@@ -41,10 +41,30 @@ class ExecutionCenterStage11Tests(unittest.TestCase):
         main = (root / "main.py").read_text(encoding="utf-8")
         build = (root / "build_windows.bat").read_text(encoding="utf-8")
         workflow = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
+        release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         self.assertIn("SM_AUTOLAB_EXECUTION_29924", main)
         self.assertIn("install_ui_execution_center_29924", main)
         self.assertIn("install_ui_execution_center_29924", build)
         self.assertIn("install_ui_execution_center_29924", workflow)
+        for source in (workflow, release):
+            self.assertIn("install_ui_micro_29918", source)
+            self.assertIn("install_ui_planilha_29919", source)
+            self.assertIn("install_ui_grade_29922", source)
+            self.assertIn("install_ui_responsivo_29921", source)
+            self.assertIn("install_ui_auditoria_29920", source)
+
+    def test_percentual_final_preserva_execucao_interrompida(self):
+        from execution_center_29924 import _stage11_final_percentual
+
+        self.assertAlmostEqual(
+            _stage11_final_percentual(4, 10, "Parado pelo usuário"),
+            0.4,
+        )
+        self.assertEqual(
+            _stage11_final_percentual(10, 10, "Concluída"),
+            1.0,
+        )
+
 
     def test_modulo_expoe_funcao_do_centro(self):
         source = (Path(__file__).resolve().parents[1] / "execution_center_29924.py").read_text(encoding="utf-8")

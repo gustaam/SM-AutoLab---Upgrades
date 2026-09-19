@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-
 import customtkinter as ctk
 
 
@@ -29,6 +27,13 @@ def _stage11_snapshot(processados, total, sucessos, erros, codigo=""):
         "codigo": str(codigo or "").strip(),
         "percentual": percentual,
     }
+
+
+def _stage11_final_percentual(processados, total, status):
+    snapshot = _stage11_snapshot(processados, total, 0, 0)
+    if "parado" in str(status or "").lower():
+        return snapshot["percentual"]
+    return 1.0 if snapshot["total"] else 0.0
 
 
 def format_execution_center(processados, total, sucessos, erros, codigo=""):
@@ -237,9 +242,10 @@ def _stage11_finish(self, resultado, status):
         text=f'Último: {data["ultimo"]}',
         text_color=self.TEXT if data["codigo"] else self.SUBTEXT,
     )
-    panel._stage11_progress.set(1.0 if total else 0.0)
+    final_percentual = _stage11_final_percentual(processados, total, status)
+    panel._stage11_progress.set(final_percentual)
     panel._stage11_progress_value.configure(
-        text="100%" if total else "0%",
+        text=f"{final_percentual:.0%}" if total else "0%",
         text_color=cor,
     )
     panel._stage11_summary.configure(
