@@ -8,15 +8,16 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
 
     def test_grade_visual_e_selecao_estao_na_camada_final(self):
         source = (self.root / "main.py").read_text(encoding="utf-8")
+        patch = (self.root / "patch.py").read_text(encoding="utf-8")
         for marker in (
             "def _stage9_desenhar_grade",
             "def _stage9_get_visible_rows",
             "def _stage9_desenhar_borda",
             "_planilha_celulas_selecionadas",
-            "<B1-Motion>",
-            "<ButtonRelease-1>",
         ):
             self.assertIn(marker, source)
+        self.assertIn("<B1-Motion>", patch)
+        self.assertIn("<ButtonRelease-1>", patch)
 
     def test_grade_e_reutilizavel_e_nao_percorre_10000_linhas_para_desenho(self):
         source = (self.root / "main.py").read_text(encoding="utf-8")
