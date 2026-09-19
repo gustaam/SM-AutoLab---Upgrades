@@ -12,6 +12,13 @@ class PlanilhaOpenPathTests(unittest.TestCase):
         self.assertEqual(interface.count("    def abrir_planilha(self, dados_iniciais=None):"), 1)
         self.assertNotIn("App.abrir_planilha = _abrir_planilha_297", patch)
         self.assertNotIn("App.abrir_planilha = open_planilha_wrapper", main)
+        self.assertNotIn("def _abrir_planilha_2991", patch)
+        self.assertNotIn("App._planilha_clicar_celula = _planilha_clicar_celula_2991", patch)
+        self.assertNotIn("App._planilha_arrastar_selecao = _planilha_arrastar_selecao_2991", patch)
+        self.assertNotIn("App._planilha_soltar_selecao = _planilha_soltar_selecao_2991", patch)
+        self.assertIn('self._planilha_implementacao = "grade-final-29922"', interface)
+        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
+        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
         self.assertIn("self.abrir_planilha(cells)", interface)
 
     def test_snapshot_historico_reutiliza_a_mesma_abertura(self):
