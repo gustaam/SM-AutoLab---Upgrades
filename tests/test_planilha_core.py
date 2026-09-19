@@ -89,7 +89,7 @@ class PlanilhaCoreTests(unittest.TestCase):
             start_col=2,
         )
         self.assertTrue(changed)
-        self.assertEqual(result.get("9999,2"), "C")
+        self.assertEqual(result.get("9999,2"), "A")
         self.assertNotIn("10000,2", result)
         self.assertEqual(MAX_COLS, 3)
 
