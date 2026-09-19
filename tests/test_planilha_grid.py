@@ -36,7 +36,7 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
     def test_grade_e_reutilizavel_e_nao_percorre_10000_linhas_para_desenho(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _planilha_desenhar_grade")
-        end = source.index("    def _planilha_stage9_get_visible_rows", start)
+        end = source.index("def _planilha_desenhar_borda", start)
         block = source[start:end]
         self.assertIn("_planilha_stage9_get_visible_rows(tree)", block)
         self.assertNotIn("range(10000)", block)
