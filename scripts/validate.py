@@ -20,7 +20,7 @@ ACTION_RUNTIME_REFS = {
 REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 
 REQUIRED_PATHS = (
-    "main.py", "interface.py", "app.py", "config.py", "patch.py", "requirements.txt",
+    "main.py", "interface.py", "app.py", "patch.py", "requirements.txt",
     "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate.py",
     "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py",
     "tests/test_validate_executable.py", "tests/test_storage_safe.py", "tests/test_validate_quality.py",
@@ -46,7 +46,7 @@ LEGACY_IMPORTS = (
 )
 
 LEGACY_IMPORT_CHECK_PATHS = (
-    "main.py", "interface.py", "app.py", "config.py", "build_windows.bat",
+    "main.py", "interface.py", "app.py", "build_windows.bat",
 )
 
 WORKFLOW_PATHS = (
@@ -190,13 +190,12 @@ def validate_architecture(root: Path) -> None:
             fail(f"arquivo/artefato obsoleto ainda presente: {relative}")
 
     contents = {relative: read_text(root, relative) for relative in (
-        "main.py", "interface.py", "app.py", "config.py", "patch.py", "build_windows.bat", "tests/test_patch.py",
+        "main.py", "interface.py", "app.py", "patch.py", "build_windows.bat", "tests/test_patch.py",
     )}
 
     main = contents["main.py"]
     interface = contents["interface.py"]
     app = contents["app.py"]
-    config = contents["config.py"]
     patch = contents["patch.py"]
     build = contents["build_windows.bat"]
     tests = contents["tests/test_patch.py"]
@@ -297,10 +296,10 @@ def validate_architecture(root: Path) -> None:
     if re.search(r"SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper", interface):
         fail("referência ao atualizador separado detectada")
 
-    if not re.search(r'DEFAULT_PORTAL_USUARIO\s*=\s*""', config):
-        fail("usuário padrão não está vazio em config.py")
-    if not re.search(r'DEFAULT_PORTAL_SENHA\s*=\s*""', config):
-        fail("senha padrão não está vazia em config.py")
+    if not re.search(r'DEFAULT_PORTAL_USUARIO\s*=\s*""', app):
+        fail("usuário padrão não está vazio em app.py")
+    if not re.search(r'DEFAULT_PORTAL_SENHA\s*=\s*""', app):
+        fail("senha padrão não está vazia em app.py")
     if re.search(r'"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"', interface):
         fail("valor de acesso literal encontrado em interface.py para PORTAL_USUARIO")
     if re.search(r'"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"', interface):
@@ -338,7 +337,6 @@ PRODUCTION_FILES = (
     "main.py",
     "interface.py",
     "app.py",
-    "config.py",
     "patch.py",
 )
 
