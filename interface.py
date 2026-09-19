@@ -1897,14 +1897,18 @@ class App:
         tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")
         tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")
         tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula, add="+")
-        tree.bind("<Return>",self._planilha_editar_selecao)
-        tree.bind("<Control-z>",lambda e:self._planilha_desfazer())
-        tree.bind("<Control-a>",lambda e:self._planilha_selecionar_tudo())
-        tree.bind("<Control-c>",self._planilha_copiar)
-        # Ctrl+V: cobre o evento de tecla explícito e o evento virtual do Tk.
-        tree.bind("<Control-KeyPress-v>", self._planilha_colar_teclado, add="+")
-        tree.bind("<Control-KeyPress-V>", self._planilha_colar_teclado, add="+")
-        tree.bind("<<Paste>>", self._planilha_colar_teclado, add="+")
+        tree.bind("<Return>", self._planilha_editar_selecao)
+        tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
+        tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
+        tree.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")
+        tree.bind("<Control-KeyPress-c>", self._planilha_atalho_copiar, add="+")
+        tree.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")
+        tree.bind("<Delete>", self._planilha_atalho_excluir, add="+")
+        tree.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")
+        # Ctrl+V: cobre tecla física, tecla em caixa alta e evento virtual do Tk.
+        tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")
+        tree.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")
+        tree.bind("<<Paste>>", self._planilha_atalho_colar, add="+")
         def _planilha_botao_direito(event):
             row=tree.identify_row(event.y); col=tree.identify_column(event.x)
             if row and col in ("#1","#2","#3"):
@@ -1914,7 +1918,7 @@ class App:
                 self._planilha_desenhar_borda()
             return "break"
         tree.bind("<Button-3>", _planilha_botao_direito)
-        tree.bind("<Shift-Insert>",self._planilha_colar)
+        tree.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
         self._planilha_tree=tree
         self._planilha_row_header=row_header
         self._planilha_implementacao = "grade-final-29922"
@@ -1942,6 +1946,27 @@ class App:
                 add="+",
             )
 
+        # Fallbacks de teclado para ambientes Tk/Windows que não propagam
+        # algum atalho do Treeview. O foco é sempre validado antes.
+        if not getattr(self, "_planilha_shortcuts_global_instalado", False):
+            self._planilha_shortcuts_global_instalado = True
+
+            def _shortcut_global(handler):
+                def callback(event):
+                    if not self._planilha_foco_pertence_a_grade():
+                        return None
+                    if self._planilha_tem_entry_em_foco():
+                        return None
+                    return handler(event)
+                return callback
+
+            self.app.bind_all("<Control-KeyPress-z>", _shortcut_global(self._planilha_atalho_desfazer), add="+")
+            self.app.bind_all("<Control-KeyPress-y>", _shortcut_global(self._planilha_atalho_refazer), add="+")
+            self.app.bind_all("<Control-KeyPress-a>", _shortcut_global(self._planilha_atalho_selecionar_tudo), add="+")
+            self.app.bind_all("<Control-KeyPress-c>", _shortcut_global(self._planilha_atalho_copiar), add="+")
+            self.app.bind_all("<Control-KeyPress-x>", _shortcut_global(self._planilha_recortar), add="+")
+            self.app.bind_all("<Delete>", _shortcut_global(self._planilha_atalho_excluir), add="+")
+            self.app.bind_all("<BackSpace>", _shortcut_global(self._planilha_atalho_excluir), add="+")
         # Primeira repintura após a viewport estar realmente montada.
         try:
             tree.update_idletasks()
@@ -2287,6 +2312,7 @@ class App:
         entry.bind("<Control-KeyPress-v>", self._planilha_colar_entry, add="+")
         entry.bind("<Control-KeyPress-V>", self._planilha_colar_entry, add="+")
         entry.bind("<<Paste>>", self._planilha_colar_entry, add="+")
+        # Os demais atalhos permanecem nativos enquanto a célula está sendo editada.
         def finish(save=True):
             if self._planilha_edit_entry is not entry:return
             new=entry.get() if save else old
@@ -2303,6 +2329,97 @@ class App:
                 else: self._planilha_data.pop(key,None)
                 self._planilha_marcar_alteracao()
         entry.bind("<Return>",lambda e:(finish(True),"break")[1]); entry.bind("<Escape>",lambda e:(finish(False),"break")[1]); entry.bind("<FocusOut>",lambda e:finish(True))
+
+    def _planilha_tem_entry_em_foco(self):
+        entry = getattr(self, "_planilha_edit_entry", None)
+        if entry is None:
+            return False
+        try:
+            return self.app.focus_get() is entry
+        except Exception:
+            return False
+
+    def _planilha_limpar_celulas_selecionadas(self):
+        tree = self._planilha_tree
+        if tree is None:
+            return "break"
+
+        selected = set(getattr(self, "_planilha_celulas_selecionadas", set()) or ())
+        active = getattr(self, "_planilha_celula_ativa", None)
+        if not selected and active:
+            selected = {(int(active[0]), int(active[1]))}
+        if not selected:
+            return "break"
+
+        items = {str(iid): iid for iid in tree.get_children()}
+        alterou = False
+        self._planilha_push_undo()
+        self._planilha_redo = []
+
+        for row, col in selected:
+            iid = str(row)
+            if iid not in items or not 0 <= int(col) < 3:
+                continue
+            try:
+                vals = list(tree.item(iid, "values"))
+            except Exception:
+                continue
+            if str(vals[int(col)]).strip() == "":
+                continue
+            vals[int(col)] = ""
+            tree.item(iid, values=vals)
+            self._planilha_data.pop(f"{int(row)},{int(col)}", None)
+            alterou = True
+
+        if alterou:
+            self._planilha_marcar_alteracao()
+            self._planilha_desenhar_borda()
+        else:
+            # Não deixa um snapshot inútil no histórico.
+            try:
+                if self._planilha_undo:
+                    self._planilha_undo.pop()
+            except Exception:
+                pass
+        return "break"
+
+    def _planilha_recortar(self, event=None):
+        if self._planilha_tem_entry_em_foco():
+            return None
+        self._planilha_copiar(event)
+        return self._planilha_limpar_celulas_selecionadas()
+
+    def _planilha_atalho_desfazer(self, event=None):
+        if self._planilha_tem_entry_em_foco():
+            return None
+        self._planilha_desfazer()
+        return "break"
+
+    def _planilha_atalho_refazer(self, event=None):
+        if self._planilha_tem_entry_em_foco():
+            return None
+        self._planilha_refazer()
+        return "break"
+
+    def _planilha_atalho_selecionar_tudo(self, event=None):
+        if self._planilha_tem_entry_em_foco():
+            return None
+        return self._planilha_selecionar_tudo()
+
+    def _planilha_atalho_copiar(self, event=None):
+        if self._planilha_tem_entry_em_foco():
+            return None
+        return self._planilha_copiar(event)
+
+    def _planilha_atalho_colar(self, event=None):
+        if self._planilha_tem_entry_em_foco():
+            return self._planilha_colar_entry(event)
+        return self._planilha_colar(event)
+
+    def _planilha_atalho_excluir(self, event=None):
+        if self._planilha_tem_entry_em_foco():
+            return None
+        return self._planilha_limpar_celulas_selecionadas()
 
     def _planilha_copiar(self,event=None):
         tree=self._planilha_tree
