@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 import struct
 
-from scripts.validate_executable import validate_pe
+from scripts.validate import validate_pe
 
 
 class ExecutableValidationTests(unittest.TestCase):
