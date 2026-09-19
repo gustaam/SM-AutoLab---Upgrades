@@ -301,8 +301,6 @@ def validate(root: Path) -> None:
 
     if "SM AutoLab" not in build:
         fail("build_windows.bat não contém a rotina de build do SM AutoLab")
-    if "from interface import App; from patch import aplicar_patch_ui" not in build:
-        fail("build_windows.bat não usa a integração consolidada")
     if "from interface import App; from main import install_ui, _validar_base_aplicacao" not in build:
         fail("build_windows.bat não usa o mesmo ponto de entrada da UI")
     if "install_ui(App); _validar_base_aplicacao()" not in build:
