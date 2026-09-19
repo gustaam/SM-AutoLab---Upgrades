@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 import main
 
@@ -33,6 +34,18 @@ class TooltipRegressionTests(unittest.TestCase):
 
     def test_texto_generico_nao_recebe_descricao_inventada(self):
         self.assertIsNone(main._stage7_tooltip_text(self._FakeButton("Botão genérico")))
+
+    def test_tooltip_cobre_filhos_internos_do_ctkbutton(self):
+        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+        start = source.index("class _SMAutoLabTooltip:")
+        end = source.index("def _stage7_tooltip_text", start)
+        block = source[start:end]
+        self.assertIn("def _iter_widget_tree", block)
+        self.assertIn("def _bind_widget_tree", block)
+        self.assertIn('child.bind("<Enter>"', block)
+        self.assertIn('child.bind("<Leave>"', block)
+        self.assertIn("HIDE_GRACE_MS", block)
+        self.assertIn("_pointer_inside_button", block)
 
 
 if __name__ == "__main__":
