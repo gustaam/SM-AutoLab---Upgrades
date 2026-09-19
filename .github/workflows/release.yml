@@ -116,6 +116,16 @@ jobs:
         shell: cmd
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
+      - name: Validar estrutura e metadados do executável
+        shell: pwsh
+        run: |
+          python scripts/validate_executable.py "dist\SM AutoLab.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Falha na validação estrutural do executável." }
+          $version = (Get-Content VERSION -Raw).Trim()
+          $info = (Get-Item "dist\SM AutoLab.exe").VersionInfo
+          if ([string]$info.ProductName -ne "SM AutoLab") { throw "ProductName inválido: $($info.ProductName)" }
+          if ([string]$info.ProductVersion -ne $version) { throw "ProductVersion ($($info.ProductVersion)) não corresponde a VERSION ($version)." }
+
       - name: Verificar executável com Microsoft Defender
         shell: pwsh
         run: |

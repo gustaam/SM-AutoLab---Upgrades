@@ -104,6 +104,9 @@ if not exist "dist\SM AutoLab.exe" (
     goto :erro
 )
 
+%PYTHON% scripts\validate_executable.py "dist\SM AutoLab.exe"
+if errorlevel 1 goto :erro
+
 echo.
 echo BUILD CONCLUIDO:
 echo dist\SM AutoLab.exe
