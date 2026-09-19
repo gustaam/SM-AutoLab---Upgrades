@@ -467,14 +467,16 @@ class App:
                 app_y = self.app.winfo_rooty()
                 bx = self.botao_configuracoes.winfo_rootx() - app_x
                 by = self.botao_configuracoes.winfo_rooty() - app_y + self.botao_configuracoes.winfo_height() + 4
-                menu_width = self._menu_config.winfo_width() or 218
-                app_width = self.app.winfo_width()
-                # Ancoragem direta: o menu começa exatamente abaixo do
-                # botão Configurações, sem deslocamento arbitrário.
+                menu_width = max(218, self._menu_config.winfo_reqwidth())
+                app_width = max(1, self.app.winfo_width())
+                # O menu nasce no mesmo eixo X do botão Configurações.
                 menu_x = bx
                 if menu_x + menu_width > app_width - 6:
                     menu_x = max(6, app_width - menu_width - 6)
-                self._menu_config.place(x=int(menu_x), y=max(0, by))
+                self._menu_config.place_configure(
+                    x=int(menu_x),
+                    y=int(max(0, by)),
+                )
                 self._menu_config.lift()
 
             if self._menu_aparencia is not None and self._menu_aparencia.winfo_exists():
@@ -682,6 +684,11 @@ class App:
                 _widget.bind("<Button-1>", _abrir_aparencia_por_clique, add="+")
             except Exception:
                 pass
+        try:
+            aparencia.bind("<Enter>", _abrir_aparencia_por_hover, add="+")
+            aparencia.bind("<Button-1>", _abrir_aparencia_por_clique, add="+")
+        except Exception:
+            pass
 
         mudar = ctk.CTkButton(
             menu,
@@ -737,11 +744,12 @@ class App:
         if self._menu_aparencia is not None:
             try:
                 if self._menu_aparencia.winfo_exists():
+                    # Clique explícito na própria opção alterna o submenu.
                     self._menu_aparencia.destroy()
+                    self._menu_aparencia = None
+                    return
             except Exception:
-                pass
-            self._menu_aparencia = None
-            return
+                self._menu_aparencia = None
 
         sub = ctk.CTkFrame(
             self.app,
