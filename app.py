@@ -158,7 +158,7 @@ def ler_checkpoint_interno(codigos):
     if not c.exists():
         return None
     try:
-        d = json.loads(c.read_text(encoding="utf-8"))
+        d = read_json_with_backup(c, {})
         if d.get("fingerprint") != _fingerprint_codigos(codigos):
             return None
         x = int(d.get("proximo_indice", 0))
