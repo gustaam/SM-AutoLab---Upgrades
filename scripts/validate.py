@@ -32,7 +32,7 @@ OBSOLETE_PATHS = (
     "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py",
     "patch_2991.py", "patch_29910.py", "patch_ui.py", "tests/test_atualizacao.py",
     "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py", ".etapa-b-trigger",
-    ".github/workflows/_fix_patch_b_import.yml",
+    ".github/workflows/_fix_patch_b_import.yml", ".github/workflows/create-release-tag.yml",
     "automacao.py", "atualizacao.py", "planilha_core.py", "planilha_virtual_29926.py", "storage_safe.py",
     "ui_platform.py", "windows11_native_29925.py",
     "tests/test_config_menu_position.py", "tests/test_dashboard.py", "tests/test_planilha_behavior.py",
