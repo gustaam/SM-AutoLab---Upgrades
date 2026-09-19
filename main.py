@@ -295,9 +295,10 @@ _STAGE7_UI_TOKENS = {
 
 
 class _SMAutoLabTooltip:
-    """Tooltip leve, determinístico e independente de janelas CTkToplevel."""
+    """Tooltip leve, determinístico e cobrindo toda a área do CTkButton."""
 
     DELAY_MS = 450
+    HIDE_GRACE_MS = 80
     PAD_X = 8
     PAD_Y = 5
     MAX_WIDTH = 340
@@ -306,13 +307,36 @@ class _SMAutoLabTooltip:
         self.widget = widget
         self.message = str(message)
         self._after_id = None
+        self._hide_id = None
         self._window = None
         self._closed = False
+        self._bound_widgets = set()
 
-        widget.bind("<Enter>", self._on_enter, add="+")
-        widget.bind("<Leave>", self._on_leave, add="+")
-        widget.bind("<Motion>", self._on_motion, add="+")
-        widget.bind("<Destroy>", self._on_destroy, add="+")
+        self._bind_widget_tree()
+
+    def _iter_widget_tree(self, widget=None):
+        widget = widget or self.widget
+        yield widget
+        try:
+            children = widget.winfo_children()
+        except Exception:
+            children = ()
+        for child in children:
+            yield from self._iter_widget_tree(child)
+
+    def _bind_widget_tree(self):
+        """Recebe Enter/Leave/Motion tanto no CTkButton quanto em seus filhos."""
+        for child in self._iter_widget_tree():
+            if child in self._bound_widgets:
+                continue
+            try:
+                child.bind("<Enter>", self._on_enter, add="+")
+                child.bind("<Leave>", self._on_leave, add="+")
+                child.bind("<Motion>", self._on_motion, add="+")
+                child.bind("<Destroy>", self._on_destroy, add="+")
+                self._bound_widgets.add(child)
+            except Exception:
+                pass
 
     def _cancel_pending(self):
         if self._after_id is None:
@@ -323,18 +347,41 @@ class _SMAutoLabTooltip:
             pass
         self._after_id = None
 
+    def _cancel_hide(self):
+        if self._hide_id is None:
+            return
+        try:
+            self.widget.after_cancel(self._hide_id)
+        except Exception:
+            pass
+        self._hide_id = None
+
+    def _pointer_inside_button(self):
+        try:
+            x = self.widget.winfo_pointerx()
+            y = self.widget.winfo_pointery()
+            left = self.widget.winfo_rootx()
+            top = self.widget.winfo_rooty()
+            right = left + self.widget.winfo_width()
+            bottom = top + self.widget.winfo_height()
+            return left <= x < right and top <= y < bottom
+        except Exception:
+            return False
+
     def update_message(self, message):
         message = "" if message is None else str(message).strip()
         self.message = message
         if not message:
             self.hide()
             return
+        self._bind_widget_tree()
         if self._window is not None:
             self._render()
 
     def _on_enter(self, _event=None):
         if self._closed or not self.message:
             return
+        self._cancel_hide()
         self._cancel_pending()
         try:
             self._after_id = self.widget.after(self.DELAY_MS, self.show)
@@ -343,16 +390,28 @@ class _SMAutoLabTooltip:
 
     def _on_leave(self, _event=None):
         self._cancel_pending()
-        self.hide()
+        self._cancel_hide()
+        try:
+            self._hide_id = self.widget.after(self.HIDE_GRACE_MS, self._hide_if_outside)
+        except Exception:
+            self.hide()
+
+    def _hide_if_outside(self):
+        self._hide_id = None
+        if not self._pointer_inside_button():
+            self.hide()
 
     def _on_motion(self, _event=None):
+        self._cancel_hide()
+        # Rebind filhos criados dinamicamente e mantém o posicionamento vivo.
+        self._bind_widget_tree()
         if self._window is not None:
             self._position()
 
     def _on_destroy(self, _event=None):
         self._closed = True
         self._cancel_pending()
-        self.hide()
+        self._cancel_hide()
 
     def _theme(self):
         try:
@@ -365,7 +424,8 @@ class _SMAutoLabTooltip:
 
     def show(self):
         self._after_id = None
-        if self._closed or not self.message:
+        self._cancel_hide()
+        if self._closed or not self.message or not self._pointer_inside_button():
             return
         try:
             if not self.widget.winfo_exists():
@@ -382,9 +442,7 @@ class _SMAutoLabTooltip:
                     self._window.attributes("-topmost", True)
                 except Exception:
                     pass
-                self._render()
-            else:
-                self._render()
+            self._render()
             self._position()
             self._window.deiconify()
             self._window.lift()
@@ -454,6 +512,7 @@ class _SMAutoLabTooltip:
 
     def hide(self):
         self._cancel_pending()
+        self._cancel_hide()
         if self._window is None:
             return
         try:
@@ -468,13 +527,22 @@ class _SMAutoLabTooltip:
     def destroy(self):
         self._closed = True
         self._cancel_pending()
+        self._cancel_hide()
+        for child in tuple(self._bound_widgets):
+            try:
+                child.unbind("<Enter>")
+                child.unbind("<Leave>")
+                child.unbind("<Motion>")
+                child.unbind("<Destroy>")
+            except Exception:
+                pass
+        self._bound_widgets.clear()
         if self._window is not None:
             try:
                 self._window.destroy()
             except Exception:
                 pass
         self._window = None
-
 
 def _stage7_tooltip_text(widget):
     try:
