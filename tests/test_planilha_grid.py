@@ -18,6 +18,7 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
 
     def test_grade_visual_e_selecao_estao_na_camada_final(self):
         source = (self.root / "main.py").read_text(encoding="utf-8")
+        interface = (self.root / "interface.py").read_text(encoding="utf-8")
         patch = (self.root / "patch.py").read_text(encoding="utf-8")
         for marker in (
             "def _stage9_desenhar_grade",
