@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from windows11_native_29925 import (
+from interface import (
     SM_AUTOLAB_WINDOWS_NATIVE_29925,
     _material_for_window,
 )
