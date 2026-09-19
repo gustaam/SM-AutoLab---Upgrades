@@ -18,9 +18,12 @@ ACTION_RUNTIME_REFS = {
 REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 
 REQUIRED_PATHS = (
-    "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
-    "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat",
-    "scripts/validate_architecture.py", "scripts/validate_executable.py", "scripts/validate_version.py", "scripts/validate_quality.py", "planilha_core.py", "planilha_virtual_29926.py", "storage_safe.py", "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py", "tests/test_validate_executable.py", "tests/test_storage_safe.py", "tests/test_validate_quality.py", "windows11_native_29925.py", "tests/test_stage12.py", "tests/test_stage13.py",
+    "main.py", "interface.py", "app.py", "config.py", "patch.py", "requirements.txt",
+    "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate_architecture.py",
+    "scripts/validate_executable.py", "scripts/validate_version.py", "scripts/validate_quality.py",
+    "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py",
+    "tests/test_validate_executable.py", "tests/test_storage_safe.py", "tests/test_validate_quality.py",
+    "tests/test_stage12.py", "tests/test_stage13.py",
 )
 
 OBSOLETE_PATHS = (
@@ -30,6 +33,8 @@ OBSOLETE_PATHS = (
     "patch_2991.py", "patch_29910.py", "patch_ui.py", "tests/test_atualizacao.py",
     "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py", ".etapa-b-trigger",
     ".github/workflows/_fix_patch_b_import.yml",
+    "automacao.py", "atualizacao.py", "planilha_core.py", "planilha_virtual_29926.py", "storage_safe.py",
+    "ui_platform.py", "windows11_native_29925.py",
 )
 
 LEGACY_IMPORTS = (
@@ -40,7 +45,7 @@ LEGACY_IMPORTS = (
 )
 
 LEGACY_IMPORT_CHECK_PATHS = (
-    "main.py", "interface.py", "app.py", "automacao.py", "atualizacao.py", "build_windows.bat",
+    "main.py", "interface.py", "app.py", "config.py", "build_windows.bat",
 )
 
 WORKFLOW_PATHS = (
@@ -184,20 +189,16 @@ def validate(root: Path) -> None:
             fail(f"arquivo/artefato obsoleto ainda presente: {relative}")
 
     contents = {relative: read_text(root, relative) for relative in (
-        "main.py", "interface.py", "app.py", "automacao.py", "atualizacao.py", "patch.py", "config.py", "planilha_core.py",
-        "build_windows.bat", "tests/test_patch.py", "planilha_virtual_29926.py",
+        "main.py", "interface.py", "app.py", "config.py", "patch.py", "build_windows.bat", "tests/test_patch.py",
     )}
 
     main = contents["main.py"]
     interface = contents["interface.py"]
     app = contents["app.py"]
-    atualizacao = contents["atualizacao.py"]
     config = contents["config.py"]
     patch = contents["patch.py"]
-    planilha_core = contents["planilha_core.py"]
     build = contents["build_windows.bat"]
     tests = contents["tests/test_patch.py"]
-    virtual = contents["planilha_virtual_29926.py"]
 
     require_markers("main.py", main, (
         "from patch import aplicar_patch_ui", "def install_ui_29912", "def install_ui_fluent_29916", "class StartupSplash",
@@ -207,8 +208,8 @@ def validate(root: Path) -> None:
         "def install_ui_auditoria_29920", "SM_AUTOLAB_RESPONSIVO_29921",
         "def install_ui_responsivo_29921",
         "def install_ui(App)",
-        "SM_AUTOLAB_GRADE_VIRTUAL_29926", "from planilha_virtual_29926 import SM_AUTOLAB_GRADE_VIRTUAL_29926",
-        "from windows11_native_29925 import install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
+        "SM_AUTOLAB_GRADE_VIRTUAL_29926", "SM_AUTOLAB_WINDOWS_NATIVE_29925",
+        "from interface import App, SM_AUTOLAB_GRADE_VIRTUAL_29926, install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
@@ -226,8 +227,8 @@ def validate(root: Path) -> None:
         "def insert(",
         "def event_generate(",
     ):
-        if legacy_virtual in virtual:
-            fail(f"compatibilidade Treeview obsoleta em planilha_virtual_29926.py: {legacy_virtual}")
+        if legacy_virtual in interface:
+            fail(f"compatibilidade Treeview obsoleta em interface.py: {legacy_virtual}")
 
     # A planilha tem uma única implementação de abertura e uma única camada
     # final de interação. Overrides históricos não podem voltar ao runtime.
@@ -283,18 +284,16 @@ def validate(root: Path) -> None:
 
     for legacy_import in LEGACY_IMPORTS:
         for relative in LEGACY_IMPORT_CHECK_PATHS:
-            if legacy_import in contents[relative]:
+            if relative in contents and legacy_import in contents[relative]:
                 fail(f"import legado detectado em {relative}: {legacy_import}")
 
     if "Ctrl + clique para selecionar várias datas" in patch:
         fail("instrução visual antiga ainda presente em patch.py")
     if "tkcalendar" in interface:
         fail("dependência tkcalendar detectada")
-    if "from atualizacao import find_update, launch_updater" not in interface:
-        fail("atualizador integrado não encontrado em interface.py")
-    if not re.search(r"def\s+find_update\s*\(", atualizacao) or not re.search(r"def\s+launch_updater\s*\(", atualizacao):
-        fail("atualizacao.py não expõe o motor integrado")
-    if re.search(r"SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper", atualizacao):
+    if not re.search(r"def\s+find_update\s*\(", interface) or not re.search(r"def\s+launch_updater\s*\(", interface):
+        fail("motor integrado de atualização não encontrado em interface.py")
+    if re.search(r"SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper", interface):
         fail("referência ao atualizador separado detectada")
 
     if not re.search(r'DEFAULT_PORTAL_USUARIO\s*=\s*""', config):
