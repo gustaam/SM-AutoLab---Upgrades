@@ -1811,6 +1811,8 @@ class App:
                 pass
         tree.bind("<Configure>", _ajustar_larguras_planilha, add="+")
 
+        # Virtualização do cabeçalho de linhas: o cabeçalho continua enxuto e
+        # independente da quantidade total de registros lógicos.
         # A grade virtual usa uma janela fixa de objetos Canvas para representar
         # apenas a viewport lógica; os 10.000 registros continuam em _planilha_data.
         def _sync_row_header(first, last):
