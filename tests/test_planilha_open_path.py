@@ -21,6 +21,25 @@ class PlanilhaOpenPathTests(unittest.TestCase):
         self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
         self.assertIn("self.abrir_planilha(cells)", interface)
 
+
+    def test_ctrl_v_tem_fallback_local_global_e_virtual(self):
+        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('tree.bind("<Control-KeyPress-v>", self._planilha_colar_teclado, add="+")', interface)
+        self.assertIn('tree.bind("<Control-KeyPress-V>", self._planilha_colar_teclado, add="+")', interface)
+        self.assertIn('tree.bind("<<Paste>>", self._planilha_colar_teclado, add="+")', interface)
+        self.assertIn('self.app.bind_all(\n                "<Control-KeyPress-v>"', interface)
+        self.assertIn('self.app.bind_all(\n                "<Control-KeyPress-V>"', interface)
+        self.assertIn("def _planilha_foco_pertence_a_grade(self):", interface)
+        self.assertIn("def _planilha_colar_entry(self, event=None):", interface)
+
+    def test_entry_da_edicao_tem_paste_proprio(self):
+        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = interface.index("def _planilha_editar_iid")
+        end = interface.index("def _planilha_copiar", start)
+        block = interface[start:end]
+        self.assertIn('entry.bind("<Control-KeyPress-v>", self._planilha_colar_entry, add="+")', block)
+        self.assertIn('entry.bind("<<Paste>>", self._planilha_colar_entry, add="+")', block)
+
     def test_snapshot_historico_reutiliza_a_mesma_abertura(self):
         root = Path(__file__).resolve().parents[1]
         source = (root / "interface.py").read_text(encoding="utf-8")
