@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate_version import parse_version, validate_version
+from scripts.validate import parse_version, validate_version
 
 
 class VersionValidationTests(unittest.TestCase):
