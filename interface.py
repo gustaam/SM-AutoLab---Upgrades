@@ -606,6 +606,15 @@ class App:
                 pass
         self._mostrar_menu_configuracoes()
 
+    def _iterar_descendentes_ui(self, widget):
+        yield widget
+        try:
+            children = widget.winfo_children()
+        except Exception:
+            children = ()
+        for child in children:
+            yield from self._iterar_descendentes_ui(child)
+
     def _mostrar_menu_configuracoes(self, _event=None):
         self._cancelar_fechar_menus()
 
@@ -643,6 +652,21 @@ class App:
             anchor="w"
         )
         aparencia.pack(fill="x", padx=7, pady=(8, 3))
+
+        # CTkButton pode receber o ponteiro sobre um widget interno. Nesse
+        # caso o comando do botão externo não é necessariamente disparado.
+        # O menu de Aparência precisa responder em toda a área visual.
+        def _abrir_aparencia_por_clique(event=None):
+            self._mostrar_menu_aparencia()
+            return "break"
+
+        for _widget in self._iterar_descendentes_ui(aparencia):
+            if _widget is aparencia:
+                continue
+            try:
+                _widget.bind("<Button-1>", _abrir_aparencia_por_clique, add="+")
+            except Exception:
+                pass
 
         mudar = ctk.CTkButton(
             menu,
