@@ -73,7 +73,7 @@ jobs:
             echo "A release ${RELEASE_TAG} já está publicada; nenhuma alteração será feita."
             exit 0
           fi
-          if ! grep -qE '"status"[[:space:]]*:[[:space:]]*404|HTTP([/][0-9.]+)?[[:space:]]+404([[:space:]]|$)' <<< "$response"; then
+          if [[ "$response" != *'"status":"404"'* && "$response" != *'(HTTP 404)'* ]]; then
             echo "$response" >&2
             exit 1
           fi
