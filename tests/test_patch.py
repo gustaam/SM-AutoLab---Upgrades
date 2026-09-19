@@ -571,8 +571,9 @@ class GradePerformanceStage9Tests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         interface = (root / "interface.py").read_text(encoding="utf-8")
         main_source = (root / "main.py").read_text(encoding="utf-8")
+        from interface import SM_AUTOLAB_GRADE_29922
         self.assertEqual(
-            main.SM_AUTOLAB_GRADE_29922,
+            SM_AUTOLAB_GRADE_29922,
             "SM-AUTOLAB-GRADE-PERFORMANCE-29922",
         )
         self.assertIn("def _planilha_desenhar_grade", interface)
