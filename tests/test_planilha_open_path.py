@@ -22,6 +22,28 @@ class PlanilhaOpenPathTests(unittest.TestCase):
         self.assertIn("self.abrir_planilha(cells)", interface)
 
 
+
+    def test_atalhos_de_edicao_da_grade_estao_robustos(self):
+        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        for binding in (
+            'tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")',
+            'tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")',
+            'tree.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")',
+            'tree.bind("<Control-KeyPress-c>", self._planilha_atalho_copiar, add="+")',
+            'tree.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")',
+            'tree.bind("<Delete>", self._planilha_atalho_excluir, add="+")',
+            'tree.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")',
+            'tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")',
+        ):
+            self.assertIn(binding, interface)
+        self.assertIn("def _planilha_atalho_desfazer", interface)
+        self.assertIn("def _planilha_atalho_refazer", interface)
+        self.assertIn("def _planilha_atalho_selecionar_tudo", interface)
+        self.assertIn("def _planilha_atalho_copiar", interface)
+        self.assertIn("def _planilha_recortar", interface)
+        self.assertIn("def _planilha_atalho_excluir", interface)
+        self.assertIn("def _planilha_tem_entry_em_foco", interface)
+
     def test_ctrl_v_tem_fallback_local_global_e_virtual(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('tree.bind("<Control-KeyPress-v>", self._planilha_colar_teclado, add="+")', interface)
