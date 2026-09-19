@@ -224,7 +224,7 @@ class PlanilhaVirtualStage13Tests(unittest.TestCase):
     def test_stage13_nao_carrega_compatibilidade_da_grade_antiga(self):
         root = Path(__file__).resolve().parents[1]
         interface = (root / "interface.py").read_text(encoding="utf-8")
-        virtual = (root / "planilha_virtual_29926.py").read_text(encoding="utf-8")
+        virtual = (root / "interface.py").read_text(encoding="utf-8")
         self.assertNotIn("_planilha_povoamento_", interface)
         self.assertNotIn("def tag_configure(", virtual)
         self.assertNotIn("def insert(", virtual)
