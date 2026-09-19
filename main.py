@@ -1013,6 +1013,18 @@ def install_ui_29912(App):
 
     App._planilha_salvar_e_sair = save_exit_wrapper
 
+    original_open_planilha = App.abrir_planilha
+
+    def open_planilha_wrapper(self, *args, **kwargs):
+        result = original_open_planilha(self, *args, **kwargs)
+        try:
+            self.app.after_idle(lambda: _home_counter(self))
+        except Exception:
+            _home_counter(self)
+        return result
+
+    App.abrir_planilha = open_planilha_wrapper
+
     original_save_start = getattr(App, "_planilha_salvar_e_iniciar", None)
     if original_save_start is not None:
         def save_start_wrapper(self, *args, **kwargs):
