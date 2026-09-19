@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate_quality import validate_quality
+from scripts.validate import validate_quality
 
 
 class QualityValidationTests(unittest.TestCase):
