@@ -259,6 +259,7 @@ _STAGE7_TOOLTIP_MESSAGES = {
     "não executados": "Mostra os códigos que não foram executados.",
     "atividade": "Mostra a atividade e os eventos da execução.",
     "histórico": "Mostra o histórico das execuções anteriores.",
+    "histórico de erros": "Mostra as execuções que apresentaram códigos não executados.",
     "restaurar": "Restaura as configurações padrão.",
     "cancelar": "Fecha esta janela sem aplicar as alterações.",
     "salvar": "Salva as alterações atuais.",
@@ -303,9 +304,10 @@ class _SMAutoLabTooltip:
     PAD_Y = 5
     MAX_WIDTH = 340
 
-    def __init__(self, widget, message):
+    def __init__(self, widget, message, bind_children=True):
         self.widget = widget
         self.message = str(message)
+        self._bind_children = bool(bind_children)
         self._after_id = None
         self._hide_id = None
         self._window = None
@@ -325,8 +327,9 @@ class _SMAutoLabTooltip:
             yield from self._iter_widget_tree(child)
 
     def _bind_widget_tree(self):
-        """Recebe Enter/Leave/Motion tanto no CTkButton quanto em seus filhos."""
-        for child in self._iter_widget_tree():
+        """Recebe eventos em todo o botão, ou só na superfície externa quando necessário."""
+        widgets = self._iter_widget_tree() if self._bind_children else (self.widget,)
+        for child in widgets:
             if child in self._bound_widgets:
                 continue
             try:
@@ -602,7 +605,12 @@ def _stage7_attach_tooltip(widget):
         return
 
     try:
-        widget._sm_autolab_tooltip = _SMAutoLabTooltip(widget, message)
+        bind_children = not str(message).startswith("Inicia a automação")
+        widget._sm_autolab_tooltip = _SMAutoLabTooltip(
+            widget,
+            message,
+            bind_children=bind_children,
+        )
     except Exception:
         widget._sm_autolab_tooltip = None
 
@@ -924,8 +932,8 @@ def _create_history_tile(self, execucao, atual=False):
         corner_radius=8,
         border_width=1,
         border_color=self.BORDER,
-        width=128,
-        height=104,
+        width=108,
+        height=108,
     )
     tile.grid(row=row, column=col, padx=2, pady=2, sticky="nw")
     tile.grid_propagate(False)
@@ -939,10 +947,10 @@ def _create_history_tile(self, execucao, atual=False):
     hora = inicio.split(" ")[1] if " " in inicio else ""
 
     ctk.CTkLabel(
-        tile, text="📁", font=("Segoe UI Emoji", 21), text_color=self.ACCENT
+        tile, text="▣", font=("Segoe UI Symbol", 24), text_color=self.ACCENT
     ).pack(pady=(6, 0))
     ctk.CTkLabel(
-        tile, text=dia, text_color=self.TEXT, font=("Segoe UI", 10, "bold")
+        tile, text=dia, text_color=self.TEXT, font=("Segoe UI", 9, "bold")
     ).pack()
     ctk.CTkLabel(
         tile, text=hora, text_color=self.SUBTEXT, font=("Segoe UI", 8)
@@ -952,7 +960,7 @@ def _create_history_tile(self, execucao, atual=False):
         text=f"{status} • {erros}",
         text_color=self.SUBTEXT,
         font=("Segoe UI", 8),
-        wraplength=112,
+        wraplength=92,
     ).pack(pady=(2, 0))
 
     _bind_history_tile(self, tile)
@@ -1484,6 +1492,7 @@ def _aplicar_fluent_ui_29916(self):
     # Botões principais: estados hover coerentes com o Fluent 2.
     try:
         self.botao_iniciar.configure(
+            text="▶  Iniciar",
             corner_radius=10,
             height=46,
             hover_color=self.ACCENT_HOVER,
