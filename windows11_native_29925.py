@@ -226,6 +226,10 @@ def _get_toplevels(root):
                 window = root.nametowidget(str(item))
             except Exception:
                 continue
+            # Tooltips são janelas transitórias próprias e não devem receber
+            # backdrop/tema DWM da aplicação.
+            if getattr(window, "_sm_autolab_tooltip_window", False):
+                continue
             if window not in result:
                 result.append(window)
     except Exception:
