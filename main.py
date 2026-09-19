@@ -676,27 +676,38 @@ def _home_counter(self):
         return
 
     total = 0
+
+    def contar(cells):
+        if not isinstance(cells, dict):
+            return 0
+        quantidade = 0
+        for key, value in cells.items():
+            if str(value).strip() == "":
+                continue
+            try:
+                _linha, coluna = (int(part.strip()) for part in str(key).split(","))
+            except Exception:
+                continue
+            if coluna == 1:
+                quantidade += 1
+        return quantidade
+
     try:
         cells = getattr(self, "_planilha_data", None)
         if isinstance(cells, dict) and cells:
-            total = sum(
-                1
-                for key, value in cells.items()
-                if str(value).strip() != ""
-                and str(key).split(",")[-1].strip() == "1"
-            )
+            total = contar(cells)
         elif getattr(self, "_planilha_arquivo", None) is not None and self._planilha_arquivo.exists():
             payload = __import__("json").loads(
                 self._planilha_arquivo.read_text(encoding="utf-8")
             )
             cells = payload.get("cells", {}) if isinstance(payload, dict) else {}
-            if isinstance(cells, dict):
-                total = sum(
-                    1
-                    for key, value in cells.items()
-                    if str(value).strip() != ""
-                    and str(key).split(",")[-1].strip() == "1"
-                )
+            total = contar(cells)
+
+        # Compatibilidade com testes/integrações legadas que ainda fornecem
+        # o contador persistido antigo. O fallback só é usado quando não há
+        # dados de uma planilha atual carregada ou persistida.
+        if total == 0 and callable(getattr(self, "_count_saved_passwords", None)):
+            total = max(0, int(self._count_saved_passwords() or 0))
     except Exception:
         total = 0
 
