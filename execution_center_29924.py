@@ -290,7 +290,12 @@ def install_ui_execution_center_29924(App):
     def progress_wrapper(self, processados, total, sucessos, erros, codigo, *args, **kwargs):
         result = original_progress(self, processados, total, sucessos, erros, codigo, *args, **kwargs)
         try:
-            _stage11_update(self, processados, total, sucessos, erros, codigo)
+            self.app.after(
+                0,
+                lambda: _stage11_update(
+                    self, processados, total, sucessos, erros, codigo
+                ),
+            )
         except Exception:
             pass
         return result
