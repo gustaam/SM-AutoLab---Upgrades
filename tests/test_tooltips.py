@@ -35,6 +35,15 @@ class TooltipRegressionTests(unittest.TestCase):
     def test_texto_generico_nao_recebe_descricao_inventada(self):
         self.assertIsNone(main._stage7_tooltip_text(self._FakeButton("Botão genérico")))
 
+    def test_menu_aparencia_tem_handler_para_filhos_internos(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _mostrar_menu_configuracoes")
+        end = source.index("def _mostrar_menu_aparencia", start)
+        block = source[start:end]
+        self.assertIn("_iterar_descendentes_ui(aparencia)", block)
+        self.assertIn("_abrir_aparencia_por_clique", block)
+        self.assertIn('bind("<Button-1>", _abrir_aparencia_por_clique', block)
+
     def test_tooltip_cobre_filhos_internos_do_ctkbutton(self):
         source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
         start = source.index("class _SMAutoLabTooltip:")
