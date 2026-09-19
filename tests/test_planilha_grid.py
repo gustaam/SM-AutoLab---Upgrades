@@ -6,6 +6,16 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(__file__).resolve().parents[1]
 
+    def test_pastas_do_historico_sao_quadradas(self):
+        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+        start = source.index("def _create_history_tile")
+        end = source.index("def _restore_history", start)
+        block = source[start:end]
+        self.assertIn("width=108", block)
+        self.assertIn("height=108", block)
+        self.assertNotIn("width=128", block)
+        self.assertNotIn("height=104", block)
+
     def test_grade_visual_e_selecao_estao_na_camada_final(self):
         source = (self.root / "main.py").read_text(encoding="utf-8")
         patch = (self.root / "patch.py").read_text(encoding="utf-8")
