@@ -21,8 +21,7 @@ REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "config.py", "patch.py", "requirements.txt",
-    "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate_architecture.py",
-    "scripts/validate_executable.py", "scripts/validate_version.py", "scripts/validate_quality.py",
+    "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate.py",
     "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py",
     "tests/test_validate_executable.py", "tests/test_storage_safe.py", "tests/test_validate_quality.py",
     "tests/test_stage12.py", "tests/test_stage13.py",
