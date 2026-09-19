@@ -8,7 +8,6 @@ from datetime import datetime
 from pathlib import Path
 
 import customtkinter as ctk
-from CTkToolTip import CTkToolTip
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 
@@ -296,51 +295,247 @@ _STAGE7_UI_TOKENS = {
 }
 
 
+class _SMAutoLabTooltip:
+    """Tooltip leve, determinístico e independente de janelas CTkToplevel."""
+
+    DELAY_MS = 450
+    PAD_X = 8
+    PAD_Y = 5
+    MAX_WIDTH = 340
+
+    def __init__(self, widget, message):
+        self.widget = widget
+        self.message = str(message)
+        self._after_id = None
+        self._window = None
+        self._closed = False
+
+        widget.bind("<Enter>", self._on_enter, add="+")
+        widget.bind("<Leave>", self._on_leave, add="+")
+        widget.bind("<Motion>", self._on_motion, add="+")
+        widget.bind("<Destroy>", self._on_destroy, add="+")
+
+    def _cancel_pending(self):
+        if self._after_id is None:
+            return
+        try:
+            self.widget.after_cancel(self._after_id)
+        except Exception:
+            pass
+        self._after_id = None
+
+    def update_message(self, message):
+        message = "" if message is None else str(message).strip()
+        self.message = message
+        if not message:
+            self.hide()
+            return
+        if self._window is not None:
+            self._render()
+
+    def _on_enter(self, _event=None):
+        if self._closed or not self.message:
+            return
+        self._cancel_pending()
+        try:
+            self._after_id = self.widget.after(self.DELAY_MS, self.show)
+        except Exception:
+            self._after_id = None
+
+    def _on_leave(self, _event=None):
+        self._cancel_pending()
+        self.hide()
+
+    def _on_motion(self, _event=None):
+        if self._window is not None:
+            self._position()
+
+    def _on_destroy(self, _event=None):
+        self._closed = True
+        self._cancel_pending()
+        self.hide()
+
+    def _theme(self):
+        try:
+            dark = str(ctk.get_appearance_mode()).lower() == "dark"
+        except Exception:
+            dark = False
+        if dark:
+            return "#F8F8F8", "#1A1A1A", "#C8C8C8"
+        return "#2B2B2B", "#FFFFFF", "#454545"
+
+    def show(self):
+        self._after_id = None
+        if self._closed or not self.message:
+            return
+        try:
+            if not self.widget.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            if self._window is None or not self._window.winfo_exists():
+                self._window = tk.Toplevel(self.widget)
+                self._window._sm_autolab_tooltip_window = True
+                self._window.overrideredirect(True)
+                try:
+                    self._window.attributes("-topmost", True)
+                except Exception:
+                    pass
+                self._render()
+            else:
+                self._render()
+            self._position()
+            self._window.deiconify()
+            self._window.lift()
+        except Exception:
+            self.hide()
+
+    def _render(self):
+        if self._window is None:
+            return
+        bg, fg, border = self._theme()
+        try:
+            for child in self._window.winfo_children():
+                child.destroy()
+            frame = tk.Frame(
+                self._window,
+                bg=bg,
+                highlightbackground=border,
+                highlightcolor=border,
+                highlightthickness=1,
+                bd=0,
+            )
+            frame.pack()
+            label = tk.Label(
+                frame,
+                text=self.message,
+                bg=bg,
+                fg=fg,
+                font=("Segoe UI", 9),
+                justify="left",
+                anchor="w",
+                wraplength=self.MAX_WIDTH,
+                padx=self.PAD_X,
+                pady=self.PAD_Y,
+                bd=0,
+                relief="flat",
+            )
+            label.pack()
+            self._window.update_idletasks()
+        except Exception:
+            self.hide()
+
+    def _position(self):
+        if self._window is None:
+            return
+        try:
+            self._window.update_idletasks()
+            self.widget.update_idletasks()
+            pointer_x = self.widget.winfo_pointerx()
+            pointer_y = self.widget.winfo_pointery()
+            width = self._window.winfo_reqwidth()
+            height = self._window.winfo_reqheight()
+            sw = self.widget.winfo_screenwidth()
+            sh = self.widget.winfo_screenheight()
+
+            x = pointer_x + 14
+            y = pointer_y - height - 14
+            if y < 4:
+                y = pointer_y + 18
+            if x + width > sw - 4:
+                x = max(4, pointer_x - width - 14)
+            if y + height > sh - 4:
+                y = max(4, sh - height - 4)
+
+            self._window.geometry(f"{width}x{height}+{int(x)}+{int(y)}")
+        except Exception:
+            pass
+
+    def hide(self):
+        self._cancel_pending()
+        if self._window is None:
+            return
+        try:
+            self._window.withdraw()
+        except Exception:
+            try:
+                self._window.destroy()
+            except Exception:
+                pass
+        self._window = None
+
+    def destroy(self):
+        self._closed = True
+        self._cancel_pending()
+        if self._window is not None:
+            try:
+                self._window.destroy()
+            except Exception:
+                pass
+        self._window = None
+
+
 def _stage7_tooltip_text(widget):
     try:
-        raw = str(widget.cget("text")).replace("✓", "").strip()
+        raw = widget.cget("text")
     except Exception:
         return None
-    raw_compact = " ".join(raw.split()).strip()
+
+    # Botões de imagem/ícone podem retornar None. Nunca transformar isso
+    # literalmente em "None" e nunca criar tooltip para texto vazio.
+    if raw is None:
+        return None
+    raw_compact = " ".join(str(raw).split()).strip()
+    if not raw_compact or raw_compact.casefold() == "none":
+        return None
+
     if raw_compact in _STAGE7_TOOLTIP_MESSAGES:
         return _STAGE7_TOOLTIP_MESSAGES[raw_compact]
+
     key = raw_compact.casefold()
     for symbol in ("▶", "■", "←", "→", "‹", "›"):
         if key.startswith(symbol):
             key = key[len(symbol):].strip()
             break
+
     if not key:
         return None
+
     explicit = _STAGE7_TOOLTIP_MESSAGES.get(key)
     if explicit:
         return explicit
+
     if key.startswith(("http://", "https://")):
         return "Ação relacionada ao endereço configurado."
-    if key.replace(" ", "").isalnum() and len(key) >= 4:
+
+    compact = key.replace(" ", "")
+    if compact.isalnum() and len(compact) >= 4 and any(ch.isdigit() for ch in compact):
         return "Clique para copiar este código."
-    return f"Executa: {key}."
+
+    return None
 
 
 def _stage7_attach_tooltip(widget):
     if not isinstance(widget, ctk.CTkButton):
         return
-    if getattr(widget, "_sm_autolab_tooltip", None) is not None:
-        return
+
     message = _stage7_tooltip_text(widget)
+    tooltip = getattr(widget, "_sm_autolab_tooltip", None)
+
+    if tooltip is not None:
+        try:
+            tooltip.update_message(message)
+        except Exception:
+            pass
+        return
+
     if not message:
         return
+
     try:
-        widget._sm_autolab_tooltip = CTkToolTip(
-            widget=widget,
-            delay=0.45,
-            message=message,
-            alpha=0.94,
-            corner_radius=9,
-            follow=True,
-            padding=(6, 4),
-            x_offset=-18,
-            y_offset=-44,
-        )
+        widget._sm_autolab_tooltip = _SMAutoLabTooltip(widget, message)
     except Exception:
         widget._sm_autolab_tooltip = None
 
@@ -349,16 +544,24 @@ def _stage7_instalar_tooltips_universais():
     button_class = ctk.CTkButton
     if getattr(button_class, "_sm_autolab_tooltip_patched", False):
         return
+
     original_init = button_class.__init__
+    original_configure = button_class.configure
 
     def init_with_tooltip(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
         _stage7_attach_tooltip(self)
 
+    def configure_with_tooltip(self, *args, **kwargs):
+        result = original_configure(self, *args, **kwargs)
+        _stage7_attach_tooltip(self)
+        return result
+
     button_class.__init__ = init_with_tooltip
+    button_class.configure = configure_with_tooltip
     button_class._sm_autolab_tooltip_patched = True
     button_class._sm_autolab_original_init = original_init
-
+    button_class._sm_autolab_original_configure = original_configure
 
 def _stage7_aplicar_layout_responsivo(self):
     try:
