@@ -10,7 +10,7 @@ class ConfigMenuPositionTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("menu_x = bx", block)
         self.assertNotIn("bx - 40", block)
-        self.assertIn("self._menu_config.place(x=int(menu_x)", block)
+        self.assertIn("self._menu_config.place_configure(", block)
 
 
 if __name__ == "__main__":
