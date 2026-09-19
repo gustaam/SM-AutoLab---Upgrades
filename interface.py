@@ -12,6 +12,7 @@ import customtkinter as ctk
 from ui_platform import aplicar_backdrop_sistema, atualizar_backdrop_tema
 
 from planilha_core import (
+    MAX_ROWS,
     apply_paste,
     clear_cells,
     extract_column,
