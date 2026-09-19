@@ -11,6 +11,18 @@ import customtkinter as ctk
 
 from ui_platform import aplicar_backdrop_sistema, atualizar_backdrop_tema
 
+from planilha_core import (
+    apply_paste,
+    clear_cells,
+    extract_column,
+    filled_row_count,
+    non_empty_cells,
+    parse_paste_text,
+    rectangle_selection,
+    redo_state,
+    undo_state,
+)
+
 from app import (ler_checkpoint, salvar_checkpoint, principal, principal_interno, ler_checkpoint_interno, salvar_checkpoint_interno, excluir_checkpoint_interno)
 
 
@@ -2113,16 +2125,7 @@ class App:
             pass
 
     def _planilha_retangulo_selecao(self, inicio, fim):
-        r1, c1 = int(inicio[0]), int(inicio[1])
-        r2, c2 = int(fim[0]), int(fim[1])
-        lo_r, hi_r = sorted((r1, r2))
-        lo_c, hi_c = sorted((c1, c2))
-        return {
-            (row, col)
-            for row in range(lo_r, hi_r + 1)
-            for col in range(lo_c, hi_c + 1)
-            if 0 <= row < 10000 and 0 <= col < 3
-        }
+        return rectangle_selection(inicio, fim)
 
     def _planilha_clicar_celula(self, event):
         tree = self._planilha_tree
@@ -2229,34 +2232,12 @@ class App:
         return "break"
 
     def _planilha_selecionar_tudo(self):
-        tree = self._planilha_tree
-        if tree:
-            cells = set()
-            for row in range(10000):
-                for col in range(3):
-                    try:
-                        value = tree.item(str(row), "values")[col]
-                    except Exception:
-                        value = ""
-                    if str(value).strip() != "":
-                        cells.add((row, col))
-            self._planilha_definir_selecao(cells)
+        if self._planilha_tree:
+            self._planilha_definir_selecao(non_empty_cells(self._planilha_data))
         return "break"
 
     def _planilha_atualizar_contador(self):
-        # Conta linhas preenchidas: uma linha vale 1 se pelo menos uma das
-        # três colunas (Qtd/Senha/Item) possuir conteúdo.
-        linhas=set()
-        for chave, valor in self._planilha_data.items():
-            if str(valor).strip()=="":
-                continue
-            try:
-                linha, coluna=[int(x) for x in str(chave).split(",")]
-            except Exception:
-                continue
-            if 0 <= linha < 10000 and 0 <= coluna < 3:
-                linhas.add(linha)
-        n=len(linhas)
+        n = filled_row_count(self._planilha_data)
         if self._planilha_contador_label is not None:
             self._planilha_contador_label.configure(text=f"{n} linhas preenchidas")
         try:
@@ -2351,36 +2332,16 @@ class App:
         if not selected:
             return "break"
 
-        items = {str(iid): iid for iid in tree.get_children()}
-        alterou = False
+        updated, changed = clear_cells(self._planilha_data, selected)
+        if not changed:
+            return "break"
+
         self._planilha_push_undo()
         self._planilha_redo = []
-
-        for row, col in selected:
-            iid = str(row)
-            if iid not in items or not 0 <= int(col) < 3:
-                continue
-            try:
-                vals = list(tree.item(iid, "values"))
-            except Exception:
-                continue
-            if str(vals[int(col)]).strip() == "":
-                continue
-            vals[int(col)] = ""
-            tree.item(iid, values=vals)
-            self._planilha_data.pop(f"{int(row)},{int(col)}", None)
-            alterou = True
-
-        if alterou:
-            self._planilha_marcar_alteracao()
-            self._planilha_desenhar_borda()
-        else:
-            # Não deixa um snapshot inútil no histórico.
-            try:
-                if self._planilha_undo:
-                    self._planilha_undo.pop()
-            except Exception:
-                pass
+        self._planilha_data = updated
+        self._planilha_atualizar_grade()
+        self._planilha_marcar_alteracao()
+        self._planilha_desenhar_borda()
         return "break"
 
     def _planilha_recortar(self, event=None):
@@ -2493,53 +2454,21 @@ class App:
                 return self._planilha_colar_entry(event)
         return self._planilha_colar(event)
 
-    def _planilha_colar(self,event=None):
-        tree=self._planilha_tree
+    def _planilha_colar(self, event=None):
+        tree = self._planilha_tree
         if tree is None:
             return "break"
 
         self._planilha_fechar_edicao()
-
         try:
-            text=self.app.clipboard_get()
+            text = self.app.clipboard_get()
         except Exception:
             try:
-                text=self.app.clipboard_get(type="PRIMARY")
+                text = self.app.clipboard_get(type="PRIMARY")
             except Exception:
                 return "break"
 
-        if not text:
-            return "break"
-
-        text=str(text).replace("\r\n","\n").replace("\r","\n")
-        while text.endswith("\n"):
-            text=text[:-1]
-        if not text:
-            return "break"
-
-        # Planilhas normalmente usam TAB. Alguns aplicativos, porém, entregam
-        # o conteúdo como texto com espaços. Nesse caso interpretamos a linha
-        # como Qtd | Senha | Item, preservando o restante como Item.
-        rows_data=[]
-        tem_tab="\t" in text
-        for raw_row in text.split("\n"):
-            if tem_tab:
-                rowvals=raw_row.split("\t")
-            else:
-                # Evita colar toda a linha na primeira coluna quando a origem
-                # fornece apenas espaços como separadores.
-                parts=raw_row.strip().split(None,2)
-                if len(parts) >= 3:
-                    rowvals=parts[:3]
-                elif len(parts) == 2:
-                    rowvals=parts
-                else:
-                    rowvals=[raw_row]
-            rows_data.append(rowvals)
-
-        # Remove linhas totalmente vazias somente do final.
-        while rows_data and all(v=="" for v in rows_data[-1]):
-            rows_data.pop()
+        rows_data = parse_paste_text(text)
         if not rows_data:
             return "break"
 
@@ -2552,37 +2481,20 @@ class App:
             start_i = int(focus_i) if focus_i else 0
             start_col = 0
 
-        max_rows=10000-start_i
-        if max_rows <= 0:
+        updated, pasted = apply_paste(
+            self._planilha_data,
+            rows_data,
+            start_i,
+            start_col,
+        )
+        if not pasted:
             return "break"
 
         self._planilha_push_undo()
-        self._planilha_redo=[]
-
-        items=tree.get_children()
-        pasted=False
-
-        for r,rowvals in enumerate(rows_data[:max_rows]):
-            idx=start_i+r
-            vals=list(tree.item(items[idx],"values"))
-
-            for c,v in enumerate(rowvals[:3]):
-                target_col=start_col+c
-                if target_col >= 3:
-                    break
-                vals[target_col]=v
-                key=f"{idx},{target_col}"
-                if v != "":
-                    self._planilha_data[key]=v
-                else:
-                    self._planilha_data.pop(key,None)
-                pasted=True
-
-            tree.item(items[idx],values=vals)
-
-        if pasted:
-            self._planilha_marcar_alteracao()
-
+        self._planilha_redo = []
+        self._planilha_data = updated
+        self._planilha_atualizar_grade()
+        self._planilha_marcar_alteracao()
         return "break"
 
     def _planilha_limpar(self):
@@ -2602,14 +2514,28 @@ class App:
             i=int(iid); vals=[self._planilha_data.get(f"{i},{c}","") for c in range(3)]; tree.item(iid,values=vals,tags=("even" if i % 2 == 0 else "odd",))
 
     def _planilha_desfazer(self):
-        if not self._planilha_undo:return
-        self._planilha_redo.append(self._planilha_snapshot())
-        self._planilha_data=self._planilha_undo.pop(); self._planilha_atualizar_grade(); self._planilha_marcar_alteracao()
+        state = undo_state(
+            self._planilha_undo,
+            self._planilha_redo,
+            self._planilha_data,
+        )
+        if state is None:
+            return
+        self._planilha_undo, self._planilha_redo, self._planilha_data = state
+        self._planilha_atualizar_grade()
+        self._planilha_marcar_alteracao()
 
     def _planilha_refazer(self):
-        if not self._planilha_redo:return
-        self._planilha_undo.append(self._planilha_snapshot())
-        self._planilha_data=self._planilha_redo.pop(); self._planilha_atualizar_grade(); self._planilha_marcar_alteracao()
+        state = redo_state(
+            self._planilha_undo,
+            self._planilha_redo,
+            self._planilha_data,
+        )
+        if state is None:
+            return
+        self._planilha_undo, self._planilha_redo, self._planilha_data = state
+        self._planilha_atualizar_grade()
+        self._planilha_marcar_alteracao()
 
     def _planilha_fechar_edicao(self):
         if self._planilha_edit_entry is not None:
@@ -2700,23 +2626,8 @@ class App:
 
     def _extrair_codigos_planilha(self):
         """Retorna todos os códigos preenchidos na segunda coluna (Senha)."""
-        codigos=[]
-        itens=[]
-        for chave, valor in self._planilha_data.items():
-            try:
-                linha, coluna = [int(x) for x in str(chave).split(",")]
-            except Exception:
-                continue
-            if coluna != 1:
-                continue
-            texto=str(valor).strip()
-            if texto:
-                itens.append((linha, texto))
-        itens.sort(key=lambda item: item[0])
-        return [texto for _, texto in itens]
+        return extract_column(self._planilha_data, column=1)
 
-    def _garantir_pasta_planilha(self):
-        self._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
 
     def _filtrar_arquivos_60_dias(self, itens):
         agora = datetime.now()
