@@ -185,7 +185,7 @@ def validate(root: Path) -> None:
 
     contents = {relative: read_text(root, relative) for relative in (
         "main.py", "interface.py", "app.py", "automacao.py", "atualizacao.py", "patch.py", "config.py", "planilha_core.py",
-        "build_windows.bat", "tests/test_patch.py",
+        "build_windows.bat", "tests/test_patch.py", "planilha_virtual_29926.py",
     )}
 
     main = contents["main.py"]
@@ -197,6 +197,7 @@ def validate(root: Path) -> None:
     planilha_core = contents["planilha_core.py"]
     build = contents["build_windows.bat"]
     tests = contents["tests/test_patch.py"]
+    virtual = contents["planilha_virtual_29926.py"]
 
     require_markers("main.py", main, (
         "from patch import aplicar_patch_ui", "def install_ui_29912", "def install_ui_fluent_29916", "class StartupSplash",
@@ -212,6 +213,21 @@ def validate(root: Path) -> None:
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
     require_markers("main.py", main, UI_MARKERS)
+
+    for legacy_grid in (
+        "ttk.Treeview(",
+        "ttk.Style(",
+        "_planilha_povoamento_",
+    ):
+        if legacy_grid in interface:
+            fail(f"estrutura legada da grade detectada em interface.py: {legacy_grid}")
+    for legacy_virtual in (
+        "def tag_configure(",
+        "def insert(",
+        "def event_generate(",
+    ):
+        if legacy_virtual in virtual:
+            fail(f"compatibilidade Treeview obsoleta em planilha_virtual_29926.py: {legacy_virtual}")
 
     # A planilha tem uma única implementação de abertura e uma única camada
     # final de interação. Overrides históricos não podem voltar ao runtime.
