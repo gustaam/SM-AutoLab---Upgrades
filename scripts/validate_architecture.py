@@ -206,7 +206,7 @@ def validate(root: Path) -> None:
         "SM_AUTOLAB_AUDITORIA_29920", "def _configurar_dpi_windows",
         "def install_ui_auditoria_29920", "SM_AUTOLAB_RESPONSIVO_29921",
         "def install_ui_responsivo_29921",
-        "SM_AUTOLAB_GRADE_29922", "def install_ui_grade_29922", "SM_AUTOLAB_EXECUTION_29924", "def install_ui_execution_center_29924",
+        "SM_AUTOLAB_GRADE_29922", "def install_ui_grade_29922", "SM_AUTOLAB_EXECUTION_29924", "from execution_center_29924 import SM_AUTOLAB_EXECUTION_29924, install_ui_execution_center_29924", "install_ui_execution_center_29924(App)",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
