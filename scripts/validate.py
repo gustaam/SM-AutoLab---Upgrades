@@ -296,9 +296,9 @@ def validate_architecture(root: Path) -> None:
     if re.search(r"SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper", interface):
         fail("referência ao atualizador separado detectada")
 
-    if not re.search(r'DEFAULT_PORTAL_USUARIO\s*=\s*""', config):
+    if not re.search(r'DEFAULT_PORTAL_USUARIO\s*=\s*""', app):
         fail("usuário padrão não está vazio em app.py")
-    if not re.search(r'DEFAULT_PORTAL_SENHA\s*=\s*""', config):
+    if not re.search(r'DEFAULT_PORTAL_SENHA\s*=\s*""', app):
         fail("senha padrão não está vazia em app.py")
     if re.search(r'"PORTAL_USUARIO"\s*:\s*"[^"\r\n]+"', interface):
         fail("valor de acesso literal encontrado em interface.py para PORTAL_USUARIO")
