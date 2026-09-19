@@ -25,8 +25,7 @@ def atomic_write_text(path: Path, text: str, *, backup: bool = True) -> None:
     )
     temporary = Path(temporary_name)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="
-") as handle:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(str(text))
             handle.flush()
             os.fsync(handle.fileno())
