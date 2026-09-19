@@ -3241,7 +3241,7 @@ class App:
         modo = ctk.get_appearance_mode().lower()
         canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
         self.status_indicator.configure(bg=canvas_bg)
-        if self._status_blink_fast:
+        if self._status_blink_fast or self._status_text_base == "Pronto":
             self._iniciar_pisca_status()
         else:
             self._parar_pisca_status()
