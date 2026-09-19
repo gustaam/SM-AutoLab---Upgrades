@@ -20,11 +20,11 @@ REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
     "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat",
-    "scripts/validate_architecture.py", "tests/test_patch.py", "execution_center_29924.py", "tests/test_stage11.py", "windows11_native_29925.py", "tests/test_stage12.py",
+    "scripts/validate_architecture.py", "tests/test_patch.py", "windows11_native_29925.py", "tests/test_stage12.py",
 )
 
 OBSOLETE_PATHS = (
-    "version_info_template.txt", "ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py",
+    "version_info_template.txt", "ui_fixes_29912.py", "planilha.py", "resultados.py", "splash.py", "execution_center_29924.py", "tests/test_stage11.py",
     "patch_base.py", "patch_arquivos.py", "patch_ajustes.py", "patch_v266.py", "patch_v267.py",
     "patch_v266_new.py", "updater.py", "patch_297.py", "patch_298.py", "patch_299.py",
     "patch_2991.py", "patch_29910.py", "patch_ui.py", "tests/test_atualizacao.py",
@@ -205,7 +205,7 @@ def validate(root: Path) -> None:
         "SM_AUTOLAB_AUDITORIA_29920", "def _configurar_dpi_windows",
         "def install_ui_auditoria_29920", "SM_AUTOLAB_RESPONSIVO_29921",
         "def install_ui_responsivo_29921",
-        "SM_AUTOLAB_GRADE_29922", "def install_ui_grade_29922", "SM_AUTOLAB_EXECUTION_29924", "from execution_center_29924 import SM_AUTOLAB_EXECUTION_29924", "install_ui_execution_center_29924(App)", "SM_AUTOLAB_WINDOWS_NATIVE_29925", "from windows11_native_29925 import SM_AUTOLAB_WINDOWS_NATIVE_29925, install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
+        "SM_AUTOLAB_GRADE_29922", "def install_ui_grade_29922", "SM_AUTOLAB_WINDOWS_NATIVE_29925", "from windows11_native_29925 import SM_AUTOLAB_WINDOWS_NATIVE_29925, install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
