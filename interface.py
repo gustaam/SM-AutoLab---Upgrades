@@ -1808,11 +1808,25 @@ class App:
                     tree.insert("", "end", iid=str(i), values=row_values[i],
                                 tags=("even" if i % 2 == 0 else "odd",))
                 self._planilha_povoamento_proxima_linha = fim
+
+                # A grade virtualizada precisa ser redesenhada depois que os
+                # itens do lote realmente existem no Treeview. Isso elimina
+                # a condição em que a janela abre sem divisões/numeração.
+                try:
+                    self._planilha_desenhar_borda()
+                    self._planilha_desenhar_cabecalho_linhas()
+                except Exception:
+                    pass
+
                 if fim >= 10000:
                     self._planilha_povoamento_concluido = True
                     self._planilha_povoamento_job = None
                     self._planilha_atualizar_contador()
-                    self._planilha_desenhar_cabecalho_linhas()
+                    try:
+                        self._planilha_desenhar_borda()
+                        self._planilha_desenhar_cabecalho_linhas()
+                    except Exception:
+                        pass
                     return
                 self._planilha_povoamento_job = tree.after(1, _povoar_lote)
             except Exception:
@@ -1843,6 +1857,17 @@ class App:
         tree.bind("<Shift-Insert>",self._planilha_colar)
         self._planilha_tree=tree
         self._planilha_row_header=row_header
+
+        # Primeira repintura após a viewport estar realmente montada.
+        try:
+            tree.update_idletasks()
+            self._planilha_desenhar_borda()
+            self._planilha_desenhar_cabecalho_linhas()
+            tree.after(25, self._planilha_desenhar_borda)
+            tree.after(25, self._planilha_desenhar_cabecalho_linhas)
+        except Exception:
+            pass
+
         row_header.bind(
             "<Configure>",
             lambda _e: self._planilha_desenhar_cabecalho_linhas(),
