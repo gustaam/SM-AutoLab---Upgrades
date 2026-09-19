@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import atualizacao
+import interface as atualizacao
 import main
 from patch import aplicar_patch_ui
 
@@ -73,12 +73,11 @@ class TestPatch(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         main_content = (root / "main.py").read_text(encoding="utf-8")
         interface = (root / "interface.py").read_text(encoding="utf-8")
-        atualizacao_content = (root / "atualizacao.py").read_text(encoding="utf-8")
         build = (root / "build_windows.bat").read_text(encoding="utf-8")
         self.assertIn("from patch import aplicar_patch_ui", main_content)
         self.assertIn("def install_ui_29912", main_content)
         self.assertNotIn("from ui_fixes_29912 import", main_content)
-        for content in (main_content, interface, atualizacao_content, build):
+        for content in (main_content, interface, build):
             self.assertNotIn("from patch_base import", content)
             self.assertNotIn("from patch_arquivos import", content)
             self.assertNotIn("from patch_ajustes import", content)
@@ -125,7 +124,7 @@ class TestPatch(unittest.TestCase):
 
     def test_automacao_usa_imports_explicitos(self):
         root = Path(__file__).resolve().parents[1]
-        automacao = (root / "automacao.py").read_text(encoding="utf-8")
+        automacao = (root / "app.py").read_text(encoding="utf-8")
         self.assertNotIn("from config import *", automacao)
         self.assertIn("from config import (", automacao)
         for symbol in (
