@@ -20,7 +20,7 @@ REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "automacao.py", "config.py", "atualizacao.py",
     "patch.py", "requirements.txt", "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat",
-    "scripts/validate_architecture.py", "tests/test_patch.py", "tests/test_planilha_open_path.py", "windows11_native_29925.py", "tests/test_stage12.py",
+    "scripts/validate_architecture.py", "planilha_core.py", "tests/test_patch.py", "tests/test_planilha_open_path.py", "tests/test_planilha_core.py", "windows11_native_29925.py", "tests/test_stage12.py",
 )
 
 OBSOLETE_PATHS = (
@@ -184,7 +184,7 @@ def validate(root: Path) -> None:
             fail(f"arquivo/artefato obsoleto ainda presente: {relative}")
 
     contents = {relative: read_text(root, relative) for relative in (
-        "main.py", "interface.py", "app.py", "automacao.py", "atualizacao.py", "patch.py", "config.py",
+        "main.py", "interface.py", "app.py", "automacao.py", "atualizacao.py", "patch.py", "config.py", "planilha_core.py",
         "build_windows.bat", "tests/test_patch.py",
     )}
 
@@ -194,6 +194,7 @@ def validate(root: Path) -> None:
     atualizacao = contents["atualizacao.py"]
     config = contents["config.py"]
     patch = contents["patch.py"]
+    planilha_core = contents["planilha_core.py"]
     build = contents["build_windows.bat"]
     tests = contents["tests/test_patch.py"]
 
@@ -204,7 +205,8 @@ def validate(root: Path) -> None:
         "SM_AUTOLAB_AUDITORIA_29920", "def _configurar_dpi_windows",
         "def install_ui_auditoria_29920", "SM_AUTOLAB_RESPONSIVO_29921",
         "def install_ui_responsivo_29921",
-        "SM_AUTOLAB_GRADE_29922", "def install_ui_grade_29922", "SM_AUTOLAB_WINDOWS_NATIVE_29925", "from windows11_native_29925 import SM_AUTOLAB_WINDOWS_NATIVE_29925, install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
+        "def install_ui(App)",
+        "SM_AUTOLAB_WINDOWS_NATIVE_29925", "from windows11_native_29925 import SM_AUTOLAB_WINDOWS_NATIVE_29925, install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
     require_markers("patch.py", patch, PATCH_MARKERS)
@@ -246,9 +248,14 @@ def validate(root: Path) -> None:
             "setter(2)",
         ),
     )
-    require_markers("interface.py", interface, ("def abrir_planilha(self, dados_iniciais=None):", "self._planilha_implementacao = \"grade-final-29922\"", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "_planilha_povoamento_job", "fim = min(10000, inicio + 500)", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")"))
+    require_markers("interface.py", interface, ("def abrir_planilha(self, dados_iniciais=None):", "self._planilha_implementacao = \"grade-final-29922\"",
+        "SM_AUTOLAB_GRADE_29922", "def _planilha_desenhar_grade", "def _planilha_stage9_get_grid_state", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "_planilha_povoamento_job", "fim = min(10000, inicio + 500)", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")"))
 
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
+    require_markers("planilha_core.py", planilha_core, (
+        "def rectangle_selection", "def parse_paste_text", "def apply_paste",
+        "def clear_cells", "def undo_state", "def redo_state",
+    ))
     stage12_test = read_text(root, "tests/test_stage12.py")
     require_markers("tests/test_stage12.py", stage12_test, ("class Windows11NativeStage12Tests", "SM_AUTOLAB_WINDOWS_NATIVE_29925", "install_ui_windows11_native_29925", "SystemParametersInfoW", "SetWindowTheme"))
     validate_dependencies(root)
@@ -297,15 +304,15 @@ def validate(root: Path) -> None:
         fail("build_windows.bat não contém a rotina de build do SM AutoLab")
     if "from interface import App; from patch import aplicar_patch_ui" not in build:
         fail("build_windows.bat não usa a integração consolidada")
-    if "from main import _corrigir_historico_ilimitado, _validar_base_aplicacao, install_ui_29912, install_ui_fluent_29916, install_ui_dashboard_29917, install_ui_micro_29918, install_ui_planilha_29919, install_ui_grade_29922, install_ui_responsivo_29921, install_ui_auditoria_29920" not in build:
-        fail("build_windows.bat não usa o mesmo fluxo de integração do CI")
-    if "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); install_ui_windows11_native_29925(App); _validar_base_aplicacao()" not in build:
-        fail("build_windows.bat não executa o fluxo consolidado completo")
+    if "from interface import App; from main import install_ui, _validar_base_aplicacao" not in build:
+        fail("build_windows.bat não usa o mesmo ponto de entrada da UI")
+    if "install_ui(App); _validar_base_aplicacao()" not in build:
+        fail("build_windows.bat não executa o ponto de entrada consolidado")
 
     release = read_text(root, ".github/workflows/release.yml")
-    release_flow = "aplicar_patch_ui(App); _corrigir_historico_ilimitado(); install_ui_29912(App); install_ui_fluent_29916(App); install_ui_dashboard_29917(App); install_ui_micro_29918(App); install_ui_planilha_29919(App); install_ui_grade_29922(App); install_ui_responsivo_29921(App); install_ui_auditoria_29920(App); install_ui_windows11_native_29925(App); _validar_base_aplicacao()"
+    release_flow = "from interface import App; from main import install_ui, _validar_base_aplicacao; install_ui(App); _validar_base_aplicacao()"
     if release_flow not in release:
-        fail("release.yml não executa o mesmo fluxo consolidado completo da validação da main")
+        fail("release.yml não usa o mesmo ponto de entrada consolidado da validação da main")
     for marker in BUILD_MARKERS:
         if marker not in build:
             fail(f"build_windows.bat não contém o metadado esperado: {marker}")
