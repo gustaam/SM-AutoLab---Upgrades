@@ -44,6 +44,14 @@ class TooltipRegressionTests(unittest.TestCase):
         self.assertIn("_abrir_aparencia_por_clique", block)
         self.assertIn('bind("<Button-1>", _abrir_aparencia_por_clique', block)
 
+    def test_menu_aparencia_usa_deteccao_global_do_cursor(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _mostrar_menu_configuracoes")
+        end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
+        block = source[start:end]
+        self.assertIn('self.app.bind(', block)
+        self.assertIn('" <Motion>"'.replace(" ",""), block)
+
     def test_menu_aparencia_abre_por_hover(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _mostrar_menu_configuracoes")
