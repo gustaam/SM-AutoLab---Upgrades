@@ -1,5 +1,4 @@
 from pathlib import Path
-from atualizacao import find_update, launch_updater
 import json
 import calendar as pycalendar
 import tkinter as tk
@@ -9,25 +8,1586 @@ from datetime import datetime, timedelta
 from tkinter import messagebox, Canvas, Frame, ttk, Entry
 import customtkinter as ctk
 
-from ui_platform import aplicar_backdrop_sistema, atualizar_backdrop_tema
-from planilha_virtual_29926 import VirtualGridTree
-
-from storage_safe import atomic_write_json, read_json_with_backup
-
-from planilha_core import (
-    MAX_ROWS,
-    apply_paste,
-    clear_cells,
-    extract_column,
-    filled_row_count,
-    non_empty_cells,
-    parse_paste_text,
-    rectangle_selection,
-    redo_state,
-    undo_state,
-)
 
 from app import (ler_checkpoint, salvar_checkpoint, principal, principal_interno, ler_checkpoint_interno, salvar_checkpoint_interno, excluir_checkpoint_interno)
+
+
+import hashlib
+import json
+import os
+import re
+import subprocess
+import tempfile
+import urllib.request
+from pathlib import Path
+
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
+
+REPO = "gustaam/SM-AutoLab---Upgrades"
+API_RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
+USER_AGENT = "SM AutoLab"
+UPDATE_CHANNEL = "SM-AUTOLAB-RESET-2026-09"
+MANIFEST_ASSET_NAMES = {
+    "release-manifest.json",
+    "sm autolab release manifest.json",
+    "sm.autolab.release.manifest.json",
+}
+
+
+def _normalize_asset_name(value: str) -> str:
+    """Normaliza nomes para aceitar diferenças de separador e capitalização."""
+    text = str(value or "").strip().lower()
+    return re.sub(r"[\s._-]+", "", text)
+
+
+def _version_tuple(value: str) -> tuple[int, ...]:
+    """Converte versões numéricas em tupla sem truncar componentes."""
+    value = str(value or "").strip().lstrip("vV")
+    if not re.fullmatch(r"\d+(?:\.\d+)*", value):
+        return ()
+    parts = [int(piece) for piece in value.split(".")]
+    while len(parts) > 1 and parts[-1] == 0:
+        parts.pop()
+    return tuple(parts)
+
+
+def current_version(base: Path | None = None) -> str:
+    base = base or Path(getattr(__import__("sys"), "_MEIPASS", Path(__file__).resolve().parent))
+    try:
+        value = (base / "VERSION").read_text(encoding="utf-8").strip()
+        if value:
+            return value.lstrip("vV")
+    except OSError:
+        pass
+    return ""
+
+
+def fetch_releases(timeout: int = 8) -> list[dict]:
+    request = urllib.request.Request(
+        API_RELEASES,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    return data if isinstance(data, list) else []
+
+
+def _is_manifest_asset(asset: dict) -> bool:
+    name = _normalize_asset_name(str(asset.get("name", "")))
+    return name in {_normalize_asset_name(item) for item in MANIFEST_ASSET_NAMES}
+
+
+def _release_asset_by_name(assets: list[dict], expected_name: str) -> dict | None:
+    expected = _normalize_asset_name(expected_name)
+    if not expected:
+        return None
+    return next(
+        (
+            asset
+            for asset in assets
+            if _normalize_asset_name(str(asset.get("name", ""))) == expected
+        ),
+        None,
+    )
+
+
+def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
+    assets = release.get("assets") or []
+    manifest_asset = next((a for a in assets if _is_manifest_asset(a)), None)
+    if manifest_asset is None:
+        return None
+    url = str(manifest_asset.get("browser_download_url") or "")
+    if not url or not url.lower().startswith("https://github.com/"):
+        return None
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            manifest = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+    if not isinstance(manifest, dict) or manifest.get("channel") != UPDATE_CHANNEL:
+        return None
+    release_version = str(release.get("tag_name", "")).strip().lstrip("vV")
+    manifest_version = str(manifest.get("version", "")).strip().lstrip("vV")
+    manifest_tag = str(manifest.get("tag", "")).strip().lstrip("vV")
+    if not release_version or manifest_version != release_version or manifest_tag != release_version:
+        return None
+    main_asset = _release_asset_by_name(assets, str(manifest.get("main_asset", "")))
+    if main_asset is None:
+        return None
+    main_name = str(main_asset.get("name", "")).strip().lower()
+    if not main_name.endswith(".exe") or "updater" in _normalize_asset_name(main_name):
+        return None
+    asset_digest = str(main_asset.get("digest") or "").strip().lower()
+    if asset_digest.startswith("sha256:"):
+        asset_digest = asset_digest.split(":", 1)[1]
+    manifest_digest = str(manifest.get("main_sha256") or "").strip().lower()
+    if manifest_digest and not re.fullmatch(r"[0-9a-f]{64}", manifest_digest):
+        return None
+    if asset_digest and not re.fullmatch(r"[0-9a-f]{64}", asset_digest):
+        return None
+    if asset_digest and manifest_digest and manifest_digest != asset_digest:
+        return None
+    return manifest
+
+
+def find_update(timeout: int = 8) -> dict | None:
+    current = current_version()
+    current_tuple = _version_tuple(current)
+    if not current_tuple:
+        return None
+    compatible: list[tuple[dict, tuple[int, ...], dict]] = []
+    try:
+        releases = fetch_releases(timeout)
+    except Exception:
+        return None
+    for release in releases:
+        if release.get("draft") or release.get("prerelease"):
+            continue
+        tag = str(release.get("tag_name", "")).strip().lstrip("vV")
+        version_tuple = _version_tuple(tag)
+        if not tag or not version_tuple or version_tuple <= current_tuple:
+            continue
+        manifest = _load_release_manifest(release, timeout)
+        if manifest is None:
+            continue
+        compatible.append((release, version_tuple, manifest))
+    if not compatible:
+        return None
+    release, _, manifest = max(compatible, key=lambda item: item[1])
+    latest = str(release.get("tag_name", "")).strip().lstrip("vV")
+    assets = release.get("assets") or []
+    asset = _release_asset_by_name(assets, str(manifest.get("main_asset", "")))
+    if asset is None:
+        return None
+    digest = str(asset.get("digest") or "")
+    if digest.lower().startswith("sha256:"):
+        digest = digest.split(":", 1)[1]
+    if not digest:
+        digest = str(manifest.get("main_sha256") or "")
+    if not digest:
+        return None
+    return {
+        "version": latest,
+        "current": current,
+        "name": release.get("name") or f"SM AutoLab v{latest}",
+        "url": release.get("html_url") or "",
+        "download_url": asset.get("browser_download_url") or "",
+        "sha256": digest,
+        "asset_name": asset.get("name") or "",
+        "release_url": release.get("html_url") or "",
+    }
+
+
+def download_file(url: str, destination: Path, expected_sha256: str = "") -> None:
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    hasher = hashlib.sha256()
+    with urllib.request.urlopen(request, timeout=30) as response, destination.open("wb") as output:
+        while True:
+            chunk = response.read(1024 * 1024)
+            if not chunk:
+                break
+            output.write(chunk)
+            hasher.update(chunk)
+    if expected_sha256 and hasher.hexdigest().lower() != expected_sha256.lower():
+        try:
+            destination.unlink()
+        except OSError:
+            pass
+        raise RuntimeError("A verificação SHA-256 da atualização falhou.")
+
+
+def _escape_cmd_path(value: str) -> str:
+    """Escapa caracteres especiais para uso em arquivo .cmd sem expansão de variáveis."""
+    return (
+        str(value)
+        .replace("^", "^^")
+        .replace("&", "^&")
+        .replace("|", "^|")
+        .replace("<", "^<")
+        .replace(">", "^>")
+        .replace("%", "%%")
+        .replace("!", "^^!")
+    )
+
+
+def _sanitize_pyinstaller_environment(environ: dict[str, str] | None = None) -> dict[str, str]:
+    """Remove o estado interno herdado do PyInstaller antes do reinício."""
+    source = dict(os.environ if environ is None else environ)
+    return {
+        key: value
+        for key, value in source.items()
+        if not key.upper().startswith("_PYI_") and key.upper() != "_MEIPASS2"
+    }
+
+
+def _prepare_independent_restart_environment(environ: dict[str, str] | None = None) -> dict[str, str]:
+    """Prepara o ambiente para que a nova onefile seja tratada como instância independente."""
+    env = _sanitize_pyinstaller_environment(environ)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
+
+
+def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, str]:
+    script_dir = downloaded.parent
+    script = script_dir / "apply_update.cmd"
+    target_cmd = _escape_cmd_path(str(target))
+    downloaded_cmd = _escape_cmd_path(str(downloaded))
+    script_text = f"""@echo off
+setlocal DisableDelayedExpansion
+:wait_replace
+move /Y "{downloaded_cmd}" "{target_cmd}" >nul 2>&1
+if exist "{downloaded_cmd}" (
+    timeout /t 1 /nobreak >nul
+    goto wait_replace
+)
+start "" "{target_cmd}"
+cd /d "%TEMP%" >nul 2>&1
+rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
+"""
+    try:
+        script.write_text(script_text, encoding="utf-8", newline="\r\n")
+        flags = 0
+        if os.name == "nt":
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+        restart_env = _prepare_independent_restart_environment()
+        subprocess.Popen(
+            ["cmd.exe", "/d", "/c", str(script)],
+            cwd=str(script_dir),
+            close_fds=True,
+            creationflags=flags,
+            env=restart_env,
+        )
+        return True, ""
+    except OSError as exc:
+        return False, str(exc)
+
+
+def launch_updater(update: dict) -> tuple[bool, str]:
+    if os.name != "nt":
+        return False, "A atualização automática integrada só está disponível no Windows."
+    if not update.get("download_url"):
+        return False, "A release encontrada não possui um executável correspondente à versão."
+
+    target = Path(__import__("sys").executable).resolve()
+    if target.suffix.lower() != ".exe" or not getattr(__import__("sys"), "frozen", False):
+        return False, "A atualização automática integrada só está disponível no executável do SM AutoLab."
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="sm_autolab_update_"))
+    downloaded = temp_dir / target.name
+    try:
+        download_file(str(update["download_url"]), downloaded, str(update.get("sha256") or ""))
+        ok, error = _schedule_replace_after_exit(target, downloaded)
+        if not ok:
+            raise RuntimeError(error or "Não foi possível preparar a substituição da atualização.")
+        return True, ""
+    except Exception as exc:
+        try:
+            if downloaded.exists():
+                downloaded.unlink()
+        except OSError:
+            pass
+        try:
+            script = temp_dir / "apply_update.cmd"
+            if script.exists():
+                script.unlink()
+        except OSError:
+            pass
+        try:
+            temp_dir.rmdir()
+        except OSError:
+            pass
+        return False, str(exc)
+
+
+if __name__ == "__main__":
+    print("SM AutoLab pronto.")
+
+
+from typing import Iterable, Mapping, Sequence
+
+MAX_ROWS = 10_000
+MAX_COLS = 3
+
+
+def rectangle_selection(start: Sequence[int], end: Sequence[int]) -> set[tuple[int, int]]:
+    """Retorna todas as células dentro de um retângulo inclusivo."""
+    r1, c1 = int(start[0]), int(start[1])
+    r2, c2 = int(end[0]), int(end[1])
+    lo_r, hi_r = sorted((r1, r2))
+    lo_c, hi_c = sorted((c1, c2))
+    return {
+        (row, col)
+        for row in range(lo_r, hi_r + 1)
+        for col in range(lo_c, hi_c + 1)
+        if 0 <= row < MAX_ROWS and 0 <= col < MAX_COLS
+    }
+
+
+def non_empty_cells(cells: Mapping[str, object] | None) -> set[tuple[int, int]]:
+    """Converte o armazenamento esparso em células preenchidas válidas."""
+    result: set[tuple[int, int]] = set()
+    for key, value in (cells or {}).items():
+        if str(value).strip() == "":
+            continue
+        try:
+            row, col = (int(part.strip()) for part in str(key).split(","))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= row < MAX_ROWS and 0 <= col < MAX_COLS:
+            result.add((row, col))
+    return result
+
+
+def filled_row_count(cells: Mapping[str, object] | None) -> int:
+    """Conta quantas linhas possuem ao menos uma célula preenchida."""
+    return len({row for row, _ in non_empty_cells(cells)})
+
+
+def extract_column(cells: Mapping[str, object] | None, column: int = 1) -> list[str]:
+    """Extrai valores não vazios de uma coluna, na ordem das linhas."""
+    items: list[tuple[int, str]] = []
+    for key, value in (cells or {}).items():
+        try:
+            row, col = (int(part.strip()) for part in str(key).split(","))
+        except (TypeError, ValueError):
+            continue
+        if col != int(column) or not 0 <= row < MAX_ROWS:
+            continue
+        text = str(value).strip()
+        if text:
+            items.append((row, text))
+    items.sort(key=lambda item: item[0])
+    return [text for _, text in items]
+
+
+def parse_paste_text(text: object) -> list[list[str]]:
+    """Interpreta texto copiado de planilhas, com TAB ou separadores por espaço."""
+    if text is None:
+        return []
+
+    normalized = str(text).replace("\r\n", "\n").replace("\r", "\n")
+    while normalized.endswith("\n"):
+        normalized = normalized[:-1]
+    if not normalized:
+        return []
+
+    rows: list[list[str]] = []
+    has_tab = "\t" in normalized
+    for raw_row in normalized.split("\n"):
+        if has_tab:
+            row_values = raw_row.split("\t")
+        else:
+            parts = raw_row.strip().split(None, 2)
+            if len(parts) >= 3:
+                row_values = parts[:3]
+            elif len(parts) == 2:
+                row_values = parts
+            else:
+                row_values = [raw_row]
+        rows.append(row_values)
+
+    while rows and all(value == "" for value in rows[-1]):
+        rows.pop()
+    return rows
+
+
+def apply_paste(
+    cells: Mapping[str, object] | None,
+    rows: Sequence[Sequence[object]],
+    start_row: int,
+    start_col: int,
+) -> tuple[dict[str, str], bool]:
+    """Aplica uma matriz colada ao armazenamento esparso da planilha."""
+    result = {str(key): str(value) for key, value in (cells or {}).items() if str(value) != ""}
+    row0 = int(start_row)
+    col0 = int(start_col)
+    if not rows or row0 < 0 or row0 >= MAX_ROWS or col0 >= MAX_COLS:
+        return result, False
+
+    changed = False
+    for row_offset, values in enumerate(rows):
+        row = row0 + row_offset
+        if row >= MAX_ROWS:
+            break
+        for col_offset, value in enumerate(values[:MAX_COLS]):
+            col = col0 + col_offset
+            if col >= MAX_COLS or col < 0:
+                break
+            key = f"{row},{col}"
+            text = str(value)
+            if text:
+                if result.get(key) != text:
+                    changed = True
+                result[key] = text
+            else:
+                if key in result:
+                    changed = True
+                result.pop(key, None)
+    return result, changed
+
+
+def clear_cells(
+    cells: Mapping[str, object] | None,
+    selected: Iterable[Sequence[int]],
+) -> tuple[dict[str, str], bool]:
+    """Limpa as células selecionadas e informa se houve alteração."""
+    result = {str(key): str(value) for key, value in (cells or {}).items() if str(value) != ""}
+    changed = False
+    for cell in selected:
+        try:
+            row, col = int(cell[0]), int(cell[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if not 0 <= row < MAX_ROWS or not 0 <= col < MAX_COLS:
+            continue
+        key = f"{row},{col}"
+        if key in result:
+            result.pop(key, None)
+            changed = True
+    return result, changed
+
+
+def undo_state(
+    undo: Sequence[Mapping[str, object]],
+    redo: Sequence[Mapping[str, object]],
+    current: Mapping[str, object],
+) -> tuple[list[dict[str, str]], list[dict[str, str]], dict[str, str]] | None:
+    """Calcula o próximo estado de Undo sem depender de Tkinter."""
+    if not undo:
+        return None
+    new_undo = [dict(item) for item in undo[:-1]]
+    new_redo = [dict(item) for item in redo]
+    new_redo.append({str(key): str(value) for key, value in current.items()})
+    new_current = {str(key): str(value) for key, value in undo[-1].items()}
+    return new_undo, new_redo, new_current
+
+
+def redo_state(
+    undo: Sequence[Mapping[str, object]],
+    redo: Sequence[Mapping[str, object]],
+    current: Mapping[str, object],
+) -> tuple[list[dict[str, str]], list[dict[str, str]], dict[str, str]] | None:
+    """Calcula o próximo estado de Redo sem depender de Tkinter."""
+    if not redo:
+        return None
+    new_undo = [dict(item) for item in undo]
+    new_undo.append({str(key): str(value) for key, value in current.items()})
+    new_redo = [dict(item) for item in redo[:-1]]
+    new_current = {str(key): str(value) for key, value in redo[-1].items()}
+    return new_undo, new_redo, new_current
+
+
+import math
+import tkinter as tk
+from collections.abc import Callable, Iterable
+from typing import Any
+
+
+SM_AUTOLAB_GRADE_VIRTUAL_29926 = "SM-AUTOLAB-GRADE-VIRTUAL-29926"
+DEFAULT_TOTAL_ROWS = 10000
+DEFAULT_ROW_HEIGHT = 28
+DEFAULT_OVERSCAN = 3
+
+
+def _clamp_fraction(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def visible_row_range(
+    first_fraction: float,
+    viewport_height: int,
+    total_rows: int = DEFAULT_TOTAL_ROWS,
+    row_height: int = DEFAULT_ROW_HEIGHT,
+    overscan: int = DEFAULT_OVERSCAN,
+) -> tuple[int, int]:
+    """Mapeia a viewport lógica para um intervalo pequeno de linhas."""
+    total_rows = max(0, int(total_rows))
+    row_height = max(1, int(row_height))
+    overscan = max(0, int(overscan))
+    if total_rows == 0:
+        return 0, 0
+
+    fraction = _clamp_fraction(first_fraction)
+    viewport_rows = max(1, math.ceil(max(1, int(viewport_height)) / row_height))
+    pool_size = viewport_rows + overscan * 2
+    scrollable_rows = max(0, total_rows - viewport_rows)
+    logical_top = min(scrollable_rows, int(fraction * scrollable_rows + 1e-7))
+    start = max(0, logical_top - overscan)
+    end = min(total_rows, start + pool_size)
+    if end - start < pool_size:
+        start = max(0, end - pool_size)
+    return start, end
+
+
+class VirtualGridTree(tk.Frame):
+    """API mínima compatível com a planilha usando um pool fixo de Canvas."""
+
+    def __init__(
+        self,
+        master: tk.Misc,
+        *,
+        columns: Iterable[tuple[str, str, int, int, str, bool]],
+        total_rows: int = DEFAULT_TOTAL_ROWS,
+        row_height: int = DEFAULT_ROW_HEIGHT,
+        header_height: int = DEFAULT_ROW_HEIGHT,
+        value_provider: Callable[[int], Iterable[Any]] | None = None,
+        bg: str = "#FFFFFF",
+        header_bg: str = "#F5F5F5",
+        fg: str = "#242424",
+        header_fg: str = "#242424",
+        border: str = "#E0E0E0",
+        even_bg: str = "#FFFFFF",
+        odd_bg: str = "#FBFBFB",
+    ):
+        super().__init__(master, bd=0, highlightthickness=0)
+        self._columns = list(columns)
+        self._total_rows = max(0, int(total_rows))
+        self._row_height = max(1, int(row_height))
+        self._header_height = max(1, int(header_height))
+        self._value_provider = value_provider
+
+        self._bg = bg
+        self._header_bg = header_bg
+        self._fg = fg
+        self._header_fg = header_fg
+        self._border = border
+        self._even_bg = even_bg
+        self._odd_bg = odd_bg
+
+        self._widths = {
+            name: max(1, int(width))
+            for name, _text, width, _minwidth, _anchor, _stretch in self._columns
+        }
+        self._minimum_widths = {
+            name: max(1, int(minwidth))
+            for name, _text, _width, minwidth, _anchor, _stretch in self._columns
+        }
+        self._anchors = {
+            name: anchor
+            for name, _text, _width, _minwidth, anchor, _stretch in self._columns
+        }
+        self._headings = {
+            name: text
+            for name, text, _width, _minwidth, _anchor, _stretch in self._columns
+        }
+        self._focus_iid = ""
+        self._refresh_job = None
+        self._xscrollcommand = None
+        self._yscrollcommand = None
+        self._pool: list[dict[str, Any]] = []
+
+        # Convert the pool to a list after initialisation for deterministic
+        # typing and easy reuse.
+        self._pool = []
+        self._header_items: dict[str, int] = {}
+        self._header_lines: list[int] = []
+
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        self._header = tk.Canvas(
+            self,
+            height=self._header_height,
+            bg=self._header_bg,
+            highlightthickness=1,
+            highlightbackground=self._border,
+            bd=0,
+        )
+        self._header.grid(row=0, column=0, sticky="ew")
+
+        self._canvas = tk.Canvas(
+            self,
+            bg=self._bg,
+            highlightthickness=1,
+            highlightbackground=self._border,
+            bd=0,
+            takefocus=True,
+        )
+        self._canvas.grid(row=1, column=0, sticky="nsew")
+
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
+        self._canvas.bind("<MouseWheel>", self._on_mousewheel)
+        self._canvas.bind("<Button-4>", lambda _event: self.yview_scroll(-3, "units"))
+        self._canvas.bind("<Button-5>", lambda _event: self.yview_scroll(3, "units"))
+
+        self._scroll_anchor = self._canvas.create_rectangle(
+            0,
+            0,
+            1,
+            max(1, self._total_rows * self._row_height),
+            outline="",
+            fill=self._bg,
+            tags=("virtual-scroll-anchor",),
+        )
+
+        self._redraw_header()
+        self._update_scrollregion()
+        self._schedule_refresh()
+
+    @property
+    def total_rows(self) -> int:
+        return self._total_rows
+
+    @property
+    def row_height(self) -> int:
+        return self._row_height
+
+    @property
+    def visible_pool_size(self) -> int:
+        return len(self._pool)
+
+    def _total_width(self) -> int:
+        return max(
+            1,
+            sum(self._widths.get(name, 1) for name, *_rest in self._columns),
+        )
+
+    def _update_scrollregion(self) -> None:
+        total_width = self._total_width()
+        total_height = max(1, self._total_rows * self._row_height)
+        self._canvas.configure(scrollregion=(0, 0, total_width, total_height))
+        self._header.configure(scrollregion=(0, 0, total_width, self._header_height))
+        try:
+            self._canvas.coords(
+                self._scroll_anchor,
+                0,
+                0,
+                1,
+                total_height,
+            )
+        except tk.TclError:
+            pass
+
+    def _column_left(self, name: str) -> int:
+        left = 0
+        for column_name, _text, _width, _minwidth, _anchor, _stretch in self._columns:
+            if column_name == name:
+                return left
+            left += self._widths.get(column_name, 1)
+        return left
+
+    def _redraw_header(self) -> None:
+        self._header.delete("all")
+        self._header_items.clear()
+        self._header_lines.clear()
+
+        total_width = self._total_width()
+        self._header.create_rectangle(
+            0,
+            0,
+            total_width,
+            self._header_height,
+            fill=self._header_bg,
+            outline=self._border,
+            width=1,
+        )
+
+        x = 0
+        for name, text, _width, _minwidth, anchor, _stretch in self._columns:
+            width = self._widths.get(name, 1)
+            text_anchor = "w" if anchor == "w" else ("e" if anchor == "e" else "center")
+            if text_anchor == "w":
+                text_x = x + 8
+            elif text_anchor == "e":
+                text_x = x + width - 8
+            else:
+                text_x = x + width / 2
+            self._header_items[name] = self._header.create_text(
+                text_x,
+                self._header_height / 2,
+                text=str(text),
+                fill=self._header_fg,
+                font=("Segoe UI", 10, "bold"),
+                anchor=text_anchor,
+            )
+            self._header_lines.append(
+                self._header.create_line(
+                    x + width,
+                    0,
+                    x + width,
+                    self._header_height,
+                    fill=self._border,
+                )
+            )
+            x += width
+        self._update_scrollregion()
+
+    def _on_canvas_configure(self, _event=None) -> None:
+        self._ensure_pool()
+        self._schedule_refresh()
+
+    def _on_mousewheel(self, event) -> str:
+        try:
+            delta = int(event.delta)
+        except (AttributeError, TypeError, ValueError):
+            delta = 0
+        if delta == 0:
+            return "break"
+        units = -max(1, abs(delta) // 120) if delta > 0 else max(1, abs(delta) // 120)
+        self.yview_scroll(units, "units")
+        return "break"
+
+    def _schedule_refresh(self) -> None:
+        if self._refresh_job is not None:
+            return
+        try:
+            self._refresh_job = self.after_idle(self._refresh_visible)
+        except tk.TclError:
+            self._refresh_job = None
+
+    def _ensure_pool(self) -> None:
+        height = max(1, self._canvas.winfo_height())
+        viewport_rows = max(1, math.ceil(height / self._row_height))
+        target = min(
+            max(8, viewport_rows + DEFAULT_OVERSCAN * 2 + 2),
+            max(8, self._total_rows + DEFAULT_OVERSCAN),
+        )
+        while len(self._pool) < target:
+            background = self._canvas.create_rectangle(
+                0,
+                0,
+                1,
+                self._row_height,
+                outline="",
+                fill=self._even_bg,
+                tags=("virtual-row",),
+            )
+            cells = [
+                self._canvas.create_text(
+                    0,
+                    self._row_height / 2,
+                    text="",
+                    fill=self._fg,
+                    font=("Segoe UI", 9),
+                    anchor="w",
+                    tags=("virtual-cell",),
+                )
+                for _name, _text, _width, _minwidth, _anchor, _stretch in self._columns
+            ]
+            line = self._canvas.create_line(
+                0,
+                self._row_height - 1,
+                self._total_width(),
+                self._row_height - 1,
+                fill=self._border,
+            )
+            self._pool.append(
+                {
+                    "background": background,
+                    "line": line,
+                    "cells": cells,
+                }
+            )
+
+    def _values_for_row(self, row: int) -> tuple[str, ...]:
+        if self._value_provider is None:
+            return tuple("" for _ in self._columns)
+        try:
+            values = tuple(
+                "" if value is None else str(value)
+                for value in self._value_provider(row)
+            )
+        except Exception:
+            values = ()
+        expected = len(self._columns)
+        return values[:expected] + tuple("" for _ in range(max(0, expected - len(values))))
+
+    def _refresh_visible(self) -> None:
+        self._refresh_job = None
+        try:
+            self._ensure_pool()
+            first = float(self._canvas.yview()[0])
+            height = max(1, self._canvas.winfo_height())
+            start, end = visible_row_range(
+                first,
+                height,
+                self._total_rows,
+                self._row_height,
+                DEFAULT_OVERSCAN,
+            )
+            width = self._total_width()
+
+            for offset, slot in enumerate(self._pool):
+                logical_row = start + offset
+                visible = logical_row < end and logical_row < self._total_rows
+                if not visible:
+                    self._canvas.itemconfigure(slot["background"], state="hidden")
+                    self._canvas.itemconfigure(slot["line"], state="hidden")
+                    for cell in slot["cells"]:
+                        self._canvas.itemconfigure(cell, state="hidden")
+                    continue
+
+                y0 = logical_row * self._row_height
+                row_values = self._values_for_row(logical_row)
+                row_bg = self._odd_bg if logical_row % 2 else self._even_bg
+                self._canvas.coords(
+                    slot["background"],
+                    0,
+                    y0,
+                    width,
+                    y0 + self._row_height,
+                )
+                self._canvas.itemconfigure(
+                    slot["background"],
+                    fill=row_bg,
+                    state="normal",
+                )
+                self._canvas.coords(
+                    slot["line"],
+                    0,
+                    y0 + self._row_height - 1,
+                    width,
+                    y0 + self._row_height - 1,
+                )
+                self._canvas.itemconfigure(
+                    slot["line"],
+                    fill=self._border,
+                    state="normal",
+                )
+
+                x = 0
+                for idx, (
+                    name,
+                    _text,
+                    _width,
+                    _minwidth,
+                    anchor,
+                    _stretch,
+                ) in enumerate(self._columns):
+                    column_width = self._widths.get(name, 1)
+                    value = row_values[idx] if idx < len(row_values) else ""
+                    text_anchor = "w" if anchor == "w" else ("e" if anchor == "e" else "center")
+                    if text_anchor == "w":
+                        text_x = x + 7
+                    elif text_anchor == "e":
+                        text_x = x + column_width - 7
+                    else:
+                        text_x = x + column_width / 2
+                    self._canvas.coords(
+                        slot["cells"][idx],
+                        text_x,
+                        y0 + self._row_height / 2,
+                    )
+                    self._canvas.itemconfigure(
+                        slot["cells"][idx],
+                        text=value,
+                        fill=self._fg,
+                        anchor=text_anchor,
+                        state="normal",
+                    )
+                    x += column_width
+
+            try:
+                self._header.xview_moveto(float(self._canvas.xview()[0]))
+            except (tk.TclError, TypeError, ValueError):
+                pass
+            self._update_scroll_callbacks()
+        except tk.TclError:
+            pass
+
+    def _update_scroll_callbacks(self) -> None:
+        try:
+            first, last = self._canvas.yview()
+            if self._yscrollcommand is not None:
+                self._yscrollcommand(first, last)
+            first_x, last_x = self._canvas.xview()
+            self._header.xview_moveto(first_x)
+            if self._xscrollcommand is not None:
+                self._xscrollcommand(first_x, last_x)
+        except (tk.TclError, TypeError, ValueError):
+            pass
+
+    def refresh(self) -> None:
+        self._ensure_pool()
+        self._refresh_visible()
+
+    # Minimal Treeview-like API consumed by interface.py.
+    def heading(self, column: str, option: str | None = None, **kwargs: Any):
+        if kwargs and "text" in kwargs:
+            self._headings[column] = kwargs["text"]
+            self._redraw_header()
+            return None
+        if option == "text":
+            return self._headings.get(column, "")
+        return {"text": self._headings.get(column, "")}
+
+    def column(self, column: str, option: str | None = None, **kwargs: Any):
+        if kwargs:
+            if "minwidth" in kwargs:
+                self._minimum_widths[column] = max(1, int(kwargs["minwidth"]))
+            if "width" in kwargs:
+                self._widths[column] = max(
+                    self._minimum_widths.get(column, 1),
+                    int(kwargs["width"]),
+                )
+            if "anchor" in kwargs:
+                self._anchors[column] = str(kwargs["anchor"])
+            self._redraw_header()
+            self._schedule_refresh()
+            return None
+        if option == "width":
+            return self._widths.get(column, 0)
+        return {
+            "width": self._widths.get(column, 0),
+            "minwidth": self._minimum_widths.get(column, 0),
+            "anchor": self._anchors.get(column, "w"),
+        }
+
+    def configure(self, cnf=None, **kwargs: Any):
+        if cnf:
+            kwargs.update(cnf)
+        if "yscrollcommand" in kwargs:
+            self._yscrollcommand = kwargs.pop("yscrollcommand")
+        if "xscrollcommand" in kwargs:
+            self._xscrollcommand = kwargs.pop("xscrollcommand")
+        if kwargs:
+            try:
+                super().configure(**kwargs)
+            except tk.TclError:
+                try:
+                    self._canvas.configure(**kwargs)
+                except tk.TclError:
+                    pass
+        self._schedule_refresh()
+
+    config = configure
+
+    def get_children(self, item: str = "") -> tuple[str, ...]:
+        try:
+            first = float(self._canvas.yview()[0])
+            height = max(1, self._canvas.winfo_height())
+        except (tk.TclError, TypeError, ValueError):
+            first = 0.0
+            height = 1
+        start, end = visible_row_range(
+            first,
+            height,
+            self._total_rows,
+            self._row_height,
+            DEFAULT_OVERSCAN,
+        )
+        return tuple(str(row) for row in range(start, end))
+
+    def next(self, iid: str) -> str:
+        current = int(iid)
+        visible = self.get_children("")
+        try:
+            index = visible.index(str(current))
+        except ValueError:
+            return ""
+        return visible[index + 1] if index + 1 < len(visible) else ""
+
+    def focus(self, iid: str | None = None):
+        if iid is not None:
+            self._focus_iid = str(iid)
+            return None
+        return self._focus_iid
+
+    def focus_set(self):
+        try:
+            self._canvas.focus_set()
+        except tk.TclError:
+            pass
+
+    def item(self, iid: str, option: str | None = None, **kwargs: Any):
+        values = self._values_for_row(int(str(iid)))
+        if "values" in kwargs:
+            if self._value_provider is None:
+                setattr(self, "_manual_values", getattr(self, "_manual_values", {}))
+                self._manual_values[str(iid)] = tuple(
+                    "" if value is None else str(value)
+                    for value in kwargs["values"]
+                )
+            self._schedule_refresh()
+            values = self._values_for_row(int(str(iid)))
+        if option == "values":
+            return values
+        if kwargs:
+            return None
+        return {"values": values}
+
+    def bbox(self, iid: str, column: str | None = None):
+        try:
+            row = int(str(iid))
+            if row < 0 or row >= self._total_rows:
+                return None
+            first, last = visible_row_range(
+                float(self._canvas.yview()[0]),
+                max(1, self._canvas.winfo_height()),
+                self._total_rows,
+                self._row_height,
+                DEFAULT_OVERSCAN,
+            )
+            if row < first or row >= last:
+                return None
+            x_scroll = float(self._canvas.canvasx(0))
+            y_scroll = float(self._canvas.canvasy(0))
+            y = row * self._row_height - y_scroll + self._header_height
+            if column is None:
+                x = -x_scroll
+                width = self._total_width()
+            else:
+                index = int(str(column).lstrip("#")) - 1
+                name = self._columns[index][0]
+                x = self._column_left(name) - x_scroll
+                width = self._widths[name]
+            return int(round(x)), int(round(y)), int(width), self._row_height
+        except (ValueError, IndexError, TypeError, tk.TclError):
+            return None
+
+    def identify_row(self, y: int | float) -> str:
+        """Identifica a linha usando coordenadas relativas ao Canvas da grade.
+        Os bindings de mouse da planilha são instalados no Canvas interno; por
+        isso event.y já começa em 0 no topo da primeira linha. O cabeçalho
+        horizontal pertence a outro Canvas e não deve ser descontado aqui.
+        """
+        try:
+            logical_y = float(self._canvas.canvasy(float(y)))
+            row = int(logical_y // self._row_height)
+            return str(row) if 0 <= row < self._total_rows else ""
+        except (TypeError, ValueError, tk.TclError):
+            return ""
+
+    def identify_column(self, x: int | float) -> str:
+        """Identifica a coluna usando coordenadas relativas ao Canvas da grade."""
+        try:
+            canvas_x = float(self._canvas.canvasx(float(x)))
+        except (TypeError, ValueError, tk.TclError):
+            return ""
+        for idx, (name, _text, _width, _minwidth, _anchor, _stretch) in enumerate(self._columns, start=1):
+            left = self._column_left(name)
+            right = left + self._widths.get(name, 1)
+            if left <= canvas_x < right:
+                return f"#{idx}"
+        return ""
+
+    def see(self, iid: str):
+        if self._total_rows <= 0:
+            return
+        try:
+            row = max(0, min(self._total_rows - 1, int(str(iid))))
+        except (TypeError, ValueError):
+            return
+
+        height = max(1, self._canvas.winfo_height())
+        viewport_rows = max(1, int(height / self._row_height))
+        current = float(self._canvas.yview()[0])
+        start, end = visible_row_range(
+            current,
+            height,
+            self._total_rows,
+            self._row_height,
+            DEFAULT_OVERSCAN,
+        )
+        if row < start:
+            target = max(0, row - DEFAULT_OVERSCAN)
+        elif row >= end:
+            target = max(0, row - viewport_rows + 1)
+        else:
+            return
+        self._canvas.yview_moveto(target / max(1, self._total_rows))
+        self._update_scroll_callbacks()
+        self._schedule_refresh()
+
+    def yview(self, *args):
+        if not args:
+            return self._canvas.yview()
+        self._canvas.yview(*args)
+        self._update_scroll_callbacks()
+        self._schedule_refresh()
+
+    def xview(self, *args):
+        if not args:
+            return self._canvas.xview()
+        self._canvas.xview(*args)
+        self._update_scroll_callbacks()
+        self._schedule_refresh()
+
+    def yview_scroll(self, number: int, what: str):
+        self._canvas.yview_scroll(int(number), what)
+        self._update_scroll_callbacks()
+        self._schedule_refresh()
+
+    def xview_scroll(self, number: int, what: str):
+        self._canvas.xview_scroll(int(number), what)
+        self._update_scroll_callbacks()
+        self._schedule_refresh()
+
+    def bind(self, sequence=None, func=None, add=None):
+        return self._canvas.bind(sequence, func, add)
+
+__all__ = [
+    "SM_AUTOLAB_GRADE_VIRTUAL_29926",
+    "VirtualGridTree",
+    "visible_row_range",
+]
+
+
+import ctypes
+import os
+import sys
+from ctypes import wintypes
+
+import customtkinter as ctk
+
+
+SM_AUTOLAB_WINDOWS_NATIVE_29925 = "SM-AUTOLAB-WINDOWS-NATIVE-29925"
+
+DWMWA_BORDER_COLOR = 34
+DWMWA_CAPTION_COLOR = 35
+DWMWA_TEXT_COLOR = 36
+DWMWA_SYSTEMBACKDROP_TYPE = 38
+
+DWMWCP_ROUND = 2
+DWMSBT_AUTO = 0
+DWMSBT_NONE = 1
+DWMSBT_MAINWINDOW = 2
+DWMSBT_TRANSIENTWINDOW = 3
+DWMSBT_TABBEDWINDOW = 4
+
+DWMWA_COLOR_DEFAULT = 0xFFFFFFFF
+
+SPI_GETHIGHCONTRAST = 0x0042
+HCF_HIGHCONTRASTON = 0x00000001
+
+_NATIVE_CONTROL_CLASSES = frozenset(
+    {
+        "syslistview32",
+        "systreeview32",
+        "listbox",
+        "combobox",
+        "scrollbar",
+        "msctls_progress32",
+        "systabcontrol32",
+    }
+)
+
+
+class _HIGHCONTRAST(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.UINT),
+        ("dwFlags", wintypes.DWORD),
+        ("lpszDefaultScheme", wintypes.LPWSTR),
+    ]
+
+
+def _windows11_available():
+    if os.name != "nt":
+        return False
+    try:
+        return int(sys.getwindowsversion().build) >= 22000
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
+def _windows11_backdrops_available():
+    if not _windows11_available():
+        return False
+    try:
+        return int(sys.getwindowsversion().build) >= 22621
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
+def _high_contrast_enabled():
+    if not _windows11_available():
+        return False
+    try:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        getter = user32.SystemParametersInfoW
+        getter.argtypes = [
+            wintypes.UINT,
+            wintypes.UINT,
+            ctypes.c_void_p,
+            wintypes.UINT,
+        ]
+        getter.restype = wintypes.BOOL
+        value = _HIGHCONTRAST()
+        value.cbSize = ctypes.sizeof(_HIGHCONTRAST)
+        if not getter(
+            SPI_GETHIGHCONTRAST,
+            value.cbSize,
+            ctypes.byref(value),
+            0,
+        ):
+            return False
+        return bool(value.dwFlags & HCF_HIGHCONTRASTON)
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
+def _set_dwm_attribute(hwnd, attribute, value):
+    try:
+        dwmapi = ctypes.WinDLL("dwmapi", use_last_error=True)
+        setter = dwmapi.DwmSetWindowAttribute
+        setter.argtypes = [
+            wintypes.HWND,
+            wintypes.DWORD,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+        ]
+        setter.restype = ctypes.c_long
+        result = setter(
+            wintypes.HWND(hwnd),
+            wintypes.DWORD(attribute),
+            ctypes.byref(value),
+            ctypes.sizeof(value),
+        )
+        return int(result) == 0
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
+
+def aplicar_backdrop_sistema(window, material="mica", dark=None):
+    """Aplica Mica/Mica Alt/Acrylic via DWM; retorna False quando indisponível."""
+    if window is None or not _windows11_backdrops_available():
+        return False
+    try:
+        window.update_idletasks()
+        hwnd = int(window.winfo_id())
+    except Exception:
+        return False
+    materiais = {
+        "mica": DWMSBT_MAINWINDOW,
+        "acrylic": DWMSBT_TRANSIENTWINDOW,
+        "mica_alt": DWMSBT_TABBEDWINDOW,
+    }
+    backdrop = materiais.get(str(material).lower())
+    if backdrop is None:
+        return False
+    ok = _set_dwm_attribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ctypes.c_int(backdrop))
+    dark_value = ctypes.c_int(1 if bool(dark) else 0)
+    _set_dwm_attribute(hwnd, 20, dark_value)
+    _set_dwm_attribute(hwnd, 33, ctypes.c_int(DWMWCP_ROUND))
+    return ok
+
+
+def atualizar_backdrop_tema(window, dark: bool):
+    """Atualiza somente o modo claro/escuro do backdrop existente."""
+    if window is None or not _windows11_backdrops_available():
+        return False
+    try:
+        window.update_idletasks()
+        hwnd = int(window.winfo_id())
+    except Exception:
+        return False
+    return _set_dwm_attribute(hwnd, 20, ctypes.c_int(1 if dark else 0))
+
+def _set_native_frame(hwnd, *, dark, high_contrast, material=None):
+    if not _windows11_available():
+        return False
+
+    changed = False
+
+    dark_value = ctypes.c_int(1 if dark and not high_contrast else 0)
+    changed = _set_dwm_attribute(
+        hwnd,
+        20,  # DWMWA_USE_IMMERSIVE_DARK_MODE
+        dark_value,
+    ) or changed
+
+    corner = ctypes.c_int(DWMWCP_ROUND)
+    changed = _set_dwm_attribute(
+        hwnd,
+        33,  # DWMWA_WINDOW_CORNER_PREFERENCE
+        corner,
+    ) or changed
+
+    if high_contrast:
+        backdrop = ctypes.c_int(DWMSBT_NONE)
+        _set_dwm_attribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, backdrop)
+        default_color = ctypes.c_uint(DWMWA_COLOR_DEFAULT)
+        _set_dwm_attribute(hwnd, DWMWA_BORDER_COLOR, default_color)
+        _set_dwm_attribute(hwnd, DWMWA_CAPTION_COLOR, default_color)
+        _set_dwm_attribute(hwnd, DWMWA_TEXT_COLOR, default_color)
+        return changed
+
+    if _windows11_backdrops_available() and material:
+        material_values = {
+            "mica": DWMSBT_MAINWINDOW,
+            "mica_alt": DWMSBT_TABBEDWINDOW,
+            "acrylic": DWMSBT_TRANSIENTWINDOW,
+        }
+        backdrop_type = material_values.get(material, DWMSBT_AUTO)
+        backdrop = ctypes.c_int(backdrop_type)
+        changed = _set_dwm_attribute(
+            hwnd,
+            DWMWA_SYSTEMBACKDROP_TYPE,
+            backdrop,
+        ) or changed
+
+    return changed
+
+
+def _widget_hwnd(widget):
+    try:
+        return int(widget.winfo_id())
+    except Exception:
+        return None
+
+
+def _native_class_name(hwnd):
+    if hwnd is None or os.name != "nt":
+        return ""
+    try:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        getter = user32.GetClassNameW
+        getter.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        getter.restype = ctypes.c_int
+        buffer = ctypes.create_unicode_buffer(256)
+        length = getter(wintypes.HWND(hwnd), buffer, len(buffer))
+        return buffer.value[:length].lower()
+    except (AttributeError, OSError, TypeError, ValueError):
+        return ""
+
+
+def _set_window_theme(hwnd, dark, high_contrast):
+    if hwnd is None or os.name != "nt" or high_contrast:
+        return False
+
+    class_name = _native_class_name(hwnd)
+    if class_name not in _NATIVE_CONTROL_CLASSES:
+        return False
+
+    try:
+        uxtheme = ctypes.WinDLL("uxtheme", use_last_error=True)
+        setter = uxtheme.SetWindowTheme
+        setter.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR]
+        setter.restype = ctypes.HRESULT
+        # The public Explorer theme keeps native controls on the Windows
+        # visual-style pipeline. Dark/light colors are controlled separately
+        # by the application and DWM.
+        result = setter(wintypes.HWND(hwnd), "Explorer", None)
+        return int(result) == 0
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
+def _walk_widgets(widget):
+    yield widget
+    try:
+        children = widget.winfo_children()
+    except Exception:
+        children = ()
+    for child in children:
+        yield from _walk_widgets(child)
+
+
+def _get_toplevels(root):
+    result = [root]
+    try:
+        stack = root.tk.call("wm", "stackorder", root._w)
+        for item in stack:
+            try:
+                window = root.nametowidget(str(item))
+            except Exception:
+                continue
+            # Tooltips são janelas transitórias próprias e não devem receber
+            # backdrop/tema DWM da aplicação.
+            if getattr(window, "_sm_autolab_tooltip_window", False):
+                continue
+            if window not in result:
+                result.append(window)
+    except Exception:
+        pass
+    return result
+
+
+def _material_for_window(window, root):
+    if window is root:
+        return "mica"
+
+    try:
+        title = str(window.title()).strip().lower()
+    except Exception:
+        title = ""
+
+    if any(
+        token in title
+        for token in (
+            "mudar o feegow",
+            "detalhe",
+            "erro",
+            "aviso",
+            "confirma",
+        )
+    ):
+        return "acrylic"
+
+    if any(
+        token in title
+        for token in (
+            "planilha",
+            "arquivo",
+            "histórico",
+            "historico",
+        )
+    ):
+        return "mica_alt"
+
+    return "mica_alt"
+
+
+def _native_apply_window(window, root, dark, high_contrast):
+    hwnd = _widget_hwnd(window)
+    if hwnd is None:
+        return
+
+    material = _material_for_window(window, root)
+    signature = (bool(dark), bool(high_contrast), material)
+    if getattr(window, "_sm_windows11_native_signature", None) == signature:
+        return
+
+    if high_contrast:
+        _set_native_frame(
+            hwnd,
+            dark=dark,
+            high_contrast=True,
+            material=None,
+        )
+        try:
+            atualizar_backdrop_tema(window, False)
+        except Exception:
+            pass
+    else:
+        try:
+            aplicar_backdrop_sistema(
+                window,
+                material,
+                dark=dark,
+            )
+        except Exception:
+            _set_native_frame(
+                hwnd,
+                dark=dark,
+                high_contrast=False,
+                material=material,
+            )
+
+    window._sm_windows11_native_signature = signature
+
+
+def _native_apply_controls(root, dark, high_contrast):
+    for widget in _walk_widgets(root):
+        hwnd = _widget_hwnd(widget)
+        class_name = _native_class_name(hwnd)
+        if class_name not in _NATIVE_CONTROL_CLASSES:
+            continue
+        signature = (bool(dark), bool(high_contrast), class_name)
+        if getattr(widget, "_sm_windows11_control_signature", None) == signature:
+            continue
+        _set_window_theme(hwnd, dark, high_contrast)
+        widget._sm_windows11_control_signature = signature
+
+
+def _stage12_refresh(self, force=False):
+    if getattr(self, "_closing", False):
+        return
+
+    root = getattr(self, "app", None)
+    if root is None:
+        return
+
+    try:
+        dark = str(ctk.get_appearance_mode()).lower() == "dark"
+    except Exception:
+        dark = False
+
+    high_contrast = _high_contrast_enabled()
+    signature = (dark, high_contrast)
+
+    if force or signature != getattr(self, "_windows11_native_theme_signature", None):
+        for window in _get_toplevels(root):
+            _native_apply_window(window, root, dark, high_contrast)
+        _native_apply_controls(root, dark, high_contrast)
+        self._windows11_native_theme_signature = signature
+    else:
+        # New Toplevels can appear without a theme change.
+        for window in _get_toplevels(root):
+            _native_apply_window(window, root, dark, high_contrast)
+        _native_apply_controls(root, dark, high_contrast)
+
+
+def _stage12_watch(self):
+    if getattr(self, "_closing", False):
+        return
+    try:
+        _stage12_refresh(self)
+    except Exception:
+        pass
+    try:
+        self._windows11_native_watch_job = self.app.after(
+            1200,
+            lambda: _stage12_watch(self),
+        )
+    except Exception:
+        self._windows11_native_watch_job = None
+
+
+def install_ui_windows11_native_29925(App):
+    """Camada nativa Windows 11 sobre Tk/CustomTkinter, sem trocar o núcleo funcional."""
+    if getattr(App, "_windows11_native_29925_aplicado", False):
+        return
+
+    App._windows11_native_29925_aplicado = True
+    App._windows11_native_29925_marker = SM_AUTOLAB_WINDOWS_NATIVE_29925
+
+    original_config = App.config_app
+
+    def config_wrapper(self, *args, **kwargs):
+        result = original_config(self, *args, **kwargs)
+        try:
+            self.app.after_idle(lambda: _stage12_refresh(self, force=True))
+            self.app.after(900, lambda: _stage12_watch(self))
+        except Exception:
+            try:
+                _stage12_refresh(self, force=True)
+            except Exception:
+                pass
+        return result
+
+    App.config_app = config_wrapper
+
+    original_theme = App._selecionar_tema
+
+    def theme_wrapper(self, *args, **kwargs):
+        result = original_theme(self, *args, **kwargs)
+        try:
+            self.app.after_idle(lambda: _stage12_refresh(self, force=True))
+        except Exception:
+            pass
+        return result
+
+    App._selecionar_tema = theme_wrapper
+
+    original_close = App._fechar_aplicativo
+
+    def close_wrapper(self, *args, **kwargs):
+        job = getattr(self, "_windows11_native_watch_job", None)
+        if job is not None:
+            try:
+                self.app.after_cancel(job)
+            except Exception:
+                pass
+            self._windows11_native_watch_job = None
+        return original_close(self, *args, **kwargs)
+
+    App._fechar_aplicativo = close_wrapper
+
+
+__all__ = [
+    "SM_AUTOLAB_WINDOWS_NATIVE_29925",
+    "_high_contrast_enabled",
+    "_material_for_window",
+    "install_ui_windows11_native_29925",
+]
 
 
 def _ler_versao_aplicativo():
