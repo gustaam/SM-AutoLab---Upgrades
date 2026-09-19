@@ -6,11 +6,11 @@ import tkinter as tk
 import threading
 import sys
 from datetime import datetime, timedelta
-from tkinter import filedialog, messagebox, Canvas, Frame, ttk, TclError, Entry
+from tkinter import messagebox, Canvas, Frame, ttk, Entry
 import customtkinter as ctk
 
 from ui_platform import aplicar_backdrop_sistema, atualizar_backdrop_tema
-from planilha_virtual_29926 import VirtualGridTree, SM_AUTOLAB_GRADE_VIRTUAL_29926
+from planilha_virtual_29926 import VirtualGridTree
 
 from storage_safe import atomic_write_json, read_json_with_backup
 
@@ -80,7 +80,6 @@ class App:
         self._automacao_atual = None
         self._retomada_dialogo_aberto = False
         self._log_count = 0
-        self._historico = []  # mantido para compatibilidade com versões anteriores
         self._historico_execucoes = []
         self._execucao_atual = None
         self._erros_codigos = []
@@ -108,7 +107,6 @@ class App:
         self._menu_close_job = None
         self._planilha_historico_window = None
         self._arquivos_body = None
-        self._arquivos_calendar_widget = None
         self._arquivos_calendar_canvas = None
         self._arquivos_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         self._arquivos_data_selecionada = None
@@ -1736,25 +1734,12 @@ class App:
 
         body=ctk.CTkFrame(win,fg_color=self.BG,corner_radius=0)
         body.pack(fill="both",expand=True,padx=12,pady=12)
-        style=ttk.Style(win)
-        try: style.theme_use("vista")
-        except TclError: pass
         modo_escuro = ctk.get_appearance_mode().lower() == "dark"
         tree_bg = "#2D3338" if modo_escuro else "#FFFFFF"
         tree_header = "#343A40" if modo_escuro else "#F5F5F5"
         tree_fg = "#F2F4F5" if modo_escuro else "#242424"
         tree_border = "#465058" if modo_escuro else "#E0E0E0"
-        tree_selected = "#1B3C53" if modo_escuro else "#EAF4FF"
         row_header_bg = "#252A2F" if modo_escuro else "#F7F7F7"
-        row_header_text = "#AEB4B9" if modo_escuro else "#6B6B6B"
-        row_header_line = "#384148" if modo_escuro else "#EEEEEE"
-        style.configure("SM.Treeview", font=("Segoe UI",9), rowheight=28, background=tree_bg, fieldbackground=tree_bg, borderwidth=1, relief="solid", foreground=tree_fg)
-        style.map(
-            "SM.Treeview",
-            background=[("selected", tree_selected), ("focus", tree_bg), ("!focus", tree_bg)],
-            foreground=[("selected", tree_fg), ("focus", tree_fg), ("!focus", tree_fg)]
-        )
-        style.configure("SM.Treeview.Heading", font=("Segoe UI",11,"bold"), relief="solid", borderwidth=1, background=tree_header, foreground=tree_fg)
 
         # A numeração das linhas é um cabeçalho lateral separado da grade.
         # Ela não pertence às células da planilha, não pode ser editada e
@@ -1865,13 +1850,7 @@ class App:
         row_header.bind("<Button-1>", _clicar_cabecalho)
 
         tree.focus("")
-        tree.tag_configure("even", background="#FFFFFF")
-        tree.tag_configure("odd", background="#FBFBFB")
-
         # Etapa 13: virtualização real; não há inserção gradual de 10.000 itens.
-        self._planilha_povoamento_job = None
-        self._planilha_povoamento_concluido = True
-        self._planilha_povoamento_proxima_linha = 10000
         self._planilha_celulas_selecionadas = set()
         self._planilha_drag_anchor = None
         self._planilha_drag_start_xy = None
@@ -3942,14 +3921,6 @@ class App:
             try:self.app.after_cancel(self._status_finalizado_job)
             except Exception:pass
             self._status_finalizado_job=None
-
-        if getattr(self, "_planilha_povoamento_job", None) is not None:
-            try:
-                if self._planilha_tree is not None:
-                    self._planilha_tree.after_cancel(self._planilha_povoamento_job)
-            except Exception:
-                pass
-            self._planilha_povoamento_job = None
 
         for job_attr in (
             "_fluent_accent_job",
