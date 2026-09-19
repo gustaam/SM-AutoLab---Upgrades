@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from storage_safe import atomic_write_json, atomic_write_text, backup_path, read_json_with_backup
+from config import atomic_write_json, atomic_write_text, backup_path, read_json_with_backup
 
 
 class StorageSafeTests(unittest.TestCase):
