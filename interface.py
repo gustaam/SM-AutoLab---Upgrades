@@ -645,6 +645,12 @@ class App:
         menu.pack_propagate(False)
         self._menu_config = menu
 
+        try:
+            menu.bind("<Enter>", lambda _event=None: self._cancelar_fechar_menus(), add="+")
+            menu.bind("<Leave>", lambda _event=None: self._agendar_fechar_menus(), add="+")
+        except Exception:
+            pass
+
         aparencia = ctk.CTkButton(
             menu,
             text="Aparência  ›",
@@ -660,17 +666,19 @@ class App:
         )
         aparencia.pack(fill="x", padx=7, pady=(8, 3))
 
-        # CTkButton pode receber o ponteiro sobre um widget interno. Nesse
-        # caso o comando do botão externo não é necessariamente disparado.
-        # O menu de Aparência precisa responder em toda a área visual.
+        # Aparência funciona como submenu em cascata: passar o mouse pela
+        # opção já abre o submenu; o clique continua funcionando como alternativa.
+        def _abrir_aparencia_por_hover(_event=None):
+            self._garantir_menu_aparencia_aberto()
+            return "break"
+
         def _abrir_aparencia_por_clique(event=None):
-            self._mostrar_menu_aparencia()
+            self._garantir_menu_aparencia_aberto()
             return "break"
 
         for _widget in self._iterar_descendentes_ui(aparencia):
-            if _widget is aparencia:
-                continue
             try:
+                _widget.bind("<Enter>", _abrir_aparencia_por_hover, add="+")
                 _widget.bind("<Button-1>", _abrir_aparencia_por_clique, add="+")
             except Exception:
                 pass
@@ -708,6 +716,16 @@ class App:
         # Explicit close/toggle: clicking Configurações again closes the menu.
         self.app.update_idletasks()
         self._reposicionar_menus()
+
+    def _garantir_menu_aparencia_aberto(self):
+        self._cancelar_fechar_menus()
+        menu = getattr(self, "_menu_aparencia", None)
+        try:
+            if menu is not None and menu.winfo_exists():
+                return
+        except Exception:
+            pass
+        self._mostrar_menu_aparencia()
 
     def _mostrar_menu_aparencia(self, _event=None):
         self._cancelar_fechar_menus()
