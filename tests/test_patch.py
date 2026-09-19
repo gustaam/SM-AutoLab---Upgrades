@@ -291,7 +291,8 @@ class PlanilhaStage5Tests(unittest.TestCase):
             content,
         )
         self.assertIn('state = getattr(self, "_stage9_row_header_state", None)', content)
-        self.assertIn('canvas.create_text(5, 0, anchor="w"', content)
+        self.assertIn("canvas.create_text(", content)
+        self.assertIn('tags=("rownum",)', content)
 
     def test_stage5_historico_tem_cache_por_assinatura(self):
         root = Path(__file__).resolve().parents[1]
