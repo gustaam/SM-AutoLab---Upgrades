@@ -97,7 +97,7 @@ class VirtualGridTree(tk.Frame):
         self._refresh_job = None
         self._xscrollcommand = None
         self._yscrollcommand = None
-        self._pool: list[dict[str, Any]] = {}
+        self._pool: list[dict[str, Any]] = []
 
         # Convert the pool to a list after initialisation for deterministic
         # typing and easy reuse.
