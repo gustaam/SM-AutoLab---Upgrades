@@ -66,7 +66,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
 
     def test_mouse_hit_testing_uses_canvas_coordinates_without_header_offset(self):
         root = Path(__file__).resolve().parents[1]
-        source = (root / "planilha_virtual_29926.py").read_text(encoding="utf-8")
+        source = (root / "interface.py").read_text(encoding="utf-8")
         identify_start = source.index("    def identify_row")
         identify_end = source.index("    def identify_column", identify_start)
         identify = source[identify_start:identify_end]
