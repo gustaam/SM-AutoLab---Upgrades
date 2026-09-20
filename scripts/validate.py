@@ -76,7 +76,7 @@ UI_MARKERS = (
 
 TEST_MARKERS = (
     "class VersionComparisonTests", "class UpdateEnvironmentTests", "class UpdateDiscoveryTests",
-    "class UIFixes29912Tests", "class HistoricoIlimitadoTests", "class GradePerformanceStage9Tests", "class PlanilhaVirtualStage13Tests", "test_arquivos_de_teste_auxiliares_foram_consolidados",
+    "class UIFixes29912Tests", "class HistoricoIlimitadoTests", "class GradeCanvasVirtualTests", "class PlanilhaVirtualStage13Tests", "test_arquivos_de_teste_auxiliares_foram_consolidados",
 )
 
 BUILD_MARKERS = ("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")
