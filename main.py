@@ -1,3 +1,4 @@
+# Bootstrap da aplicação: inicialização, splash, DPI e integração da interface.
 from __future__ import annotations
 
 import ctypes

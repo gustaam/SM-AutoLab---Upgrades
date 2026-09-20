@@ -1,3 +1,4 @@
+# Camada principal da interface: planilha, histórico, atualização e integração com o Windows.
 from pathlib import Path
 import json
 import calendar as pycalendar

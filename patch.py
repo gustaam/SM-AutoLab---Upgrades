@@ -1,3 +1,4 @@
+# Camada de compatibilidade: correções históricas consolidadas e aplicadas em uma única entrada.
 from __future__ import annotations
 
 def _load_patch_namespace(name, source):
