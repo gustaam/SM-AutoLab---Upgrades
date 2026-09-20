@@ -2,7 +2,7 @@
 
 Automação de autorizações no Feegow com uma interface desktop moderna, uma planilha virtualizada de alta capacidade e um ciclo de build/release fortemente validado.
 
-**Versão atual:** `2.99.23` — definida exclusivamente pelo arquivo `VERSION`.
+**Versão atual:** `2.99.24` — definida exclusivamente pelo arquivo `VERSION`.
 
 ## O que o SM AutoLab faz
 
@@ -235,7 +235,7 @@ O fluxo de release valida a base antes de publicar:
 9. geração do manifesto com SHA-256;
 10. publicação e verificação dos assets.
 
-A release atual publicada é **v2.99.23**.
+A release atual publicada é **v2.99.24**.
 
 ## Histórico recente de consolidação
 
