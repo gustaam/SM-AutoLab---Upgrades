@@ -1,3 +1,4 @@
+# Validador central: arquitetura, dependências, workflows, versão e executável.
 from __future__ import annotations
 
 import argparse
