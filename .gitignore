@@ -1,3 +1,4 @@
+# Regras de versionamento: mantém temporários, caches e artefatos fora do repositório.
 # Python
 __pycache__/
 *.py[cod]
