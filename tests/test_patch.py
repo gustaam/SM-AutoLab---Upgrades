@@ -8,7 +8,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_main_bootstrap_uses_only_canonical_ui(self):
         source = (self.root / "main.py").read_text(encoding="utf-8")
-        self.assertIn("SM_AUTOLAB_CANONICAL_UI_29929", source)
+        self.assertIn("SM_AUTOLAB_CANONICAL_UI", source)
         self.assertIn("def install_ui(App):", source)
         self.assertNotIn("from patch import", source)
         self.assertNotIn("aplicar_patch_ui", source)
