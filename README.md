@@ -2,7 +2,7 @@
 
 Automação de autorizações no Feegow em um aplicativo desktop para Windows, com planilha virtualizada, histórico, recuperação de execução, atualização integrada e interface moderna.
 
-**Versão atual:** `2.99.28`  
+**Versão em preparação:** `2.99.29`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -87,6 +87,8 @@ O executável recebe ícone, assets, versão e metadados do produto durante a ge
 ## Release e atualização
 
 A release atualmente publicada é **v2.99.28**.
+
+A **v2.99.29** está em preparação com a consolidação definitiva da UI, correção do hover de Aparência, seleção determinística da planilha e remoção das camadas de compatibilidade legadas.
 
 O fluxo valida a base, cria o executável, verifica PE/metadados e Defender, gera um manifesto com SHA-256 e publica o asset. O aplicativo usa esse manifesto para localizar versões compatíveis e validar a integridade antes da atualização.
 
