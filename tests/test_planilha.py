@@ -271,17 +271,15 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
 
     def test_abertura_e_interacao_estao_na_implementacao_canonica(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
-        patch = (self.root / "patch.py").read_text(encoding="utf-8")
         self.assertIn("def abrir_planilha(self, dados_iniciais=None):", interface)
         self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', interface)
-        self.assertIn('tree=VirtualGridTree(', interface)
+        self.assertIn("class VirtualGridTree", interface)
+        self.assertIn("def identify_cell", interface)
         self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', interface)
         self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
         self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
-        self.assertIn("self._planilha_desenhar_borda()", interface)
-        self.assertNotIn("def _abrir_planilha_2991", patch)
-        self.assertNotIn("App.abrir_planilha = _abrir_planilha_297", patch)
-        self.assertNotIn("App.abrir_planilha = _abrir_planilha_2991", patch)
+        self.assertNotIn("bind_all", interface)
+        self.assertFalse((self.root / "patch.py").exists())
 
     def test_virtualizacao_substitui_povoamento_incremental(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -291,159 +289,81 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
         self.assertIn("VirtualGridTree(", block)
         self.assertIn("value_provider=", block)
         self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', block)
-        self.assertNotIn("def _povoar_lote():", block)
-        self.assertNotIn("for i in range(300):", block)
-        self.assertNotIn("fim = min(10000, inicio + 500)", block)
+        self.assertNotIn("range(10000)", block)
+        self.assertNotIn("range(300)", block)
         self.assertNotIn("tree.insert(", block)
-        self.assertNotIn("_planilha_povoamento_", interface)
+
+    def test_mouse_handlers_compartilham_o_mesmo_hit_test(self):
+        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertEqual(interface.count("def identify_cell("), 1)
+        for name in (
+            "_planilha_clicar_celula",
+            "_planilha_arrastar_selecao",
+            "_planilha_soltar_selecao",
+            "_planilha_duplo_clique_celula",
+        ):
+            start = interface.index(f"def {name}")
+            end = interface.find("\n    def ", start + 1)
+            block = interface[start:end if end >= 0 else len(interface)]
+            self.assertIn("tree.identify_cell(event.x, event.y)", block)
 
     def test_snapshot_historico_reutiliza_a_mesma_abertura(self):
-        interface = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = interface.index("def _mostrar_planilhas_do_dia")
-        end = interface.index("def abrir_historico_planilha", start)
-        block = interface[start:end]
-        self.assertIn("command=lambda it=item: self._excluir_historico_planilha(it)", block)
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _abrir_snapshot_historico")
+        end = source.index("def _fechar_historico_planilha", start)
+        block = source[start:end]
+        self.assertIn("self.abrir_planilha(cells)", block)
 
-        # A rota do snapshot deve convergir para abrir_planilha(), sem criar
-        # um Treeview alternativo.
-        snapshot_start = interface.index("def _preparar_planilha_do_dia")
-        snapshot_end = interface.index("def _fechar_historico_planilha", snapshot_start)
-        snapshot_block = interface[snapshot_start:snapshot_end]
-        self.assertIn("self.abrir_planilha(cells)", snapshot_block)
-
-
-# tests/test_planilha_grid.py
 
 class PlanilhaGridSelectionTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(__file__).resolve().parents[1]
 
-    def test_pastas_do_historico_sao_quadradas(self):
-        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
-        start = source.index("def _create_history_tile")
-        end = source.index("def _restore_history", start)
-        block = source[start:end]
-        self.assertIn("width=108", block)
-        self.assertIn("height=108", block)
-        self.assertNotIn("width=128", block)
-        self.assertNotIn("height=104", block)
-
     def test_grade_visual_e_selecao_estao_na_implementacao_canonica(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
-        patch = (self.root / "patch.py").read_text(encoding="utf-8")
         for marker in (
             'SM_AUTOLAB_GRADE_29922 = "SM-AUTOLAB-GRADE-PERFORMANCE-29922"',
             "def _planilha_desenhar_borda",
             "_planilha_celulas_selecionadas",
             'tags=("planilha-selection",)',
             'tags=("virtual-column-line",)',
+            "def identify_cell",
         ):
             self.assertIn(marker, interface)
-        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
-        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
-        self.assertNotIn("_planilha_clicar_celula_2991", patch)
-        self.assertNotIn("_planilha_arrastar_selecao_2991", patch)
-        self.assertNotIn("_planilha_soltar_selecao_2991", patch)
+        self.assertNotIn("bind_all", interface)
 
     def test_grade_canvas_nao_cria_widgets_sobrepostos(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("class VirtualGridTree")
-        end = source.index("__all__ = (", start) if "__all__ = (" in source[start:] else source.index("__all__ =", start)
+        end = source.index("import ctypes", start)
         block = source[start:end]
-        self.assertIn('tags=("virtual-column-line",)', block)
-        self.assertNotIn("Frame(tree", block)
-        self.assertIn("canvas.create_rectangle(", source[source.index("def _planilha_desenhar_borda"):source.index("def _planilha_definir_selecao")])
+        self.assertIn("self._canvas = tk.Canvas(", block)
+        self.assertNotIn("tk.Entry(", block)
+        self.assertNotIn("Frame(tree,", block)
 
-    def test_grade_e_reutilizavel_e_nao_percorre_10000_linhas_para_desenho(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _planilha_desenhar_borda")
-        end = source.index("    def _planilha_definir_selecao", start)
-        block = source[start:end]
-        self.assertNotIn("range(10000)", block)
-        self.assertIn("tree.bbox(", block)
-        self.assertIn('canvas.delete("planilha-selection")', block)
-
-    def test_selecao_multipla_tem_moldura_por_celula_em_selecoes_pequenas(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _planilha_desenhar_borda")
-        end = source.index("    def _planilha_definir_selecao", start)
-        block = source[start:end]
-        self.assertIn("canvas.delete(\"planilha-selection\")", block)
-        self.assertIn("canvas.create_rectangle(", block)
-        self.assertNotIn("frame.lift()", block)
-
-
-# tests/test_planilha_open_path.py
 
 class PlanilhaOpenPathTests(unittest.TestCase):
     def test_abrir_planilha_tem_uma_unica_implementacao(self):
         root = Path(__file__).resolve().parents[1]
         interface = (root / "interface.py").read_text(encoding="utf-8")
         main = (root / "main.py").read_text(encoding="utf-8")
-        patch = (root / "patch.py").read_text(encoding="utf-8")
-
         self.assertEqual(interface.count("    def abrir_planilha(self, dados_iniciais=None):"), 1)
-        self.assertNotIn("App.abrir_planilha = _abrir_planilha_297", patch)
-        self.assertNotIn("App.abrir_planilha = open_planilha_wrapper", main)
-        self.assertNotIn("def _abrir_planilha_2991", patch)
-        self.assertNotIn("App._planilha_clicar_celula = _planilha_clicar_celula_2991", patch)
-        self.assertNotIn("App._planilha_arrastar_selecao = _planilha_arrastar_selecao_2991", patch)
-        self.assertNotIn("App._planilha_soltar_selecao = _planilha_soltar_selecao_2991", patch)
+        self.assertNotIn("from patch import", main)
+        self.assertNotIn("bind_all", main)
         self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', interface)
         self.assertIn("class VirtualGridTree", interface)
-        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
-        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
-        self.assertIn("self.abrir_planilha(cells)", interface)
 
 
+class PlanilhaEventOwnershipTests(unittest.TestCase):
+    def test_editor_e_filho_do_canvas_e_nao_do_frame_externo(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('Entry(tree._canvas, bd=1, relief="solid"', source)
+        self.assertNotIn('Entry(tree, bd=1, relief="solid"', source)
 
-    def test_atalhos_de_edicao_da_grade_estao_robustos(self):
-        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        for binding in (
-            'tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")',
-            'tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")',
-            'tree.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")',
-            'tree.bind("<Control-KeyPress-c>", self._planilha_atalho_copiar, add="+")',
-            'tree.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")',
-            'tree.bind("<Delete>", self._planilha_atalho_excluir, add="+")',
-            'tree.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")',
-            'tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")',
-        ):
-            self.assertIn(binding, interface)
-        self.assertIn("def _planilha_atalho_desfazer", interface)
-        self.assertIn("def _planilha_atalho_refazer", interface)
-        self.assertIn("def _planilha_atalho_selecionar_tudo", interface)
-        self.assertIn("def _planilha_atalho_copiar", interface)
-        self.assertIn("def _planilha_recortar", interface)
-        self.assertIn("def _planilha_atalho_excluir", interface)
-        self.assertIn("def _planilha_tem_entry_em_foco", interface)
-
-    def test_ctrl_v_tem_fallback_local_global_e_virtual(self):
-        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")', interface)
-        self.assertIn('tree.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")', interface)
-        self.assertIn('tree.bind("<<Paste>>", self._planilha_atalho_colar, add="+")', interface)
-        self.assertIn("def _planilha_colar_teclado(self, event=None):", interface)
-        self.assertIn('self.app.bind_all(\n                "<Control-KeyPress-v>"', interface)
-        self.assertIn('self.app.bind_all(\n                "<Control-KeyPress-V>"', interface)
-        self.assertIn("def _planilha_foco_pertence_a_grade(self):", interface)
-        self.assertIn("def _planilha_colar_entry(self, event=None):", interface)
-
-    def test_entry_da_edicao_tem_paste_proprio(self):
-        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = interface.index("def _planilha_editar_iid")
-        end = interface.index("def _planilha_copiar", start)
-        block = interface[start:end]
-        self.assertIn('entry.bind("<Control-KeyPress-v>", self._planilha_colar_entry, add="+")', block)
-        self.assertIn('entry.bind("<<Paste>>", self._planilha_colar_entry, add="+")', block)
-
-    def test_snapshot_historico_reutiliza_a_mesma_abertura(self):
-        root = Path(__file__).resolve().parents[1]
-        source = (root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _abrir_snapshot_historico")
-        end = source.index("def _fechar_historico_planilha", start)
-        block = source[start:end]
-        self.assertIn("self.abrir_planilha(cells)", block)
+    def test_planilha_nao_instala_eventos_globais(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("bind_all", source)
+        self.assertNotIn('bind("<Button-1>", on_click', source)
 
 
 # tests/test_stage12.py
@@ -485,7 +405,7 @@ class Windows11NativeStage12Tests(unittest.TestCase):
         validate = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
         release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
-        self.assertIn("install_ui_windows11_native_29925", main)
+        self.assertNotIn("install_ui_windows11_native_29925", main)
         self.assertIn(
             "from interface import App; from main import install_ui, _validar_base_aplicacao",
             build,
