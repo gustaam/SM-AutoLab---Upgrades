@@ -587,3 +587,15 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("SM_AUTOLAB_GRADE_VIRTUAL_29926", main)
         for source in (build, validate, release):
             self.assertIn("install_ui(App); _validar_base_aplicacao()", source)
+
+
+class PlanilhaEventOwnershipTests(unittest.TestCase):
+    def test_editor_e_filho_do_canvas_e_nao_do_frame_externo(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('Entry(tree._canvas, bd=1, relief="solid"', source)
+        self.assertNotIn('Entry(tree, bd=1, relief="solid"', source)
+
+    def test_patch_nao_instala_clique_global_para_a_planilha(self):
+        source = (Path(__file__).resolve().parents[1] / "patch.py").read_text(encoding="utf-8")
+        self.assertNotIn('bind_all("<Button-1>", on_click', source)
+        self.assertNotIn("def _limpar_selecao_planilha_299", source)

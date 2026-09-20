@@ -296,6 +296,10 @@ def validate_architecture(root: Path) -> None:
             if relative in contents and legacy_import in contents[relative]:
                 fail(f"import legado detectado em {relative}: {legacy_import}")
 
+    if 'bind_all("<Button-1>", on_click' in patch:
+        fail("clique global legado da planilha detectado em patch.py")
+    if 'Entry(tree, bd=1, relief="solid"' in interface:
+        fail("editor da planilha deve ser filho do Canvas da grade")
     if "Ctrl + clique para selecionar várias datas" in patch:
         fail("instrução visual antiga ainda presente em patch.py")
     if "tkcalendar" in interface:

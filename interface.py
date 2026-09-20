@@ -3738,7 +3738,7 @@ class App:
         self._planilha_limpar_borda()
         x,y,w,h=bbox
         vals=list(tree.item(iid,"values")); old=str(vals[col_index])
-        entry=Entry(tree, bd=1, relief="solid", justify="left", font=("Segoe UI",11), highlightthickness=0)
+        entry=Entry(tree._canvas, bd=1, relief="solid", justify="left", font=("Segoe UI",11), highlightthickness=0)
         entry.insert(0,old); entry.place(x=x+1,y=y+1,width=max(w-2,40),height=max(h-2,24))
         self._planilha_edit_entry=entry
         entry.focus_set()
