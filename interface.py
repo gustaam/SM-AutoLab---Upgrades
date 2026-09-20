@@ -2291,6 +2291,7 @@ class App:
         # o submenu sem depender de eventos globais.
         self._configurar_hover_menu(self._menu_config)
         aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
+        aparencia.bind("<Leave>", self._agendar_fechar_menus, add="+")
         
         self.app.update_idletasks()
         self._reposicionar_menus()
