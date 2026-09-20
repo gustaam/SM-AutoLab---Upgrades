@@ -1,3 +1,4 @@
+# Testes da planilha virtualizada: grade, seleção, histórico, calendário e interações.
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
