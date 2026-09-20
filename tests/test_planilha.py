@@ -276,9 +276,9 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
         self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', interface)
         self.assertIn("class VirtualGridTree", interface)
         self.assertIn("def identify_cell", interface)
-        self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', interface)
-        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
-        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
+        self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)', interface)
+        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)', interface)
+        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)', interface)
         self.assertNotIn("bind_all", interface)
         self.assertFalse((self.root / "patch.py").exists())
 
