@@ -13,6 +13,8 @@ SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 REQUIRED_PYTHON_VERSION = "3.14.7"
 REQUIRED_PIP_VERSION = "26.2.1"
 
+BUILD_MARKERS = ("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")
+
 ACTION_RUNTIME_REFS = {
     "actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
     "actions/setup-python": "5fda3b95a4ea91299a34e894583c3862153e4b97",
