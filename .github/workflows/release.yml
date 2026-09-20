@@ -1,3 +1,4 @@
+# Release oficial: validação, build do executável, manifesto, SHA-256 e publicação.
 name: Build and publish release
 
 on:
