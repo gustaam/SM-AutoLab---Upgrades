@@ -490,7 +490,10 @@ def visible_row_range(
     viewport_rows = max(1, math.ceil(max(1, int(viewport_height)) / row_height))
     pool_size = viewport_rows + overscan * 2
     scrollable_rows = max(0, total_rows - viewport_rows)
-    logical_top = min(scrollable_rows, int(fraction * scrollable_rows + 1e-7))
+    # Tk Canvas reports the first fraction relative to the entire scrollregion.
+    # Convert that directly to a logical row before applying overscan.
+    logical_top = min(total_rows, int(fraction * total_rows + 1e-7))
+
     start = max(0, logical_top - overscan)
     end = min(total_rows, start + pool_size)
     if end - start < pool_size:
@@ -1084,7 +1087,7 @@ class VirtualGridTree(tk.Frame):
         """
         row_id = self.identify_row(y)
         col_id = self.identify_column(x)
-        if not row_id or col_id not in tuple(f"#{idx}" for idx in range(1, len(self._columns) + 1)):
+        if not row_id or not col_id:
             return None
         try:
             return int(row_id), int(col_id[1:]) - 1
@@ -3424,7 +3427,13 @@ class App:
         fraction = max(0.0, min(1.0, fraction))
         row_height = 28
         total_rows = MAX_ROWS
-        inicio = max(0, min(total_rows - 1, int(fraction * total_rows + 0.0001)))
+        inicio, _ = visible_row_range(
+            fraction,
+            altura,
+            total_rows,
+            row_height,
+            overscan=0,
+        )
         visiveis = max(1, int(altura / row_height) + 3)
         fim = min(total_rows, inicio + visiveis)
         modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
