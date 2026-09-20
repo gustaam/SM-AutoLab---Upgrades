@@ -193,7 +193,7 @@ def validate_architecture(root: Path) -> None:
         fail("main.py voltou a concentrar camadas legadas; mantenha o bootstrap enxuto")
 
     require_markers("main.py", main, (
-        "SM_AUTOLAB_CANONICAL_UI_29929",
+        "SM_AUTOLAB_CANONICAL_UI",
         "class StartupSplash",
         "def _configurar_dpi_windows",
         "def _validar_base_aplicacao",
