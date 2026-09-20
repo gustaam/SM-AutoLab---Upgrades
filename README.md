@@ -20,7 +20,7 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 
 | Arquivo | Função |
 |---|---|
-| `main.py` | Entrada da aplicação. Inicia o splash, configura DPI e conecta o bootstrap da interface às camadas consolidadas. |
+| `main.py` | Bootstrap enxuto da aplicação. Configura DPI, executa o splash e valida/inicializa o runtime canônico da interface. |
 | `interface.py` | Interface principal. Reúne a planilha virtualizada, histórico/calendário, edição, undo/redo, atualização integrada e integração visual com o Windows. |
 | `app.py` | Núcleo operacional. Controla Selenium/Feegow, leitura de planilhas, resultados, checkpoints e configuração persistente. |
 | `patch.py` | Camada única de compatibilidade. Mantém correções históricas consolidadas e aplica sua sequência sem voltar a criar módulos paralelos. |
@@ -88,7 +88,7 @@ O executável recebe ícone, assets, versão e metadados do produto durante a ge
 
 A release atualmente publicada é **v2.99.28**.
 
-A **v2.99.29** está em preparação com a consolidação definitiva da UI, correção do hover de Aparência, seleção determinística da planilha e remoção das camadas de compatibilidade legadas.
+A **v2.99.29** está em preparação com a consolidação definitiva da UI, correção do hover de Aparência, seleção determinística da planilha e remoção das camadas de compatibilidade legadas e do patch runtime.
 
 O fluxo valida a base, cria o executável, verifica PE/metadados e Defender, gera um manifesto com SHA-256 e publica o asset. O aplicativo usa esse manifesto para localizar versões compatíveis e validar a integridade antes da atualização.
 
