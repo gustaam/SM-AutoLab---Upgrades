@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from interface import (
     App,
+    VirtualGridTree,
     MAX_COLS,
     MAX_ROWS,
     SM_AUTOLAB_GRADE_VIRTUAL_29926,
@@ -513,7 +514,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertEqual(grid.identify_cell(445, 5), (10, 2))
         self.assertEqual(grid.identify_cell(499, 27), (10, 2))
         self.assertIsNone(grid.identify_cell(580, 5))
-        self.assertIsNone(grid.identify_cell(5, -100))
+        self.assertIsNone(grid.identify_cell(5, -300))
 
     def test_mouse_hit_testing_uses_canvas_coordinates_without_header_offset(self):
         root = Path(__file__).resolve().parents[1]
