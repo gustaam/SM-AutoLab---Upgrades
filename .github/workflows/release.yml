@@ -98,7 +98,7 @@ jobs:
             '    StringFileInfo([',
             '      StringTable(''040904B0'', [',
             '        StringStruct(''CompanyName'', ''SM AutoLab''),',
-            '        StringStruct(''FileDescription'', ''SM AutoLab''),',
+            '        StringStruct(''FileDescription'', ''SM AutoLab — Automação de autorizações no Feegow''),',
             '        StringStruct(''FileVersion'', ''__VERSION__''),',
             '        StringStruct(''InternalName'', ''SM AutoLab''),',
             '        StringStruct(''OriginalFilename'', ''SM AutoLab.exe''),',
