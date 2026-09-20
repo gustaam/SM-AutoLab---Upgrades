@@ -287,7 +287,7 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
         block = interface[start:end]
         self.assertIn("VirtualGridTree(", block)
         self.assertIn("value_provider=", block)
-        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', block)
+        self.assertIn('self._planilha_implementacao = "grade-virtual"', block)
         self.assertNotIn("range(10000)", block)
         self.assertNotIn("range(300)", block)
         self.assertNotIn("tree.insert(", block)
@@ -321,7 +321,6 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
     def test_grade_visual_e_selecao_estao_na_implementacao_canonica(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
         for marker in (
-            'SM_AUTOLAB_GRADE_29922 = "SM-AUTOLAB-GRADE-PERFORMANCE-29922"',
             "def _planilha_desenhar_borda",
             "_planilha_celulas_selecionadas",
             'tags=("planilha-selection",)',
@@ -386,13 +385,13 @@ class NativeBackdropTests(unittest.TestCase):
         self.assertNotIn("install_ui_windows11_native_29925", main)
         self.assertNotIn("from patch import", main)
 
-# tests/test_stage13.py
+# tests/test_virtual_grid.py
 
 class VirtualGridStage13Tests(unittest.TestCase):
     def test_marker(self):
         self.assertEqual(
-            SM_AUTOLAB_GRADE_VIRTUAL_29926,
-            "SM-AUTOLAB-GRADE-VIRTUAL-29926",
+            SM_AUTOLAB_GRADE_VIRTUAL,
+            "SM-AUTOLAB-GRADE-VIRTUAL",
         )
 
     def test_visible_range_is_small_even_for_ten_thousand_rows(self):
