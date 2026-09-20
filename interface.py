@@ -1076,6 +1076,21 @@ class VirtualGridTree(tk.Frame):
                 return f"#{idx}"
         return ""
 
+    def identify_cell(self, x: int | float, y: int | float) -> tuple[int, int] | None:
+        """Converte coordenadas do Canvas diretamente em (linha, coluna).
+        
+        Todas as interações de mouse da planilha passam por este único hit-test,
+        evitando divergências entre seleção, arraste, duplo clique e contexto.
+        """
+        row_id = self.identify_row(y)
+        col_id = self.identify_column(x)
+        if not row_id or col_id not in tuple(f"#{idx}" for idx in range(1, len(self._columns) + 1)):
+            return None
+        try:
+            return int(row_id), int(col_id[1:]) - 1
+        except (TypeError, ValueError):
+            return None
+
     def see(self, iid: str):
         if self._total_rows <= 0:
             return
@@ -2189,6 +2204,17 @@ class App:
         for child in children:
             yield from self._iterar_descendentes_ui(child)
 
+    def _configurar_hover_menu(self, root):
+        """Mantém menus e submenus abertos durante a navegação por hover."""
+        if root is None:
+            return
+        for widget in self._iterar_descendentes_ui(root):
+            try:
+                widget.bind("<Enter>", self._cancelar_fechar_menus, add="+")
+                widget.bind("<Leave>", self._agendar_fechar_menus, add="+")
+            except Exception:
+                pass
+
     def _mostrar_menu_configuracoes(self, _event=None):
         """Abre o menu principal de configurações sem bindings concorrentes."""
         self._cancelar_fechar_menus()
@@ -2214,6 +2240,7 @@ class App:
         menu.place(x=0, y=0)
         menu.pack_propagate(False)
         self._menu_config = menu
+        self._configurar_hover_menu(self._menu_config)
 
         aparencia = ctk.CTkButton(
             menu,
@@ -2230,6 +2257,8 @@ class App:
         )
         aparencia.pack(fill="x", padx=7, pady=(8, 3))
         self._menu_aparencia_btn = aparencia
+        aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
+        aparencia.bind("<Leave>", self._agendar_fechar_menus, add="+")
 
         mudar = ctk.CTkButton(
             menu,
@@ -2265,8 +2294,7 @@ class App:
         self._reposicionar_menus()
 
     def _garantir_menu_aparencia_aberto_se_hover(self, event=None):
-        # Mantido somente como compatibilidade de chamada; o menu agora é acionado por clique.
-        return
+        return self._mostrar_menu_aparencia(event)
 
     def _garantir_menu_aparencia_aberto(self):
         if self._menu_config is None or not self._menu_config.winfo_exists():
@@ -2304,6 +2332,7 @@ class App:
         sub.place(x=0, y=0)
         sub.pack_propagate(False)
         self._menu_aparencia = sub
+        self._configurar_hover_menu(sub)
 
         ctk.CTkLabel(
             sub,
@@ -2342,8 +2371,7 @@ class App:
             self._menu_aparencia = None
 
     def _agendar_fechar_aparencia(self, _event=None):
-        # Kept for compatibility with older bindings.
-        self._cancelar_fechar_menus()
+        self._agendar_fechar_menus(_event)
 
     def _fechar_submenu_aparencia(self):
         self._menu_close_job = None
@@ -3355,50 +3383,8 @@ class App:
         self._planilha_row_header=row_header
         self._planilha_implementacao = "grade-virtual-29926"
         tree.refresh()
-        # Fallback global: alguns ambientes Windows/Tk não entregam Ctrl+V ao
-        # Treeview, mesmo com o binding local. Interceptamos somente enquanto
-        # o foco estiver dentro da planilha, evitando afetar o restante do app.
-        if not getattr(self, "_planilha_paste_global_instalado", False):
-            self._planilha_paste_global_instalado = True
-
-            def _planilha_paste_global(event):
-                if self._planilha_foco_pertence_a_grade():
-                    return self._planilha_colar_teclado(event)
-                return None
-
-            self._planilha_paste_global_callback = _planilha_paste_global
-            self.app.bind_all(
-                "<Control-KeyPress-v>",
-                _planilha_paste_global,
-                add="+",
-            )
-            self.app.bind_all(
-                "<Control-KeyPress-V>",
-                _planilha_paste_global,
-                add="+",
-            )
-
-        # Fallbacks de teclado para ambientes Tk/Windows que não propagam
-        # algum atalho do Treeview. O foco é sempre validado antes.
-        if not getattr(self, "_planilha_shortcuts_global_instalado", False):
-            self._planilha_shortcuts_global_instalado = True
-
-            def _shortcut_global(handler):
-                def callback(event):
-                    if not self._planilha_foco_pertence_a_grade():
-                        return None
-                    if self._planilha_tem_entry_em_foco():
-                        return None
-                    return handler(event)
-                return callback
-
-            self.app.bind_all("<Control-KeyPress-z>", _shortcut_global(self._planilha_atalho_desfazer), add="+")
-            self.app.bind_all("<Control-KeyPress-y>", _shortcut_global(self._planilha_atalho_refazer), add="+")
-            self.app.bind_all("<Control-KeyPress-a>", _shortcut_global(self._planilha_atalho_selecionar_tudo), add="+")
-            self.app.bind_all("<Control-KeyPress-c>", _shortcut_global(self._planilha_atalho_copiar), add="+")
-            self.app.bind_all("<Control-KeyPress-x>", _shortcut_global(self._planilha_recortar), add="+")
-            self.app.bind_all("<Delete>", _shortcut_global(self._planilha_atalho_excluir), add="+")
-            self.app.bind_all("<BackSpace>", _shortcut_global(self._planilha_atalho_excluir), add="+")
+        # Todos os atalhos da planilha ficam limitados ao Canvas/Entry.
+        # Isso evita que menus e controles externos disputem eventos globais.
         # Primeira repintura após a viewport estar realmente montada.
         try:
             tree.update_idletasks()
