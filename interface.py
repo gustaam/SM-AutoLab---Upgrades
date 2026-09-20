@@ -1150,7 +1150,7 @@ class VirtualGridTree(tk.Frame):
         return self._canvas.bind(sequence, func, add)
 
 __all__ = [
-    "SM_AUTOLAB_GRADE_VIRTUAL_29926",
+    "SM_AUTOLAB_GRADE_VIRTUAL",
     "VirtualGridTree",
     "visible_row_range",
 ]
@@ -3042,7 +3042,7 @@ class App:
         tree.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
         self._planilha_tree=tree
         self._planilha_row_header=row_header
-        self._planilha_implementacao = "grade-virtual-29926"
+        self._planilha_implementacao = "grade-virtual"
         tree.refresh()
         # Todos os atalhos da planilha ficam limitados ao Canvas/Entry.
         # Isso evita que menus e controles externos disputem eventos globais.
