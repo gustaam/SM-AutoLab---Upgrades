@@ -1,48 +1,269 @@
 # SM AutoLab
 
-## Base atual
+Automação de autorizações no Feegow com uma interface desktop moderna, uma planilha virtualizada de alta capacidade e um ciclo de build/release fortemente validado.
 
-Esta é a base estável atual do SM AutoLab. A versão vigente é sempre a declarada no arquivo `VERSION`. A partir da 2.99.22, a grade interna usa virtualização real: os 10.000 registros permanecem lógicos em memória e somente a viewport mais um pequeno overscan são renderizados em Canvas; a aplicação usa calendário nativo com `tkinter.Canvas` e elementos `CustomTkinter` no visual Fluent 2. A numeração de versões futuras não altera a estrutura funcional da base. A partir da 2.99.16, a interface principal também recebe uma camada visual Fluent 2 refinada, com superfícies mais consistentes, estados hover e uma microanimação discreta de acento no cabeçalho. No Windows 11 Build 22621 ou superior, a interface usa os materiais de composição do DWM: Mica na janela principal, Mica Alt em janelas secundárias persistentes e Acrylic em diálogos transitórios; em sistemas sem esse suporte, a paleta Fluent 2 sólida permanece como fallback. A partir da 2.99.17, a tela inicial também recebe um dashboard moderno de sessão, com resumo contextual, indicadores de execução e anel de progresso sincronizado com a automação.
+**Versão atual:** `2.99.23` — definida exclusivamente pelo arquivo `VERSION`.
 
-## Arquivos e histórico
+## O que o SM AutoLab faz
 
-- calendário mensal interativo;
-- navegação entre meses conforme o histórico disponível;
-- clique em uma data para listar somente as planilhas salvas naquele dia;
-- botão `← Voltar` para retornar ao calendário;
-- destaque visual para dias com planilhas;
-- histórico ilimitado;
-- seleção múltipla de datas;
-- animação/estado visual de seleção;
-- contador de células selecionadas;
-- exclusão somente das datas selecionadas;
-- botão `Limpar histórico` para limpar tudo;
-- contador de códigos calculado somente a partir do histórico existente.
+O SM AutoLab automatiza o processamento de códigos em uma rotina operacional integrada ao Feegow. O aplicativo lê códigos de uma planilha Excel, abre o navegador controlado pelo Selenium, realiza o login e percorre a rotina de autorização procedimento a procedimento.
 
-## Estrutura de manutenção
+A aplicação foi evoluindo para concentrar tudo em uma arquitetura pequena e verificável, sem perder as melhorias acumuladas na interface.
 
-`main.py` concentra a inicialização, o splash, as correções do histórico ilimitado e as correções finais de UI. `patch.py` permanece como ponto único de entrada das correções históricas consolidadas. `app.py` reúne a orquestração da execução, leitura das planilhas e armazenamento dos resultados.
+## Principais funcionalidades
 
-Os módulos pequenos `planilha.py`, `resultados.py`, `splash.py` e `ui_fixes_29912.py` foram incorporados aos módulos principais e removidos da árvore para evitar fragmentação desnecessária.
+### Automação do Feegow
 
-## Configuração e credenciais
+- Leitura de códigos da coluna configurada da planilha Excel.
+- Abertura e controle do navegador por Selenium.
+- Login com credenciais configuradas localmente pelo usuário.
+- Abertura automática da área **Autorizar Procedimento**.
+- Execução sequencial dos códigos.
+- Tratamento de falhas por código, permitindo continuar para o próximo item quando possível.
+- Recuperação automática da tela e reinicialização do navegador quando a sessão fica inutilizável.
+- Feedback de status durante login, navegação, execução e recuperação.
+- Contadores incrementais de processados, sucessos e erros.
 
-As credenciais do Feegow não fazem parte do código-fonte. `config.py` mantém apenas valores padrão vazios e persiste as configurações fornecidas pelo usuário em `SM AutoLab/feegow_config.json`. A automação interrompe o início ou a recuperação do navegador quando usuário e senha não estiverem configurados.
+### Planilha virtualizada
 
-## Build e releases
+A grade foi projetada para trabalhar com **até 10.000 linhas lógicas** sem criar 10.000 widgets de interface.
 
-Antes de qualquer release, a validação da `main` confere a estrutura atual, os componentes obrigatórios, a ausência de referências legadas, a sintaxe e a integração das camadas. O workflow de release exige que a tag aponte exatamente para a `main` validada, compara a tag com `VERSION`, gera somente o aplicativo principal e seu manifesto. A atualização automática é integrada ao próprio executável e verifica o manifesto, a versão superior e o SHA-256 antes de substituir a instalação.
+- Renderização virtual em Canvas.
+- Pool reutilizável de células visíveis.
+- Overscan pequeno para rolagem suave.
+- Cálculo do intervalo visível em vez de percorrer toda a planilha.
+- Seleção por célula e seleção retangular.
+- Arraste para seleção.
+- Seleção de todas as células preenchidas.
+- Edição direta da célula.
+- Copiar, recortar e colar.
+- Colagem por teclado com fallback local/global e suporte ao evento de clipboard.
+- Exclusão de conteúdo com Delete/Backspace.
+- Desfazer e refazer.
+- Limpeza seletiva.
+- Contador de linhas preenchidas.
+- Armazenamento esparso: células vazias não precisam permanecer materializadas.
 
-O `build_windows.bat` é autossuficiente quanto aos metadados de versão do executável: o antigo `version_info_template.txt` foi incorporado diretamente ao processo de build. O arquivo temporário `version_info.txt` continua sendo gerado apenas durante o build e é ignorado pelo Git.
+### Rascunhos, checkpoints e recuperação
 
-## Arquitetura consolidada
+- Salvamento de rascunho da planilha.
+- Recuperação de rascunho ao reabrir a aplicação.
+- Checkpoint por planilha/aba durante execução.
+- Checkpoint interno para execução direta a partir de códigos em memória.
+- Impressão digital (fingerprint) da lista de códigos para evitar retomar uma execução em uma lista diferente.
+- Limpeza automática do checkpoint ao concluir a execução.
 
-As correções de interface históricas permanecem reunidas em `patch.py`, que mantém `aplicar_patch_ui` como ponto de integração. As correções finais específicas da UI estão em `main.py`, no mesmo módulo de inicialização, sem um arquivo separado.
+### Histórico e calendário
 
-### Mapa de integração
+- Histórico persistente das planilhas processadas.
+- Calendário mensal em Canvas.
+- Navegação pelos meses disponíveis.
+- Destaque visual das datas com planilhas.
+- Abertura do conteúdo salvo a partir da data selecionada.
+- Seleção múltipla de datas.
+- Animação visual de seleção.
+- Exclusão seletiva de datas.
+- Limpeza de todo o histórico mediante confirmação.
+- Contador de códigos baseado no histórico efetivamente salvo.
+- A abertura de snapshots converge para a mesma implementação canônica da planilha, evitando uma segunda grade paralela.
 
-`patch.py` é o ponto único de entrada das correções consolidadas de interface. Ele incorpora fisicamente, em namespaces isolados, as antigas camadas de base e mantém a ordem histórica de aplicação. É o único módulo de patches importado por `main.py`.
+### Dashboard e acompanhamento de sessão
 
-Os antigos `patch_base.py`, `patch_arquivos.py` e `patch_ajustes.py` tiveram seus conteúdos preservados integralmente em fontes internas `_SOURCE_PATCH_BASE`, `_SOURCE_PATCH_ARQUIVOS` e `_SOURCE_PATCH_AJUSTES`, executadas nos namespaces `_NS_PATCH_BASE`, `_NS_PATCH_ARQUIVOS` e `_NS_PATCH_AJUSTES`. Isso preserva a resolução de nomes e a sequência de monkey-patches sem manter módulos externos separados.
+- Dashboard inicial integrado à tela principal.
+- Resumo contextual da sessão.
+- Indicadores de execução.
+- Anel de progresso sincronizado.
+- Atualização incremental de métricas.
+- Histórico de atividades e mensagens de erro.
+- Indicador de status com estado visual de prontidão.
 
-`atualizacao.py` é o motor integrado de atualização do próprio executável.
+### Interface e experiência visual
+
+A interface combina CustomTkinter, Canvas e integração nativa com o Windows.
+
+- Visual inspirado no **Fluent 2**.
+- Estados hover e foco mais consistentes.
+- Microanimações discretas de acento.
+- Layout responsivo para redimensionamento da janela.
+- Tooltips universais para botões e controles relevantes.
+- Menus de aparência/configurações com interação por clique e hover.
+- Calendário e componentes gráficos desenhados diretamente em Canvas quando isso reduz overhead.
+- Splash screen otimizado para reutilizar o mesmo item de imagem em vez de redesenhar toda a tela a cada frame.
+- Preservação de atalhos e interações de teclado da planilha.
+
+### Integração nativa com Windows 11
+
+No Windows 11 compatível, o aplicativo aproveita recursos do DWM; fora desse cenário, utiliza fallback visual sólido.
+
+- Mica na janela principal.
+- Mica Alt em janelas secundárias persistentes.
+- Acrylic em diálogos transitórios.
+- Cantos arredondados via DWM.
+- Integração com recursos de tema claro/escuro.
+- DPI awareness com fallback para APIs disponíveis na versão do Windows.
+- Ajustes nativos de tema/acessibilidade da interface.
+- Fallback seguro quando APIs nativas não estão disponíveis.
+
+## Segurança e persistência
+
+As credenciais não são gravadas no código-fonte.
+
+- Usuário e senha começam vazios no código.
+- As configurações fornecidas pelo usuário são armazenadas localmente na pasta de dados do **SM AutoLab**.
+- Gravações críticas utilizam escrita atômica.
+- Arquivos importantes podem manter backup anterior para recuperação.
+- JSON corrompido pode ser recuperado a partir do backup quando disponível.
+- Nenhuma credencial precisa ser adicionada ao Git.
+- O pipeline executa verificação do Windows Defender sobre a árvore do projeto.
+
+## Atualização automática
+
+O atualizador faz parte do próprio aplicativo; não existe um executável de updater separado como componente da distribuição.
+
+O processo valida:
+
+1. versão disponível;
+2. versão atual versus versão candidata;
+3. manifesto da release;
+4. integridade do arquivo pelo SHA-256;
+5. compatibilidade do asset esperado;
+6. preparação do ambiente para reinício independente;
+7. substituição segura do executável.
+
+Isso reduz dependências externas do processo de atualização.
+
+## Arquitetura atual
+
+A base de produção foi compactada para quatro módulos principais:
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `main.py` | Ponto de entrada da aplicação, splash, inicialização unificada da UI, dashboard, layout responsivo, tooltips e correções finais de interface. |
+| `interface.py` | Camada principal de interface: planilha virtual, calendário/histórico, edição, seleção, undo/redo, atualização integrada e recursos nativos do Windows. |
+| `app.py` | Automação do Feegow, leitura das planilhas, resultados da execução, checkpoints, configuração local e armazenamento seguro. |
+| `patch.py` | Compatibilidade histórica consolidada. Mantém a ordem de aplicação dos patches sem espalhar dezenas de arquivos auxiliares pela árvore. |
+
+### Por que `patch.py` continua separado?
+
+Ele funciona como a fronteira de compatibilidade das correções históricas. As antigas camadas de patch foram incorporadas fisicamente ao arquivo em namespaces isolados, preservando ordem e resolução de nomes sem manter módulos externos individuais.
+
+## Mapa das pastas e arquivos
+
+```
+SM-AutoLab---Upgrades/
+├── .github/
+│   └── workflows/
+│       ├── validate-main.yml   # CI da main, validações e preparação automática da release
+│       └── release.yml         # build, validação do executável, manifesto e publicação
+│
+├── assets/
+│   ├── feegow_powered.png      # identidade/assinatura visual relacionada ao Feegow
+│   └── laboratorio_principal.png # imagem usada pela interface
+│
+├── scripts/
+│   └── validate.py             # validador consolidado de arquitetura, dependências,
+│                               # qualidade, VERSION e executável PE
+│
+├── tests/
+│   ├── test_patch.py           # regressões, compatibilidade e contratos da base
+│   ├── test_main.py            # testes da camada principal/dashboard/UI
+│   ├── test_planilha.py        # planilha virtual, histórico, calendário e edição
+│   ├── test_app.py             # automação, resultados, checkpoints e armazenamento
+│   └── test_validation.py      # testes dos validadores consolidados
+│
+├── app.py                      # automação + persistência + configuração
+├── interface.py                # UI + planilha + histórico + atualização + Windows nativo
+├── main.py                     # bootstrap + splash + UI integrada
+├── patch.py                    # compatibilidade e patches históricos consolidados
+├── build_windows.bat           # build manual do executável Windows
+├── requirements.txt            # dependências de runtime fixadas
+├── VERSION                     # versão canônica do aplicativo
+├── SM AutoLab.ico              # ícone do executável
+├── README.md                   # documentação principal
+└── .gitignore                  # exclusões do Git
+```
+
+## Validação, testes e qualidade
+
+A suíte atual está consolidada em **5 arquivos**, preservando **120 casos de teste**.
+
+O validador único oferece:
+
+- `all`: arquitetura, VERSION e qualidade;
+- `architecture`: estrutura e integração;
+- `version`: validação de versão;
+- `quality`: qualidade estrutural e ciclos de importação;
+- `executable`: validação básica do PE gerado.
+
+O CI também executa:
+
+- Python **3.14.7**;
+- `pip 26.2.1`;
+- dependências fixadas em `requirements.txt`;
+- compilação sintática com `compileall`;
+- suíte completa de testes;
+- teste de integração da inicialização da UI;
+- Windows Defender.
+
+## Build do Windows
+
+O build oficial produz um único executável principal:
+
+`dist/SM AutoLab.exe`
+
+O processo usa PyInstaller e incorpora:
+
+- ícone do aplicativo;
+- assets;
+- `VERSION`;
+- metadados de arquivo/produto gerados automaticamente a partir da versão.
+
+O arquivo intermediário de metadados é temporário e não faz parte da árvore versionada.
+
+## Release
+
+O fluxo de release valida a base antes de publicar:
+
+1. validação estrutural e de dependências;
+2. testes automatizados e integração;
+3. Defender;
+4. confirmação de que a `main` não mudou após a validação;
+5. validação da versão;
+6. criação/alinhamento da tag exata do commit validado;
+7. build do executável;
+8. validação do PE e dos metadados;
+9. geração do manifesto com SHA-256;
+10. publicação e verificação dos assets.
+
+A release atual publicada é **v2.99.23**.
+
+## Histórico recente de consolidação
+
+As principais reduções estruturais já concluídas foram:
+
+- remoção de módulos auxiliares duplicados de UI e planilha;
+- consolidação da grade virtualizada em `interface.py`;
+- consolidação da automação e persistência em `app.py`;
+- consolidação do validador em `scripts/validate.py`;
+- consolidação da suíte de testes de 18 para 5 arquivos;
+- eliminação de arquivos históricos obsoletos da árvore principal;
+- manutenção das compatibilidades históricas dentro de `patch.py`;
+- eliminação de referências de importação para módulos removidos;
+- validação contínua após cada compactação para evitar regressões.
+
+## Manutenção
+
+A regra da base é simples: **não introduzir uma nova implementação paralela quando a implementação canônica já existe**.
+
+Ao alterar o aplicativo:
+
+- atualize a implementação canônica;
+- atualize os testes correspondentes;
+- atualize `scripts/validate.py` quando a estrutura mudar;
+- execute o CI completo antes do merge;
+- não deixe referências a arquivos removidos;
+- mantenha `VERSION` como única fonte de verdade da versão.
+
+---
+
+**SM AutoLab** — automação de processos, planilha de alta capacidade e interface desktop integrada em uma base enxuta e verificável.

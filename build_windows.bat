@@ -48,11 +48,7 @@ if errorlevel 1 (
 
 echo.
 echo Validando versao e arquitetura consolidada...
-%PYTHON% scripts\validate_architecture.py
-if errorlevel 1 goto :erro
-%PYTHON% scripts\validate_version.py VERSION
-if errorlevel 1 goto :erro
-%PYTHON% scripts\validate_quality.py
+%PYTHON% scripts\validate.py all
 if errorlevel 1 goto :erro
 echo Validacao de arquitetura e versao: OK
 echo.
