@@ -1,3 +1,4 @@
+# Testes do núcleo operacional: automação, resultados, checkpoints e persistência.
 import json
 import tempfile
 import unittest
