@@ -544,7 +544,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         interface = (root / "interface.py").read_text(encoding="utf-8")
         start = interface.index("def abrir_planilha")
-        end = interface.index("    def _planilha_stage9_get_grid_state", start)
+        end = interface.index("    def _planilha_desenhar_cabecalho_linhas", start)
         block = interface[start:end]
 
         self.assertIn("VirtualGridTree(", block)
