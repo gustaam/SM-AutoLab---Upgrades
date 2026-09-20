@@ -235,7 +235,7 @@ O fluxo de release valida a base antes de publicar:
 9. geração do manifesto com SHA-256;
 10. publicação e verificação dos assets.
 
-A release publicada anteriormente é **v2.99.23**. A próxima versão preparada pela base atual é **v2.99.24**, ainda dependente da validação completa e publicação.
+A release atual publicada é **v2.99.24**. A versão anterior publicada foi **v2.99.23**.
 
 ## Histórico recente de consolidação
 
