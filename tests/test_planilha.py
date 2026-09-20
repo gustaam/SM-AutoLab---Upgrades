@@ -7,9 +7,7 @@ from interface import (
     VirtualGridTree,
     MAX_COLS,
     MAX_ROWS,
-    SM_AUTOLAB_GRADE_VIRTUAL_29926,
-    SM_AUTOLAB_WINDOWS_NATIVE_29925,
-    _material_for_window,
+    SM_AUTOLAB_GRADE_VIRTUAL,
     apply_paste,
     clear_cells,
     extract_column,
@@ -273,7 +271,7 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
     def test_abertura_e_interacao_estao_na_implementacao_canonica(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("def abrir_planilha(self, dados_iniciais=None):", interface)
-        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', interface)
+        self.assertIn('self._planilha_implementacao = "grade-virtual"', interface)
         self.assertIn("class VirtualGridTree", interface)
         self.assertIn("def identify_cell", interface)
         self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)', interface)
@@ -367,69 +365,26 @@ class PlanilhaEventOwnershipTests(unittest.TestCase):
         self.assertNotIn('bind("<Button-1>", on_click', source)
 
 
-# tests/test_stage12.py
+# tests/test_native_backdrop.py
 
-class Windows11NativeStage12Tests(unittest.TestCase):
-    def test_stage12_marker(self):
-        self.assertEqual(
-            SM_AUTOLAB_WINDOWS_NATIVE_29925,
-            "SM-AUTOLAB-WINDOWS-NATIVE-29925",
-        )
+class NativeBackdropTests(unittest.TestCase):
+    def test_native_backdrop_helpers_sao_diretos_e_nao_injetam_camadas(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def aplicar_backdrop_sistema", source)
+        self.assertIn("def atualizar_backdrop_tema", source)
+        self.assertIn("DwmSetWindowAttribute", source)
+        self.assertNotIn("install_ui_windows11_native_29925", source)
+        self.assertNotIn("_stage12_refresh", source)
+        self.assertNotIn("_stage12_watch", source)
+        self.assertNotIn("_native_apply_controls", source)
+        self.assertNotIn("_native_apply_window", source)
 
-    def test_material_hierarchy(self):
-        class Root:
-            def title(self):
-                return "SM AutoLab"
-
-        class Secondary:
-            def __init__(self, title):
-                self._title = title
-
-            def title(self):
-                return self._title
-
-        root = Root()
-        self.assertEqual(_material_for_window(root, root), "mica")
-        self.assertEqual(
-            _material_for_window(Secondary("Planilha — SM AutoLab"), root),
-            "mica_alt",
-        )
-        self.assertEqual(
-            _material_for_window(Secondary("Mudar o Feegow"), root),
-            "acrylic",
-        )
-
-    def test_main_build_and_workflows_integrate_stage12(self):
+    def test_main_nao_instala_wrapper_nativo(self):
         root = Path(__file__).resolve().parents[1]
         main = (root / "main.py").read_text(encoding="utf-8")
-        build = (root / "build_windows.bat").read_text(encoding="utf-8")
-        validate = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
-        release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-
         self.assertNotIn("install_ui_windows11_native_29925", main)
-        self.assertIn(
-            "from interface import App; from main import install_ui, _validar_base_aplicacao",
-            build,
-        )
-        self.assertIn(
-            "from interface import App; from main import install_ui, _validar_base_aplicacao",
-            validate,
-        )
-        self.assertIn(
-            "from interface import App; from main import install_ui, _validar_base_aplicacao",
-            release,
-        )
-
-    def test_native_layer_has_accessibility_and_dwm_paths(self):
-        source = (
-            Path(__file__).resolve().parents[1] / "interface.py"
-        ).read_text(encoding="utf-8")
-        self.assertIn("SystemParametersInfoW", source)
-        self.assertIn("DwmSetWindowAttribute", source)
-        self.assertIn("SetWindowTheme", source)
-        self.assertIn("DWMWA_SYSTEMBACKDROP_TYPE", source)
-        self.assertIn("DWMWCP_ROUND", source)
-
+        self.assertNotIn("from patch import", main)
 
 # tests/test_stage13.py
 
