@@ -3416,6 +3416,81 @@ class App:
         )
         self._planilha_desenhar_cabecalho_linhas()
 
+    def _planilha_desenhar_cabecalho_linhas(self, first_fraction=None):
+        """Reutiliza itens Canvas do cabeçalho em vez de recriá-los a cada rolagem."""
+        canvas = getattr(self, "_planilha_row_header", None)
+        tree = getattr(self, "_planilha_tree", None)
+        if canvas is None or tree is None:
+            return
+        try:
+            altura = max(int(canvas.winfo_height()), 28)
+        except Exception:
+            altura = 360
+        try:
+            fraction = float(first_fraction) if first_fraction is not None else float(tree.yview()[0])
+        except Exception:
+            fraction = 0.0
+        fraction = max(0.0, min(1.0, fraction))
+        row_height = 28
+        total_rows = MAX_ROWS
+        inicio = max(0, min(total_rows - 1, int(fraction * total_rows + 0.0001)))
+        visiveis = max(1, int(altura / row_height) + 3)
+        fim = min(total_rows, inicio + visiveis)
+        modo_escuro = str(ctk.get_appearance_mode()).lower() == "dark"
+        bg = "#252A2F" if modo_escuro else "#F7F7F7"
+        fg = "#AEB4B9" if modo_escuro else "#6B6B6B"
+        line = "#384148" if modo_escuro else "#EEEEEE"
+        border = "#465058" if modo_escuro else "#E0E0E0"
+        canvas.configure(bg=bg, highlightbackground=border)
+
+        state = getattr(self, "_virtual_grid_row_header_state", None)
+        if not isinstance(state, dict):
+            state = {"items": []}
+            self._virtual_grid_row_header_state = state
+        items = state["items"]
+        quantidade = max(0, fim - inicio)
+        while len(items) < quantidade:
+            items.append(
+                (
+                    canvas.create_text(
+                        5, 0, anchor="w", fill=fg,
+                        font=("Segoe UI", 8), tags=("rownum",)
+                    ),
+                    canvas.create_line(
+                        0, 0, 42, 0, fill=line, tags=("rownum",)
+                    ),
+                )
+            )
+        for pos, logical_row in enumerate(range(inicio, fim)):
+            y0 = pos * row_height
+            text_id, line_id = items[pos]
+            canvas.coords(text_id, 5, y0 + row_height // 2)
+            canvas.itemconfigure(text_id, text=str(logical_row + 1), fill=fg, state="normal")
+            canvas.coords(line_id, 0, y0 + row_height, 42, y0 + row_height)
+            canvas.itemconfigure(line_id, fill=line, state="normal")
+        for text_id, line_id in items[quantidade:]:
+            canvas.itemconfigure(text_id, state="hidden")
+            canvas.itemconfigure(line_id, state="hidden")
+        top_line = state.get("top_line")
+        if top_line is None:
+            top_line = canvas.create_line(0, 0, 42, 0, fill=border, tags=("rownum",))
+            state["top_line"] = top_line
+        else:
+            canvas.coords(top_line, 0, 0, 42, 0)
+        canvas.itemconfigure(top_line, fill=border, state="normal")
+
+    def _planilha_limpar_borda(self):
+        """Oculta a moldura de seleção e as sobreposições reutilizáveis."""
+        state = self._planilha_stage9_get_grid_state()
+        widgets = state.get("selection_widgets", [])
+        for widget in widgets:
+            try:
+                widget.place_forget()
+            except Exception:
+                pass
+        self._planilha_borda_widgets = widgets
+        self._stage9_borda_bbox = None
+
     def _planilha_desenhar_borda(self):
         """Desenha a seleção diretamente no Canvas da grade, sem widgets sobrepostos."""
         tree = getattr(self, "_planilha_tree", None)
