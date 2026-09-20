@@ -252,6 +252,10 @@ As principais reduções estruturais já concluídas foram:
 - eliminação de referências de importação para módulos removidos;
 - validação contínua após cada compactação para evitar regressões.
 
+## Consolidação da v2.99.24
+
+A `v2.99.24` é a primeira versão preparada sobre a árvore já consolidada em quatro módulos de produção, cinco arquivos de teste e dois workflows. O fluxo de release ficou integrado ao `validate-main.yml`, enquanto `release.yml` permanece dedicado ao build e à publicação do executável.
+
 ## Manutenção
 
 A regra da base é simples: **não introduzir uma nova implementação paralela quando a implementação canônica já existe**.
