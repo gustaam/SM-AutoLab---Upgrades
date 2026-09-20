@@ -598,6 +598,7 @@ class VirtualGridTree(tk.Frame):
             fill=self._bg,
             tags=("virtual-scroll-anchor",),
         )
+        self._column_gridlines: list[int] = []
 
         self._redraw_header()
         self._update_scrollregion()
@@ -627,16 +628,28 @@ class VirtualGridTree(tk.Frame):
         self._canvas.configure(scrollregion=(0, 0, total_width, total_height))
         self._header.configure(scrollregion=(0, 0, total_width, self._header_height))
         try:
-            self._canvas.coords(
-                self._scroll_anchor,
-                0,
-                0,
-                1,
-                total_height,
-            )
+            self._canvas.coords(self._scroll_anchor, 0, 0, 1, total_height)
         except tk.TclError:
             pass
 
+        # As divisórias verticais pertencem ao espaço lógico do Canvas,
+        # portanto continuam visíveis durante rolagens e repinturas da pool.
+        for idx, (name, _text, _width, _minwidth, _anchor, _stretch) in enumerate(self._columns[:-1]):
+            while len(self._column_gridlines) <= idx:
+                self._column_gridlines.append(
+                    self._canvas.create_line(
+                        0, 0, 0, total_height,
+                        fill=self._border,
+                        tags=("virtual-column-gridline",),
+                    )
+                )
+            x = self._column_left(name) + self._widths.get(name, 1)
+            self._canvas.coords(self._column_gridlines[idx], x, 0, x, total_height)
+            self._canvas.itemconfigure(
+                self._column_gridlines[idx],
+                fill=self._border,
+                state="normal",
+            )
     def _column_left(self, name: str) -> int:
         left = 0
         for column_name, _text, _width, _minwidth, _anchor, _stretch in self._columns:
@@ -693,7 +706,9 @@ class VirtualGridTree(tk.Frame):
 
     def _on_canvas_configure(self, _event=None) -> None:
         self._ensure_pool()
-        self._schedule_refresh()
+        self._update_scrollregion()
+        self._refresh_visible()
+        self.after_idle(self._refresh_visible)
 
     def _on_mousewheel(self, event) -> str:
         try:
@@ -731,21 +746,6 @@ class VirtualGridTree(tk.Frame):
                 fill=self._even_bg,
                 tags=("virtual-row",),
             )
-            vertical_lines = []
-            column_x = 0
-            for name, _text, _width, _minwidth, _anchor, _stretch in self._columns[:-1]:
-                column_x += self._widths.get(name, 1)
-                vertical_lines.append(
-                    self._canvas.create_line(
-                        column_x,
-                        0,
-                        column_x,
-                        self._row_height,
-                        fill=self._border,
-                        tags=("virtual-column-line",),
-                    )
-                )
-
             cells = [
                 self._canvas.create_text(
                     0,
@@ -811,8 +811,6 @@ class VirtualGridTree(tk.Frame):
                     self._canvas.itemconfigure(slot["line"], state="hidden")
                     for cell in slot["cells"]:
                         self._canvas.itemconfigure(cell, state="hidden")
-                    for line_id in slot["vertical_lines"]:
-                        self._canvas.itemconfigure(line_id, state="hidden")
                     continue
 
                 y0 = logical_row * self._row_height
@@ -842,24 +840,6 @@ class VirtualGridTree(tk.Frame):
                     fill=self._border,
                     state="normal",
                 )
-
-                column_x = 0
-                for idx, (name, _text, _width, _minwidth, _anchor, _stretch) in enumerate(self._columns[:-1]):
-                    column_x += self._widths.get(name, 1)
-                    line_id = slot["vertical_lines"][idx]
-                    self._canvas.coords(
-                        line_id,
-                        column_x,
-                        y0,
-                        column_x,
-                        y0 + self._row_height,
-                    )
-                    self._canvas.itemconfigure(
-                        line_id,
-                        fill=self._border,
-                        state="normal",
-                    )
-
                 x = 0
                 for idx, (
                     name,
@@ -1022,6 +1002,7 @@ class VirtualGridTree(tk.Frame):
         return {"values": values}
 
     def bbox(self, iid: str, column: str | None = None):
+        """Retorna a caixa em coordenadas do viewport, adequada para Entry.place()."""
         try:
             row = int(str(iid))
             if row < 0 or row >= self._total_rows:
@@ -1037,7 +1018,6 @@ class VirtualGridTree(tk.Frame):
                 return None
             x_scroll = float(self._canvas.canvasx(0))
             y_scroll = float(self._canvas.canvasy(0))
-            y = row * self._row_height - y_scroll
             if column is None:
                 x = -x_scroll
                 width = self._total_width()
@@ -1046,35 +1026,55 @@ class VirtualGridTree(tk.Frame):
                 name = self._columns[index][0]
                 x = self._column_left(name) - x_scroll
                 width = self._widths[name]
+            y = row * self._row_height - y_scroll
             return int(round(x)), int(round(y)), int(width), self._row_height
         except (ValueError, IndexError, TypeError, tk.TclError):
             return None
 
-    def identify_row(self, y: int | float) -> str:
-        """Identifica a linha usando coordenadas relativas ao Canvas da grade.
-        Os bindings de mouse da planilha são instalados no Canvas interno; por
-        isso event.y já começa em 0 no topo da primeira linha. O cabeçalho
-        horizontal pertence a outro Canvas e não deve ser descontado aqui.
-        """
+    def cell_bbox_canvas(self, iid: str, column: str | None = None):
+        """Retorna a caixa em coordenadas lógicas do Canvas."""
         try:
-            logical_y = float(self._canvas.canvasy(float(y)))
-            row = int(logical_y // self._row_height)
-            return str(row) if 0 <= row < self._total_rows else ""
-        except (TypeError, ValueError, tk.TclError):
-            return ""
+            row = int(str(iid))
+            if row < 0 or row >= self._total_rows:
+                return None
+            if column is None:
+                x = 0
+                width = self._total_width()
+            else:
+                index = int(str(column).lstrip("#")) - 1
+                name = self._columns[index][0]
+                x = self._column_left(name)
+                width = self._widths[name]
+            return int(x), int(row * self._row_height), int(width), int(self._row_height)
+        except (ValueError, IndexError, TypeError, tk.TclError):
+            return None
 
-    def identify_column(self, x: int | float) -> str:
-        """Identifica a coluna usando coordenadas relativas ao Canvas da grade."""
+    def cell_at(self, x: int | float, y: int | float):
+        """Resolve uma coordenada de viewport para a célula lógica correspondente."""
         try:
             canvas_x = float(self._canvas.canvasx(float(x)))
+            canvas_y = float(self._canvas.canvasy(float(y)))
         except (TypeError, ValueError, tk.TclError):
-            return ""
-        for idx, (name, _text, _width, _minwidth, _anchor, _stretch) in enumerate(self._columns, start=1):
+            return None
+        if canvas_x < 0 or canvas_y < 0:
+            return None
+        row = int(canvas_y // self._row_height)
+        if row < 0 or row >= self._total_rows:
+            return None
+        for col_index, (name, _text, _width, _minwidth, _anchor, _stretch) in enumerate(self._columns):
             left = self._column_left(name)
             right = left + self._widths.get(name, 1)
             if left <= canvas_x < right:
-                return f"#{idx}"
-        return ""
+                return row, col_index
+        return None
+
+    def identify_row(self, y: int | float) -> str:
+        cell = self.cell_at(0, y)
+        return str(cell[0]) if cell is not None else ""
+
+    def identify_column(self, x: int | float) -> str:
+        cell = self.cell_at(x, 0)
+        return f"#{cell[1] + 1}" if cell is not None else ""
 
     def see(self, iid: str):
         if self._total_rows <= 0:
@@ -2022,165 +2022,149 @@ class App:
         self.app.after(350, self._verificar_retomada_pendente)
         self.app.after(1200, self._verificar_atualizacao_automatica)
 
-    def _reposicionar_menus(self, _event=None):
-        if self._closing:
+    def _widget_menu_contido(self, widget, root):
+        if widget is None or root is None:
+            return False
+        current = widget
+        try:
+            while current is not None:
+                if current is root:
+                    return True
+                current = getattr(current, "master", None)
+        except Exception:
+            return False
+        return False
+
+    def _menu_pointer_inside(self):
+        try:
+            x = self.app.winfo_pointerx()
+            y = self.app.winfo_pointery()
+            widget = self.app.winfo_containing(x, y)
+        except Exception:
+            return False
+        for root in (
+            getattr(self, "botao_configuracoes", None),
+            getattr(self, "_menu_config", None),
+            getattr(self, "_menu_aparencia_btn", None),
+            getattr(self, "_menu_aparencia", None),
+        ):
+            if self._widget_menu_contido(widget, root):
+                return True
+        return False
+
+    def _cancelar_fechar_menus(self, _event=None):
+        job = getattr(self, "_menu_close_job", None)
+        if job is not None:
+            try:
+                self.app.after_cancel(job)
+            except Exception:
+                pass
+            self._menu_close_job = None
+
+    def _agendar_fechar_menus(self, _event=None):
+        self._cancelar_fechar_menus()
+        try:
+            self._menu_close_job = self.app.after(
+                220,
+                self._fechar_menus_se_cursor_fora,
+            )
+        except Exception:
+            self._menu_close_job = None
+
+    def _fechar_menus_se_cursor_fora(self):
+        self._menu_close_job = None
+        if not self._menu_pointer_inside():
+            self._fechar_menus()
+
+    def _menu_vincular_hover(self, widget):
+        if widget is None:
             return
         try:
-            if self._menu_config is not None and self._menu_config.winfo_exists():
-                self.app.update_idletasks()
-                app_x = self.app.winfo_rootx()
-                app_y = self.app.winfo_rooty()
-                bx = self.botao_configuracoes.winfo_rootx() - app_x
-                by = self.botao_configuracoes.winfo_rooty() - app_y + self.botao_configuracoes.winfo_height() + 4
-                menu_width = max(218, self._menu_config.winfo_reqwidth())
-                app_width = max(1, self.app.winfo_width())
-                # O menu nasce no mesmo eixo X do botão Configurações.
-                menu_x = bx
-                if menu_x + menu_width > app_width - 6:
-                    menu_x = max(6, app_width - menu_width - 6)
-                self._menu_config.place_configure(
-                    x=int(menu_x),
-                    y=int(max(0, by)),
-                )
-                self._menu_config.lift()
+            if getattr(widget, "_sm_menu_hover_bound", False):
+                return
+            widget._sm_menu_hover_bound = True
+            widget.bind("<Enter>", self._cancelar_fechar_menus, add="+")
+            widget.bind("<Leave>", self._agendar_fechar_menus, add="+")
+            for child in widget.winfo_children():
+                self._menu_vincular_hover(child)
+        except Exception:
+            pass
 
-            if self._menu_aparencia is not None and self._menu_aparencia.winfo_exists():
+    def _reposicionar_menus(self, _event=None):
+        if getattr(self, "_closing", False):
+            return
+        try:
+            self.app.update_idletasks()
+            app_x = self.app.winfo_rootx()
+            app_y = self.app.winfo_rooty()
+            app_w = max(1, self.app.winfo_width())
+            app_h = max(1, self.app.winfo_height())
+
+            menu = getattr(self, "_menu_config", None)
+            if menu is not None and menu.winfo_exists():
+                bx = self.botao_configuracoes.winfo_rootx() - app_x
+                by = self.botao_configuracoes.winfo_rooty() - app_y
+                bh = self.botao_configuracoes.winfo_height()
+                menu_w = max(218, menu.winfo_reqwidth())
+                menu_h = max(1, menu.winfo_reqheight())
+                menu_x = max(4, min(bx, app_w - menu_w - 4))
+                menu_y = max(4, min(by + bh + 4, app_h - menu_h - 4))
+                menu.place_configure(
+                    x=int(menu_x),
+                    y=int(menu_y),
+                    width=int(menu_w),
+                )
+                menu.lift()
+            else:
+                menu = None
+
+            sub = getattr(self, "_menu_aparencia", None)
+            if sub is not None and sub.winfo_exists():
                 self.app.update_idletasks()
-                app_x = self.app.winfo_rootx()
-                app_y = self.app.winfo_rooty()
-                if self._menu_config is not None and self._menu_config.winfo_exists():
-                    x = self._menu_config.winfo_rootx() - app_x + self._menu_config.winfo_width() - 2
-                    y = self._menu_config.winfo_rooty() - app_y
+                sub_w = max(225, sub.winfo_reqwidth())
+                sub_h = max(1, sub.winfo_reqheight())
+                if menu is not None and menu.winfo_exists():
+                    menu_x = menu.winfo_rootx() - app_x
+                    menu_y = menu.winfo_rooty() - app_y
+                    menu_w = menu.winfo_width()
+                    sub_x = menu_x + menu_w - 2
+                    sub_y = menu_y
                 else:
-                    x = self.botao_configuracoes.winfo_rootx() - app_x + self.botao_configuracoes.winfo_width()
-                    y = self.botao_configuracoes.winfo_rooty() - app_y
-                self._menu_aparencia.place(x=max(0, x), y=max(0, y))
-                self._menu_aparencia.lift()
+                    sub_x = self.botao_configuracoes.winfo_rootx() - app_x
+                    sub_y = self.botao_configuracoes.winfo_rooty() - app_y
+
+                # Mantém os menus em uma zona visível e permite passar do item
+                # "Aparência" ao submenu sem atravessar uma lacuna real.
+                if app_x + sub_x + sub_w + 4 > self.app.winfo_screenwidth():
+                    sub_x = max(4, sub_x - menu_w - sub_w + 4 if menu is not None else sub_x)
+                sub_x = max(4, min(sub_x, app_w - sub_w - 4))
+                sub_y = max(4, min(sub_y, app_h - sub_h - 4))
+                sub.place_configure(
+                    x=int(sub_x),
+                    y=int(sub_y),
+                    width=int(sub_w),
+                )
+                sub.lift()
         except Exception:
             pass
 
     def _fixar_menu_configuracoes(self):
-        self._mostrar_menu_configuracoes()
-
-    def _verificar_atualizacao_automatica(self):
-        """Verifica silenciosamente se há uma Release mais nova.
-        Só apresenta a tela de atualização quando existe versão superior
-        com executável correspondente. Falhas de rede não interrompem o app.
-        """
-        if self._closing:
-            return
-
-        def worker():
-            try:
-                info = find_update()
-            except Exception:
-                return
-
-            if not info:
-                return
-            if not info.get("version") or not info.get("download_url"):
-                return
-
-            try:
-                self.app.after(
-                    0,
-                    lambda data=info: self._mostrar_resultado_atualizacao(data)
-                )
-            except Exception:
-                pass
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _verificar_atualizacoes_interativo(self):
-        self._fechar_menus()
-
-        def worker():
-            try:
-                info=find_update()
-                self.app.after(0,lambda:self._mostrar_resultado_atualizacao(info))
-            except Exception as exc:
-                self.app.after(0,lambda:self._mostrar_resultado_atualizacao({
-                    "error":str(exc)
-                }))
-
-        import threading
-        threading.Thread(target=worker,daemon=True).start()
-
-    def _mostrar_resultado_atualizacao(self, info):
-        if info and info.get("error"):
-            messagebox.showerror(
-                "Atualizações",
-                f"Não foi possível verificar atualizações.\n\n{info['error']}",
-                parent=self.app
-            )
-            return
-
-        if not info:
-            try:
-                versao_atual = info.get("current") if info else None
-            except Exception:
-                versao_atual = None
-            if not versao_atual:
-                try:
-                    from updater import current_version
-                    versao_atual = current_version()
-                except Exception:
-                    versao_atual = APP_VERSION
-            messagebox.showinfo(
-                "Atualizações",
-                f"Você já está usando a versão mais recente do SM AutoLab.\n\n"
-                f"Versão atual: v{versao_atual}",
-                parent=self.app
-            )
-            return
-
-        version=info.get("version","")
-        if not info.get("download_url"):
-            messagebox.showwarning(
-                "Atualização disponível",
-                f"A versão v{version} está disponível, mas ainda não há um "
-                "executável publicado para download.",
-                parent=self.app
-            )
-            return
-
-        resposta=messagebox.askyesno(
-            "Atualização disponível",
-            f"Uma nova versão do SM AutoLab está disponível.\n\n"
-            f"Versão instalada: v{info.get('current','')}\n"
-            f"Nova versão: v{version}\n\n"
-            "Deseja baixar e instalar agora?",
-            parent=self.app
-        )
-        if not resposta:
-            return
-
-        ok,msg=launch_updater(info)
-        if not ok:
-            messagebox.showerror(
-                "Atualização",
-                f"Não foi possível iniciar o atualizador.\n\n{msg}",
-                parent=self.app
-            )
-            return
-
-        self._add_activity(
-            f"Atualização para v{version} iniciada.",
-            self.INFO
-        )
-        self._fechar_aplicativo()
+        self._reposicionar_menus()
 
     def _alternar_menu_configuracoes(self):
-        if self._menu_config is not None:
-            try:
-                if self._menu_config.winfo_exists():
-                    self._fechar_menus()
-                    return
-            except Exception:
-                pass
+        self._cancelar_fechar_menus()
+        menu = getattr(self, "_menu_config", None)
+        try:
+            if menu is not None and menu.winfo_exists():
+                self._fechar_menus()
+                return
+        except Exception:
+            pass
         self._mostrar_menu_configuracoes()
 
     def _iterar_descendentes_ui(self, widget):
+        if widget is None:
+            return
         yield widget
         try:
             children = widget.winfo_children()
@@ -2190,17 +2174,14 @@ class App:
             yield from self._iterar_descendentes_ui(child)
 
     def _mostrar_menu_configuracoes(self, _event=None):
-        """Abre o menu principal de configurações sem bindings concorrentes."""
         self._cancelar_fechar_menus()
-
-        if self._menu_config is not None:
-            try:
-                if self._menu_config.winfo_exists():
-                    self._reposicionar_menus()
-                    self._menu_config.lift()
-                    return
-            except Exception:
-                self._menu_config = None
+        menu = getattr(self, "_menu_config", None)
+        try:
+            if menu is not None and menu.winfo_exists():
+                self._reposicionar_menus()
+                return
+        except Exception:
+            self._menu_config = None
 
         menu = ctk.CTkFrame(
             self.app,
@@ -2208,89 +2189,81 @@ class App:
             corner_radius=10,
             border_width=1,
             border_color=self.BORDER,
-            width=218,
-            height=150,
+            width=220,
         )
-        menu.place(x=0, y=0)
-        menu.pack_propagate(False)
         self._menu_config = menu
 
         aparencia = ctk.CTkButton(
             menu,
             text="Aparência  ›",
             command=self._mostrar_menu_aparencia,
-            width=202,
-            height=40,
-            corner_radius=8,
+            anchor="w",
+            height=38,
+            corner_radius=7,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             text_color=self.TEXT,
-            font=("Segoe UI", 12),
-            anchor="w",
+            font=("Segoe UI", 11, "bold"),
         )
-        aparencia.pack(fill="x", padx=7, pady=(8, 3))
+        aparencia.pack(fill="x", padx=8, pady=(8, 3))
         self._menu_aparencia_btn = aparencia
+        aparencia.bind(
+            "<Enter>",
+            lambda _e: self._mostrar_menu_aparencia(),
+            add="+",
+        )
 
-        mudar = ctk.CTkButton(
+        ctk.CTkButton(
             menu,
             text="Mudar o Feegow",
             command=self._abrir_popup_feegow,
-            width=202,
-            height=40,
-            corner_radius=8,
+            anchor="w",
+            height=38,
+            corner_radius=7,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             text_color=self.TEXT,
-            font=("Segoe UI", 12),
-            anchor="w",
-        )
-        mudar.pack(fill="x", padx=7, pady=(3, 3))
+            font=("Segoe UI", 11),
+        ).pack(fill="x", padx=8, pady=3)
 
-        atualizar = ctk.CTkButton(
+        ctk.CTkButton(
             menu,
             text="Verificar atualizações",
             command=self._verificar_atualizacoes_interativo,
-            width=202,
-            height=40,
-            corner_radius=8,
+            anchor="w",
+            height=38,
+            corner_radius=7,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             text_color=self.TEXT,
-            font=("Segoe UI", 12),
-            anchor="w",
-        )
-        atualizar.pack(fill="x", padx=7, pady=(3, 8))
+            font=("Segoe UI", 11),
+        ).pack(fill="x", padx=8, pady=(3, 8))
 
-        self.app.update_idletasks()
+        menu.place(x=0, y=0, width=220)
+        menu.update_idletasks()
+        self._menu_vincular_hover(menu)
         self._reposicionar_menus()
 
-    def _garantir_menu_aparencia_aberto_se_hover(self, event=None):
-        # Mantido somente como compatibilidade de chamada; o menu agora é acionado por clique.
-        return
+    def _garantir_menu_aparencia_aberto_se_hover(self, _event=None):
+        self._mostrar_menu_aparencia()
 
     def _garantir_menu_aparencia_aberto(self):
-        if self._menu_config is None or not self._menu_config.winfo_exists():
-            self._mostrar_menu_configuracoes()
-        if self._menu_aparencia is None or not self._menu_aparencia.winfo_exists():
-            self._mostrar_menu_aparencia()
+        self._mostrar_menu_aparencia()
 
     def _mostrar_menu_aparencia(self, _event=None):
-        """Abre o submenu de aparência; um segundo clique não o fecha acidentalmente."""
         self._cancelar_fechar_menus()
-
-        if self._menu_config is None or not self._menu_config.winfo_exists():
+        if getattr(self, "_menu_config", None) is None:
             self._mostrar_menu_configuracoes()
-            self.app.after_idle(lambda: self._mostrar_menu_aparencia())
+        if getattr(self, "_menu_config", None) is None:
             return
 
-        if self._menu_aparencia is not None:
-            try:
-                if self._menu_aparencia.winfo_exists():
-                    self._reposicionar_menus()
-                    self._menu_aparencia.lift()
-                    return
-            except Exception:
-                self._menu_aparencia = None
+        sub = getattr(self, "_menu_aparencia", None)
+        try:
+            if sub is not None and sub.winfo_exists():
+                self._reposicionar_menus()
+                return
+        except Exception:
+            self._menu_aparencia = None
 
         sub = ctk.CTkFrame(
             self.app,
@@ -2299,99 +2272,69 @@ class App:
             border_width=1,
             border_color=self.BORDER,
             width=225,
-            height=158,
         )
-        sub.place(x=0, y=0)
-        sub.pack_propagate(False)
         self._menu_aparencia = sub
 
         ctk.CTkLabel(
             sub,
             text="Aparência",
-            text_color=self.TEXT,
-            font=("Segoe UI", 12, "bold"),
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 10, "bold"),
             anchor="w",
-        ).pack(fill="x", padx=12, pady=(9, 4))
+        ).pack(fill="x", padx=14, pady=(10, 4))
 
-        for modo in ("light", "dark", "system"):
-            rotulo = self.THEME_LABELS[modo]
-            marcado = "✓  " if modo == self._tema else "    "
-            btn = ctk.CTkButton(
+        for texto, tema in (
+            ("Automático", "system"),
+            ("Claro", "light"),
+            ("Escuro", "dark"),
+        ):
+            ctk.CTkButton(
                 sub,
-                text=marcado + rotulo,
-                command=lambda m=modo: self._selecionar_tema(m),
-                width=210,
-                height=34,
-                corner_radius=8,
-                fg_color=("#E5F1FB", "#183B54") if modo == self._tema else self.CARD,
-                hover_color=("#EAF4FC", "#263F50"),
-                text_color=self.ACCENT if modo == self._tema else self.TEXT,
-                font=("Segoe UI", 11, "bold") if modo == self._tema else ("Segoe UI", 11),
+                text=texto,
+                command=lambda t=tema: self._selecionar_tema(t),
                 anchor="w",
-            )
-            btn.pack(fill="x", padx=6, pady=2)
+                height=34,
+                corner_radius=7,
+                fg_color="transparent",
+                hover_color=self.ACCENT_HOVER,
+                text_color=self.TEXT,
+                font=("Segoe UI", 11),
+            ).pack(fill="x", padx=8, pady=2)
 
-        self.app.update_idletasks()
+        sub.place(x=0, y=0, width=225)
+        sub.update_idletasks()
+        self._menu_vincular_hover(sub)
         self._reposicionar_menus()
+
     def _entrar_mudar_feegow(self, _event=None):
-        if self._menu_aparencia is not None:
-            try:
-                self._menu_aparencia.destroy()
-            except Exception:
-                pass
-            self._menu_aparencia = None
+        self._fechar_menus()
+        self._abrir_popup_feegow()
 
     def _agendar_fechar_aparencia(self, _event=None):
-        # Kept for compatibility with older bindings.
-        self._cancelar_fechar_menus()
+        self._agendar_fechar_menus()
 
     def _fechar_submenu_aparencia(self):
-        self._menu_close_job = None
-        if self._menu_aparencia is not None:
+        sub = getattr(self, "_menu_aparencia", None)
+        if sub is not None:
             try:
-                self._menu_aparencia.destroy()
+                sub.destroy()
             except Exception:
                 pass
-            self._menu_aparencia = None
-
-    def _cancelar_fechar_menus(self, _event=None):
-        if self._menu_close_job is not None:
-            try:
-                self.app.after_cancel(self._menu_close_job)
-            except Exception:
-                pass
-            self._menu_close_job = None
-
-    def _agendar_fechar_menus(self, _event=None):
-        # Fecha o submenu somente depois de uma pequena tolerância, permitindo
-        # mover o ponteiro de Aparência até as opções sem fechar o menu.
-        self._cancelar_fechar_menus()
-        try:
-            self._menu_close_job = self.app.after(
-                220,
-                self._fechar_menus,
-            )
-        except Exception:
-            self._menu_close_job = None
+        self._menu_aparencia = None
+        self._menu_aparencia_btn = None
 
     def _fechar_menus(self):
-        self._menu_close_job = None
-        hover_binding = getattr(self, "_config_hover_binding", None)
-        if hover_binding:
+        self._cancelar_fechar_menus()
+        self._fechar_submenu_aparencia()
+        menu = getattr(self, "_menu_config", None)
+        if menu is not None:
             try:
-                self.app.unbind("<Motion>", hover_binding)
+                menu.destroy()
             except Exception:
                 pass
-        self._config_hover_binding = None
+        self._menu_config = None
+        self._menu_aparencia = None
         self._menu_aparencia_btn = None
-        for attr in ("_menu_aparencia", "_menu_config"):
-            menu = getattr(self, attr, None)
-            if menu is not None:
-                try:
-                    menu.destroy()
-                except Exception:
-                    pass
-                setattr(self, attr, None)
 
     def _selecionar_tema(self, tema):
         if tema not in ("light", "dark", "system"):
@@ -3353,7 +3296,7 @@ class App:
         tree.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
         self._planilha_tree=tree
         self._planilha_row_header=row_header
-        self._planilha_implementacao = "grade-virtual-29926"
+        self._planilha_implementacao = "grade-virtual-29929"
         tree.refresh()
         # Fallback global: alguns ambientes Windows/Tk não entregam Ctrl+V ao
         # Treeview, mesmo com o binding local. Interceptamos somente enquanto
@@ -3491,25 +3434,20 @@ class App:
             pass
 
     def _planilha_desenhar_borda(self):
-        """Desenha a seleção diretamente no Canvas da grade, sem widgets sobrepostos."""
+        """Desenha a seleção em coordenadas lógicas do Canvas."""
         tree = getattr(self, "_planilha_tree", None)
-        if tree is None:
-            return
-
-        canvas = getattr(tree, "_canvas", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
         if canvas is None:
             return
-
         try:
             canvas.delete("planilha-selection")
         except tk.TclError:
             return
 
-        cells = getattr(self, "_planilha_celulas_selecionadas", set()) or set()
+        cells = set(getattr(self, "_planilha_celulas_selecionadas", set()) or ())
         active = getattr(self, "_planilha_celula_ativa", None)
         normalized = set()
-
-        for cell in cells:
+        for cell in cells | ({active} if active else set()):
             try:
                 row, col = int(cell[0]), int(cell[1])
             except Exception:
@@ -3517,33 +3455,57 @@ class App:
             if 0 <= row < MAX_ROWS and 0 <= col < 3:
                 normalized.add((row, col))
 
-        if active:
-            try:
-                row, col = int(active[0]), int(active[1])
-                if 0 <= row < MAX_ROWS and 0 <= col < 3:
-                    normalized.add((row, col))
-            except Exception:
-                pass
-
         if not normalized:
             return
 
         cor = self._cor_fluente(self.ACCENT)
-        for row, col in sorted(normalized):
-            bbox = tree.bbox(str(row), f"#{col + 1}")
-            if not bbox:
-                continue
-            x, y, width, height = bbox
-            canvas.create_rectangle(
-                x + 1,
-                y + 1,
-                x + width - 1,
-                y + height - 1,
-                outline=cor,
-                width=2,
-                fill="",
-                tags=("planilha-selection",),
-            )
+        rows = [row for row, _ in normalized]
+        cols = [col for _, col in normalized]
+        min_row, max_row = min(rows), max(rows)
+        min_col, max_col = min(cols), max(cols)
+        expected = {
+            (row, col)
+            for row in range(min_row, max_row + 1)
+            for col in range(min_col, max_col + 1)
+        }
+
+        if normalized == expected:
+            first_box = tree.cell_bbox_canvas(str(min_row), f"#{min_col + 1}")
+            last_box = tree.cell_bbox_canvas(str(max_row), f"#{max_col + 1}")
+            if first_box and last_box:
+                x0, y0, _, _ = first_box
+                x1, y1, w1, h1 = last_box
+                canvas.create_rectangle(
+                    x0 + 1, y0 + 1, x1 + w1 - 1, y1 + h1 - 1,
+                    outline=cor, width=2, fill="",
+                    tags=("planilha-selection",),
+                )
+        else:
+            for row, col in sorted(normalized):
+                box = tree.cell_bbox_canvas(str(row), f"#{col + 1}")
+                if not box:
+                    continue
+                x, y, width, height = box
+                canvas.create_rectangle(
+                    x + 1, y + 1, x + width - 1, y + height - 1,
+                    outline=cor, width=2, fill="",
+                    tags=("planilha-selection",),
+                )
+
+        # Mantém a célula ativa visualmente explícita dentro de seleções grandes.
+        if active:
+            try:
+                row, col = int(active[0]), int(active[1])
+                box = tree.cell_bbox_canvas(str(row), f"#{col + 1}")
+                if box:
+                    x, y, width, height = box
+                    canvas.create_rectangle(
+                        x + 2, y + 2, x + width - 2, y + height - 2,
+                        outline=cor, width=2, fill="",
+                        tags=("planilha-selection", "planilha-active"),
+                    )
+            except Exception:
+                pass
 
         try:
             canvas.tag_raise("planilha-selection")
@@ -3585,15 +3547,12 @@ class App:
         if tree is None:
             return "break"
 
-        row = tree.identify_row(event.y)
-        col_id = tree.identify_column(event.x)
-        if not row or col_id not in ("#1", "#2", "#3"):
+        current = tree.cell_at(event.x, event.y)
+        if current is None:
             return "break"
 
-        current = (int(row), int(col_id[1:]) - 1)
         selected = set(getattr(self, "_planilha_celulas_selecionadas", set()) or ())
         active = getattr(self, "_planilha_celula_ativa", None)
-
         ctrl = bool(getattr(event, "state", 0) & 0x0004)
         shift = bool(getattr(event, "state", 0) & 0x0001)
 
@@ -3603,7 +3562,6 @@ class App:
             else:
                 selected.add(current)
             self._planilha_definir_selecao(selected, active=current)
-
         elif shift and active:
             self._planilha_definir_selecao(
                 self._planilha_retangulo_selecao(active, current),
@@ -3617,6 +3575,10 @@ class App:
         self._planilha_dragging = False
         self._planilha_fechar_edicao()
         tree.focus_set()
+        try:
+            tree._canvas.grab_set()
+        except Exception:
+            pass
         return "break"
 
     def _planilha_arrastar_selecao(self, event):
@@ -3625,9 +3587,8 @@ class App:
         if tree is None or anchor is None:
             return "break"
 
-        row = tree.identify_row(event.y)
-        col_id = tree.identify_column(event.x)
-        if not row or col_id not in ("#1", "#2", "#3"):
+        current = tree.cell_at(event.x, event.y)
+        if current is None:
             return "break"
 
         start_x, start_y = getattr(
@@ -3640,7 +3601,6 @@ class App:
         ):
             return "break"
 
-        current = (int(row), int(col_id[1:]) - 1)
         self._planilha_dragging = True
         self._planilha_definir_selecao(
             self._planilha_retangulo_selecao(anchor, current),
@@ -3654,19 +3614,22 @@ class App:
         if tree is None or anchor is None:
             return "break"
 
-        row = tree.identify_row(event.y)
-        col_id = tree.identify_column(event.x)
-        if row and col_id in ("#1", "#2", "#3"):
-            current = (int(row), int(col_id[1:]) - 1)
-            if getattr(self, "_planilha_dragging", False):
-                cells = self._planilha_retangulo_selecao(anchor, current)
-            else:
-                cells = {(int(row), int(col_id[1:]) - 1)}
+        current = tree.cell_at(event.x, event.y)
+        if current is not None:
+            cells = (
+                self._planilha_retangulo_selecao(anchor, current)
+                if getattr(self, "_planilha_dragging", False)
+                else {current}
+            )
             self._planilha_definir_selecao(cells, active=current)
 
         self._planilha_drag_anchor = None
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
+        try:
+            tree._canvas.grab_release()
+        except Exception:
+            pass
         return "break"
 
     def _planilha_duplo_clique_celula(self, event):
@@ -3756,11 +3719,12 @@ class App:
             self._planilha_desenhar_borda()
             if save and new!=old:
                 self._planilha_push_undo(); self._planilha_redo=[]
-                vals[col_index]=new
-                tree.item(iid,values=vals)
                 key=f"{int(iid)},{col_index}"
-                if new: self._planilha_data[key]=new
-                else: self._planilha_data.pop(key,None)
+                if new:
+                    self._planilha_data[key] = new
+                else:
+                    self._planilha_data.pop(key, None)
+                tree.refresh()
                 self._planilha_marcar_alteracao()
         entry.bind("<Return>",lambda e:(finish(True),"break")[1]); entry.bind("<Escape>",lambda e:(finish(False),"break")[1]); entry.bind("<FocusOut>",lambda e:finish(True))
 
