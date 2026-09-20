@@ -448,8 +448,20 @@ class VirtualGridStage13Tests(unittest.TestCase):
             row_height=28,
             overscan=3,
         )
-        self.assertEqual((start, end), (4992, 5008))
+        self.assertEqual((start, end), (4997, 5013))
         self.assertLess(end - start, 100)
+
+    def test_visible_range_tracks_canvas_fraction_near_the_bottom(self):
+        start, end = visible_row_range(
+            first_fraction=0.9975,
+            viewport_height=650,
+            total_rows=10000,
+            row_height=28,
+            overscan=3,
+        )
+        self.assertGreaterEqual(start, 9950)
+        self.assertGreater(end, start + 20)
+        self.assertLessEqual(end, 10000)
 
     def test_visible_range_clamps_at_document_edges(self):
         self.assertEqual(
