@@ -1,3 +1,4 @@
+# Testes da inicialização, dashboard e integração da camada principal.
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
