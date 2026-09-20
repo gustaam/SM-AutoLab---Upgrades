@@ -280,7 +280,7 @@ def install_ui(App):
         return
     App._ui_runtime_instalado = True
     App._ui_runtime_mode = "canonical"
-    App._ui_runtime_marker = SM_AUTOLAB_CANONICAL_UI_29929
+    App._ui_runtime_marker = SM_AUTOLAB_CANONICAL_UI
 
 
 if __name__ == "__main__":
