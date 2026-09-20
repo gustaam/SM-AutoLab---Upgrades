@@ -3346,8 +3346,8 @@ class App:
                 iid = str(row_index)
                 tree.focus(iid)
                 tree.see(iid)
-                 cells = {(row_index, col) for col in range(3)}
-                 self._planilha_definir_selecao(cells, active=(row_index, 0))
+                cells = {(row_index, col) for col in range(3)}
+                self._planilha_definir_selecao(cells, active=(row_index, 0))
             except Exception:
                 pass
             return "break"
