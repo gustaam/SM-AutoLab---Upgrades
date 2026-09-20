@@ -1,3 +1,4 @@
+# Testes de compatibilidade e aplicação das correções históricas consolidadas.
 import unittest
 from datetime import date, datetime
 from pathlib import Path
