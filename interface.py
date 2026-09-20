@@ -464,7 +464,7 @@ import tkinter as tk
 from collections.abc import Callable, Iterable
 from typing import Any
 
-SM_AUTOLAB_GRADE_VIRTUAL_29926 = "SM-AUTOLAB-GRADE-VIRTUAL-29926"
+SM_AUTOLAB_GRADE_VIRTUAL_29926 = "SM-AUTOLAB-GRADE-VIRTUAL-29929"
 DEFAULT_TOTAL_ROWS = 10000
 DEFAULT_ROW_HEIGHT = 28
 DEFAULT_OVERSCAN = 3
@@ -770,7 +770,6 @@ class VirtualGridTree(tk.Frame):
                 {
                     "background": background,
                     "line": line,
-                    "vertical_lines": vertical_lines,
                     "cells": cells,
                 }
             )
@@ -1750,6 +1749,16 @@ class App:
         )
         self.botao_configuracoes.pack(side="left", padx=(0, 10))
         self.botao_configuracoes.configure(command=self._alternar_menu_configuracoes)
+        self.botao_configuracoes.bind(
+            "<Enter>",
+            self._mostrar_menu_configuracoes,
+            add="+",
+        )
+        self.botao_configuracoes.bind(
+            "<Leave>",
+            self._agendar_fechar_menus,
+            add="+",
+        )
 
         # Status com geometria fixa. A animação ocorre somente dentro do
         # canvas, sem alterar o tamanho do controle ou empurrar Configurações.
@@ -2010,7 +2019,7 @@ class App:
         )
         self.botao_iniciar.pack(side="left")
 
-        # Tooltips passam a ser gerenciados globalmente pela camada visual da Etapa 7.
+        # Tooltips são associados depois da construção completa da interface.
         try:
             aplicar_backdrop_sistema(self.app, "mica", dark=ctk.get_appearance_mode().lower() == "dark")
         except Exception:
@@ -4051,8 +4060,7 @@ class App:
         return extract_column(self._planilha_data, column=1)
 
     def _filtrar_arquivos_60_dias(self, itens):
-        agora = datetime.now()
-        limite = agora - timedelta(days=ARQUIVOS_DIAS)
+        """Normaliza o histórico e preserva todas as planilhas válidas salvas."""
         validos = []
         for item in itens or []:
             if not isinstance(item, dict):
@@ -4061,8 +4069,9 @@ class App:
                 salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
             except Exception:
                 continue
-            if limite <= salvo <= agora:
-                validos.append(item)
+            if salvo > datetime.now():
+                continue
+            validos.append(item)
         validos.sort(key=lambda item: str(item.get("saved_at", "")))
         return validos
 
@@ -4340,8 +4349,26 @@ class App:
             return str(valor[1] if modo == "dark" else valor[0])
         return str(valor)
 
+    def _data_minima_arquivos(self):
+        """Retorna a data mais antiga existente no histórico de Arquivos."""
+        hoje = datetime.now().date()
+        try:
+            datas = []
+            for item in self._carregar_historico_planilhas():
+                try:
+                    data = datetime.fromisoformat(str(item.get("saved_at", ""))).date()
+                except Exception:
+                    continue
+                if data <= hoje:
+                    datas.append(data)
+            if datas:
+                return min(datas)
+        except Exception:
+            pass
+        return hoje - timedelta(days=ARQUIVOS_DIAS)
+
     def _mes_minimo_arquivos(self):
-        limite = datetime.now().date() - timedelta(days=ARQUIVOS_DIAS)
+        limite = self._data_minima_arquivos()
         return datetime(limite.year, limite.month, 1)
 
     def _mes_atual_arquivos(self):
@@ -4360,7 +4387,7 @@ class App:
         self._arquivos_calendar_widget = None
 
         hoje = datetime.now().date()
-        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
+        limite = self._data_minima_arquivos()
         itens = self._carregar_historico_planilhas()
         por_dia = {}
         for item in itens:
@@ -4384,7 +4411,7 @@ class App:
         ).pack(anchor="w")
         ctk.CTkLabel(
             intro,
-            text="Os dias com planilhas salvas ficam destacados. O histórico mantém até 60 dias.",
+            text="Os dias com planilhas salvas ficam destacados. O histórico preserva todas as planilhas disponíveis.",
             text_color=self.SUBTEXT, font=("Segoe UI", 9)
         ).pack(anchor="w", pady=(2, 0))
 
