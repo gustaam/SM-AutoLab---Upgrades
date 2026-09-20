@@ -1482,7 +1482,9 @@ def _aplicar_fluent_ui_29916(self):
     # Botões principais: estados hover coerentes com o Fluent 2.
     try:
         self.botao_iniciar.configure(
-            text="▶  Iniciar",
+            text="Iniciar",
+            text_color="#FFFFFF",
+            border_width=0,
             corner_radius=10,
             height=46,
             hover_color=self.ACCENT_HOVER,
