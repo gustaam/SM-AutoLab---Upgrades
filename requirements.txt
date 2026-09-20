@@ -1,3 +1,4 @@
+# Dependências de execução fixadas para ambientes reproduzíveis.
 customtkinter==6.0.0
 pandas==3.0.5
 openpyxl==3.1.5
