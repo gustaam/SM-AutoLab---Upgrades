@@ -2240,7 +2240,6 @@ class App:
         menu.place(x=0, y=0)
         menu.pack_propagate(False)
         self._menu_config = menu
-        self._configurar_hover_menu(self._menu_config)
 
         aparencia = ctk.CTkButton(
             menu,
@@ -2257,8 +2256,6 @@ class App:
         )
         aparencia.pack(fill="x", padx=7, pady=(8, 3))
         self._menu_aparencia_btn = aparencia
-        aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
-        aparencia.bind("<Leave>", self._agendar_fechar_menus, add="+")
 
         mudar = ctk.CTkButton(
             menu,
@@ -2290,6 +2287,11 @@ class App:
         )
         atualizar.pack(fill="x", padx=7, pady=(3, 8))
 
+        # O binding é instalado depois que os filhos existem, para cobrir todo
+        # o submenu sem depender de eventos globais.
+        self._configurar_hover_menu(self._menu_config)
+        aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
+        
         self.app.update_idletasks()
         self._reposicionar_menus()
 
@@ -2332,7 +2334,6 @@ class App:
         sub.place(x=0, y=0)
         sub.pack_propagate(False)
         self._menu_aparencia = sub
-        self._configurar_hover_menu(sub)
 
         ctk.CTkLabel(
             sub,
@@ -2359,6 +2360,10 @@ class App:
                 anchor="w",
             )
             btn.pack(fill="x", padx=6, pady=2)
+
+        # Depois dos botões existirem, todos os descendentes participam do
+        # mesmo ciclo de hover e a travessia entre pai/submenu fica estável.
+        self._configurar_hover_menu(sub)
 
         self.app.update_idletasks()
         self._reposicionar_menus()
