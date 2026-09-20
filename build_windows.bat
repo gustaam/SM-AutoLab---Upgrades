@@ -1,3 +1,4 @@
+rem Build manual: validação completa e geração do executável Windows com PyInstaller.
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
