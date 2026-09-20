@@ -97,7 +97,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VALIDATED_SHA: ${{ github.sha }}
+          VALIDATED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
         run: |
           set -euo pipefail
           version_b64="$(gh api "repos/${GITHUB_REPOSITORY}/contents/VERSION?ref=${VALIDATED_SHA}" --jq '.content' | tr -d '\n')"
@@ -143,7 +143,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          VALIDATED_SHA: ${{ github.sha }}
+          VALIDATED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
         run: |
           set -euo pipefail
           set +e
