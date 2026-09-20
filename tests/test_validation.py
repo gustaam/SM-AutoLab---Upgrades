@@ -1,3 +1,4 @@
+# Testes das regras de validação estrutural, dependências, workflows e release.
 import struct
 import tempfile
 import unittest
