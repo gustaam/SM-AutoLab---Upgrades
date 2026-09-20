@@ -39,7 +39,7 @@ def _configurar_dpi_windows():
 
 _configurar_dpi_windows()
 
-from interface import App, SM_AUTOLAB_GRADE_VIRTUAL_29926
+from interface import App, SM_AUTOLAB_GRADE_VIRTUAL
 
 
 class StartupSplash:
