@@ -116,39 +116,25 @@ class TooltipRegressionTests(unittest.TestCase):
     def test_texto_generico_nao_recebe_descricao_inventada(self):
         self.assertIsNone(main._stage7_tooltip_text(self._FakeButton("Botão genérico")))
 
-    def test_menu_aparencia_tem_handler_para_filhos_internos(self):
+    def test_menu_aparencia_usa_comando_direto(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _mostrar_menu_configuracoes")
         end = source.index("def _mostrar_menu_aparencia", start)
         block = source[start:end]
-        self.assertIn("_iterar_descendentes_ui(aparencia)", block)
-        self.assertIn("_abrir_aparencia_por_clique", block)
-        self.assertIn('bind("<Button-1>", _abrir_aparencia_por_clique', block)
-
-    def test_menu_aparencia_usa_deteccao_global_do_cursor(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _mostrar_menu_configuracoes")
-        end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
-        block = source[start:end]
-        self.assertIn('self.app.bind(', block)
-        self.assertIn('" <Motion>"'.replace(" ",""), block)
-
-    def test_menu_aparencia_abre_por_hover(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _mostrar_menu_configuracoes")
-        end = source.index("def _mostrar_menu_aparencia", start)
-        block = source[start:end]
-        self.assertIn("_abrir_aparencia_por_hover", block)
-        self.assertIn("_garantir_menu_aparencia_aberto", block)
-        self.assertIn('bind("<Enter>", _abrir_aparencia_por_hover', block)
+        self.assertIn("command=self._mostrar_menu_aparencia", block)
+        self.assertNotIn('bind("<Button-1>"', block)
+        self.assertNotIn("_abrir_aparencia_por_hover", block)
+        self.assertNotIn("_hover_global_config", block)
 
     def test_historico_de_erros_tem_tooltip(self):
         source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
         self.assertIn('"histórico de erros":', source)
 
     def test_iniciar_preserva_legenda(self):
-        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
-        self.assertIn('text="▶  Iniciar"', source)
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('text="Iniciar"', source)
+        self.assertIn('text_color="#FFFFFF"', source)
+        self.assertNotIn('text="▶  Iniciar"', source)
 
     def test_tooltip_cobre_filhos_internos_do_ctkbutton(self):
         source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
@@ -161,3 +147,30 @@ class TooltipRegressionTests(unittest.TestCase):
         self.assertIn('child.bind("<Leave>"', block)
         self.assertIn("HIDE_GRACE_MS", block)
         self.assertIn("_pointer_inside_button", block)
+
+
+class VisualRegression29925Tests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(__file__).resolve().parents[1]
+
+    def test_botao_iniciar_nao_usa_glyph_que_pode_renderizar_area_vazia(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('text="Iniciar"', source)
+        self.assertIn('text_color="#FFFFFF"', source)
+        self.assertNotIn('text="▶  Iniciar"', source)
+
+    def test_menu_aparencia_usa_command_direto_sem_binding_de_clique_extra(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _mostrar_menu_configuracoes")
+        end = source.index("def _entrar_mudar_feegow", start)
+        block = source[start:end]
+        self.assertIn("command=self._mostrar_menu_aparencia", block)
+        self.assertNotIn('bind("<Button-1>"', block)
+        self.assertNotIn("def _abrir_aparencia_por_clique", block)
+        self.assertNotIn("def _hover_global_config", block)
+
+    def test_grade_nao_mantem_widgets_de_moldura_sobre_o_canvas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("self._planilha_stage9_get_grid_state()", source)
+        self.assertNotIn("self._planilha_stage9_reuse_frames", source)
+        self.assertNotIn("Frame(tree,", source)

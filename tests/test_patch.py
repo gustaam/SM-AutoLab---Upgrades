@@ -310,7 +310,7 @@ class PlanilhaStage5Tests(unittest.TestCase):
             "for i in range(10000):\n            y_text = i * row_height",
             content,
         )
-        self.assertIn('state = getattr(self, "_stage9_row_header_state", None)', content)
+        self.assertIn('state = getattr(self, "_virtual_grid_row_header_state", None)', content)
         self.assertIn("canvas.create_text(", content)
         self.assertIn('tags=("rownum",)', content)
 
@@ -592,8 +592,8 @@ class UpdateDiscoveryTests(unittest.TestCase):
 
 
 
-class GradePerformanceStage9Tests(unittest.TestCase):
-    def test_stage9_marker_e_metodos_estao_na_implementacao_canonica(self):
+class GradeCanvasVirtualTests(unittest.TestCase):
+    def test_grade_canvas_eh_a_implementacao_canonica(self):
         root = Path(__file__).resolve().parents[1]
         interface = (root / "interface.py").read_text(encoding="utf-8")
         main_source = (root / "main.py").read_text(encoding="utf-8")
@@ -602,13 +602,17 @@ class GradePerformanceStage9Tests(unittest.TestCase):
             SM_AUTOLAB_GRADE_29922,
             "SM-AUTOLAB-GRADE-PERFORMANCE-29922",
         )
-        self.assertIn("def _planilha_desenhar_grade", interface)
-        self.assertIn("def _planilha_stage9_get_grid_state", interface)
-        self.assertIn("def _planilha_stage9_get_visible_rows", interface)
+        self.assertIn("class VirtualGridTree", interface)
+        self.assertIn("def _planilha_desenhar_borda", interface)
+        self.assertIn('tags=("virtual-column-line",)', interface)
+        self.assertIn('tags=("planilha-selection",)', interface)
+        self.assertNotIn("def _planilha_stage9_get_grid_state", interface)
+        self.assertNotIn("def _planilha_stage9_get_visible_rows", interface)
+        self.assertNotIn("Frame(tree,", interface)
         self.assertNotIn("def install_ui_grade_29922", main_source)
-        self.assertNotIn("def _stage9_desenhar_borda", main_source)
 
-    def test_stage9_row_header_reuses_canvas_items(self):
+    def test_row_header_reuses_canvas_items(self):
+        import interface
         class Canvas:
             def __init__(self):
                 self.next_id = 1
@@ -627,27 +631,23 @@ class GradePerformanceStage9Tests(unittest.TestCase):
             _planilha_row_header = Canvas()
             _planilha_tree = Tree()
         app=AppStub()
-        main.App._planilha_desenhar_cabecalho_linhas(app)
+        interface.App._planilha_desenhar_cabecalho_linhas(app)
         created=sum(1 for c in app._planilha_row_header.calls if c[0] in ("create_text","create_line"))
-        main.App._planilha_desenhar_cabecalho_linhas(app)
+        interface.App._planilha_desenhar_cabecalho_linhas(app)
         created_again=sum(1 for c in app._planilha_row_header.calls if c[0] in ("create_text","create_line"))
         self.assertEqual(created_again, created)
 
-    def test_stage9_border_cleanup_hides_instead_of_destroying(self):
-        class FrameStub:
-            def __init__(self): self.hidden=0
-            def place_forget(self): self.hidden += 1
-        class AppStub:
-            _planilha_borda_widgets=[FrameStub(),FrameStub()]
-        app = AppStub()
-        app._planilha_stage9_get_grid_state = lambda: {
-            "widgets": [], "selection_widgets": app._planilha_borda_widgets, "bbox": None
-        }
-        main.App._planilha_limpar_borda(app)
-        self.assertEqual([w.hidden for w in app._planilha_borda_widgets], [1,1])
+    def test_selection_cleanup_uses_canvas_tag(self):
+        root = Path(__file__).resolve().parents[1]
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+        start = interface.index("def _planilha_limpar_borda")
+        end = interface.index("    def _planilha_desenhar_borda", start)
+        block = interface[start:end]
+        self.assertIn('canvas.delete("planilha-selection")', block)
+        self.assertNotIn("place_forget", block)
 
-    def test_stage9_boot_usa_a_entrada_unica(self):
-        source=Path(main.__file__).read_text(encoding="utf-8")
+    def test_boot_usa_a_entrada_unica(self):
+        source=Path(__file__).resolve().parents[1].joinpath("main.py").read_text(encoding="utf-8")
         self.assertIn("install_ui(App)", source)
         self.assertNotIn("install_ui_grade_29922(App)", source)
 
