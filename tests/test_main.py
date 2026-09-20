@@ -1,176 +1,64 @@
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-
-import main
-
-# tests/test_config_menu_position.py
-
-class ConfigMenuPositionTests(unittest.TestCase):
-    def test_menu_configuracoes_e_ancorado_abaixo_do_botao(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _reposicionar_menus")
-        end = source.index("def _fixar_menu_configuracoes", start)
-        block = source[start:end]
-        self.assertIn("menu_x = bx", block)
-        self.assertNotIn("bx - 40", block)
-        self.assertIn("self._menu_config.place_configure(", block)
 
 
-# tests/test_dashboard.py
-
-class DashboardStage3Tests(unittest.TestCase):
-    def test_dashboard_stage3_marker_and_entry_point(self):
-        root = Path(__file__).resolve().parents[1]
-        source = (root / "main.py").read_text(encoding="utf-8")
-        self.assertIn("SM_AUTOLAB_DASHBOARD_29917", source)
-        self.assertIn("def install_ui_dashboard_29917", source)
-        self.assertIn("install_ui_dashboard_29917(App)", source)
-        self.assertIn('setattr(App, "_selecionar_tema", theme_wrapper)', source)
-
-    def test_dashboard_clamp_is_safe(self):
-        self.assertEqual(main._dashboard_clamp(-1), 0.0)
-        self.assertEqual(main._dashboard_clamp(0), 0.0)
-        self.assertEqual(main._dashboard_clamp(0.42), 0.42)
-        self.assertEqual(main._dashboard_clamp(2), 1.0)
-        self.assertEqual(main._dashboard_clamp("invalido"), 0.0)
-
-    def test_dashboard_layer_is_visual_only(self):
-        root = Path(__file__).resolve().parents[1]
-        source = (root / "main.py").read_text(encoding="utf-8")
-        stage = source.split("SM_AUTOLAB_DASHBOARD_29917", 1)[1].split('if __name__ == "__main__":', 1)[0]
-        self.assertNotIn("threading.Thread", stage)
-
-
-# tests/test_saved_sheet_counter.py
-
-class SavedSheetCounterTests(unittest.TestCase):
-    def test_home_counter_conta_apenas_senhas_da_planilha_atual(self):
-        class FakeLabel:
-            def __init__(self):
-                self.text = None
-            def configure(self, **kwargs):
-                self.text = kwargs.get("text")
-            def winfo_manager(self):
-                return "pack"
-            def pack_configure(self, **kwargs):
-                pass
-            def pack_forget(self):
-                self.text = None
-
-        class AppStub:
-            arquivos_contador_label = FakeLabel()
-            _planilha_data = {
-                "0,0": "10",
-                "0,1": "senha-1",
-                "0,2": "item",
-                "1,1": "senha-2",
-                "2,0": "20",
-            }
-            _planilha_arquivo = SimpleNamespace(exists=lambda: False)
-
-        main._home_counter(AppStub)
-        self.assertEqual(AppStub.arquivos_contador_label.text, "2 Códigos salvos")
-
-
-# tests/test_status_indicator.py
-
-class StatusIndicatorTests(unittest.TestCase):
-    def test_pronto_mantem_pulso_verde(self):
-        root = Path(__file__).resolve().parents[1]
-        source = (root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('self._status_text_base == "Pronto"', source)
-        self.assertIn("self._iniciar_pisca_status()", source)
-
-
-# tests/test_tooltips.py
-
-class TooltipRegressionTests(unittest.TestCase):
-    class _FakeButton:
-        def __init__(self, value):
-            self.value = value
-
-        def cget(self, name):
-            if name != "text":
-                raise KeyError(name)
-            return self.value
-
-    def test_none_nao_vira_tooltip_literal(self):
-        self.assertIsNone(main._stage7_tooltip_text(self._FakeButton(None)))
-
-    def test_texto_vazio_nao_cria_tooltip(self):
-        self.assertIsNone(main._stage7_tooltip_text(self._FakeButton("   ")))
-
-    def test_botao_conhecido_tem_descricao(self):
-        self.assertEqual(
-            main._stage7_tooltip_text(self._FakeButton("Iniciar")),
-            "Inicia a automação com os códigos selecionados.",
-        )
-
-    def test_codigo_com_digitos_tem_descricao_de_copia(self):
-        self.assertEqual(
-            main._stage7_tooltip_text(self._FakeButton("ABC123")),
-            "Clique para copiar este código.",
-        )
-
-    def test_texto_generico_nao_recebe_descricao_inventada(self):
-        self.assertIsNone(main._stage7_tooltip_text(self._FakeButton("Botão genérico")))
-
-    def test_menu_aparencia_usa_comando_direto(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _mostrar_menu_configuracoes")
-        end = source.index("def _mostrar_menu_aparencia", start)
-        block = source[start:end]
-        self.assertIn("command=self._mostrar_menu_aparencia", block)
-        self.assertNotIn('bind("<Button-1>"', block)
-        self.assertNotIn("_abrir_aparencia_por_hover", block)
-        self.assertNotIn("_hover_global_config", block)
-
-    def test_historico_de_erros_tem_tooltip(self):
-        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
-        self.assertIn('"histórico de erros":', source)
-
-    def test_iniciar_preserva_legenda(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('text="Iniciar"', source)
-        self.assertIn('text_color="#FFFFFF"', source)
-        self.assertNotIn('text="▶  Iniciar"', source)
-
-    def test_tooltip_cobre_filhos_internos_do_ctkbutton(self):
-        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
-        start = source.index("class _SMAutoLabTooltip:")
-        end = source.index("def _stage7_tooltip_text", start)
-        block = source[start:end]
-        self.assertIn("def _iter_widget_tree", block)
-        self.assertIn("def _bind_widget_tree", block)
-        self.assertIn('child.bind("<Enter>"', block)
-        self.assertIn('child.bind("<Leave>"', block)
-        self.assertIn("HIDE_GRACE_MS", block)
-        self.assertIn("_pointer_inside_button", block)
-
-
-class VisualRegression29925Tests(unittest.TestCase):
+class CanonicalRuntimeTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(__file__).resolve().parents[1]
 
-    def test_botao_iniciar_nao_usa_glyph_que_pode_renderizar_area_vazia(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('text="Iniciar"', source)
-        self.assertIn('text_color="#FFFFFF"', source)
-        self.assertNotIn('text="▶  Iniciar"', source)
+    def test_main_bootstrap_uses_only_canonical_ui(self):
+        source = (self.root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("SM_AUTOLAB_CANONICAL_UI_29929", source)
+        self.assertIn("def install_ui(App):", source)
+        self.assertIn("App._ui_runtime_mode = \"canonical\"", source)
+        self.assertNotIn("from patch import", source)
+        self.assertNotIn("bind_all", source)
+        self.assertNotIn("install_ui_29912(", source)
+        self.assertNotIn("install_ui_fluent_29916(", source)
+        self.assertNotIn("install_ui_micro_29918(", source)
+        self.assertNotIn("install_ui_windows11_native_29925(", source)
+        self.assertLess(len(source.splitlines()), 500)
 
-    def test_menu_aparencia_usa_command_direto_sem_binding_de_clique_extra(self):
+    def test_main_build_keeps_single_bootstrap_entry(self):
+        for filename in ("build_windows.bat", ".github/workflows/validate-main.yml", ".github/workflows/release.yml"):
+            source = (self.root / filename).read_text(encoding="utf-8")
+            self.assertIn(
+                "from interface import App; from main import install_ui, _validar_base_aplicacao",
+                source,
+            )
+            self.assertIn("install_ui(App); _validar_base_aplicacao()", source)
+
+    def test_appearance_submenu_owns_hover_events(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _mostrar_menu_configuracoes")
-        end = source.index("def _entrar_mudar_feegow", start)
+        end = source.index("def _mostrar_menu_aparencia", start)
         block = source[start:end]
+        self.assertIn("def _configurar_hover_menu", source)
         self.assertIn("command=self._mostrar_menu_aparencia", block)
-        self.assertNotIn('bind("<Button-1>"', block)
-        self.assertNotIn("def _abrir_aparencia_por_clique", block)
-        self.assertNotIn("def _hover_global_config", block)
+        self.assertIn('aparencia.bind("<Enter>", self._mostrar_menu_aparencia', block)
+        self.assertIn('aparencia.bind("<Leave>", self._agendar_fechar_menus', block)
+        self.assertNotIn('self.app.bind_all("<Button-1>"', source)
 
-    def test_grade_nao_mantem_widgets_de_moldura_sobre_o_canvas(self):
+    def test_appearance_hover_compatibility_method_is_real(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertNotIn("self._planilha_stage9_get_grid_state()", source)
-        self.assertNotIn("self._planilha_stage9_reuse_frames", source)
-        self.assertNotIn("Frame(tree,", source)
+        start = source.index("def _garantir_menu_aparencia_aberto_se_hover")
+        end = source.index("def _garantir_menu_aparencia_aberto(self)", start)
+        block = source[start:end]
+        self.assertIn("return self._mostrar_menu_aparencia(event)", block)
+
+    def test_iniciar_has_one_canonical_text_owner(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertEqual(source.count('text="Iniciar"'), 1)
+        self.assertIn('text_color="#FFFFFF"', source)
+
+    def test_legacy_patch_module_is_absent(self):
+        self.assertFalse((self.root / "patch.py").exists())
+
+    def test_interface_has_no_global_mouse_binding(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("bind_all", source)
+        self.assertNotIn('bind("<Button-1>", on_click', source)
+
+
+if __name__ == "__main__":
+    unittest.main()
