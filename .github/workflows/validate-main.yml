@@ -1,3 +1,4 @@
+# CI principal: valida arquitetura, dependências, testes, integração e Defender.
 name: Validate main for release
 
 # CI trigger validation
