@@ -616,27 +616,20 @@ def _stage7_attach_tooltip(widget):
 
 
 def _stage7_instalar_tooltips_universais():
-    button_class = ctk.CTkButton
-    if getattr(button_class, "_sm_autolab_tooltip_patched", False):
+    """Compatibilidade histórica: não altera globalmente CTkButton."""
+    return
+
+
+def _stage7_instalar_tooltips_existentes(root):
+    """Cria tooltips somente para widgets já construídos."""
+    if root is None:
         return
+    try:
+        for widget in _walk_children(root):
+            _stage7_attach_tooltip(widget)
+    except Exception:
+        pass
 
-    original_init = button_class.__init__
-    original_configure = button_class.configure
-
-    def init_with_tooltip(self, *args, **kwargs):
-        original_init(self, *args, **kwargs)
-        _stage7_attach_tooltip(self)
-
-    def configure_with_tooltip(self, *args, **kwargs):
-        result = original_configure(self, *args, **kwargs)
-        _stage7_attach_tooltip(self)
-        return result
-
-    button_class.__init__ = init_with_tooltip
-    button_class.configure = configure_with_tooltip
-    button_class._sm_autolab_tooltip_patched = True
-    button_class._sm_autolab_original_init = original_init
-    button_class._sm_autolab_original_configure = original_configure
 
 def _stage7_aplicar_layout_responsivo(self):
     try:
@@ -682,8 +675,6 @@ def install_ui_responsivo_29921(App):
     for name, value in _STAGE7_UI_TOKENS.items():
         setattr(App, f"UI_{name.upper()}", value)
 
-    _stage7_instalar_tooltips_universais()
-
     original_config = App.config_app
 
     def config_wrapper(self, *args, **kwargs):
@@ -693,6 +684,7 @@ def install_ui_responsivo_29921(App):
             self.app.minsize(760, 590)
             self.app.bind("<Configure>", self._stage7_configure_responsivo, add="+")
             self.app.after_idle(lambda: _stage7_aplicar_layout_responsivo(self))
+            self.app.after_idle(lambda: _stage7_instalar_tooltips_existentes(self.app))
         except Exception:
             _stage7_aplicar_layout_responsivo(self)
         return result
@@ -1079,8 +1071,7 @@ def install_ui_29912(App):
             _home_counter(self)
         try:
             if not getattr(self, "_ui_29912_global_binding", False):
-                self.app.bind_all("<Button-1>", lambda event: _global_click(self, event), add="+")
-                self._ui_29912_global_binding = True
+                self._ui_29912_global_binding = False
         except Exception:
             pass
         return result
@@ -1482,7 +1473,6 @@ def _aplicar_fluent_ui_29916(self):
     # Botões principais: estados hover coerentes com o Fluent 2.
     try:
         self.botao_iniciar.configure(
-            text="Iniciar",
             text_color="#FFFFFF",
             border_width=0,
             corner_radius=10,
@@ -1600,35 +1590,12 @@ def _aplicar_fluent_ui_29916(self):
 
 
 def _fluent_animar_entrada(app):
-    if getattr(app, "_fluent_entry_animation_done", False):
-        return
-    app._fluent_entry_animation_done = True
-
+    """Mantém a entrada estável; não anima alpha da janela."""
     try:
-        app.attributes("-alpha", 0.94)
+        if app.winfo_exists():
+            app.attributes("-alpha", 1.0)
     except Exception:
-        return
-
-    total_frames = 7
-    interval_ms = 24
-
-    def tick(frame=0):
-        try:
-            if getattr(app, "_closing", False) or not app.winfo_exists():
-                return
-            if frame >= total_frames:
-                app.attributes("-alpha", 1.0)
-                return
-            fator = (frame + 1) / total_frames
-            app.attributes("-alpha", 0.94 + (0.06 * fator))
-            app.after(interval_ms, lambda: tick(frame + 1))
-        except Exception:
-            try:
-                app.attributes("-alpha", 1.0)
-            except Exception:
-                pass
-
-    app.after_idle(tick)
+        pass
 
 
 def install_ui_fluent_29916(App):
