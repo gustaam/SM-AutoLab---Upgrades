@@ -3480,16 +3480,15 @@ class App:
         canvas.itemconfigure(top_line, fill=border, state="normal")
 
     def _planilha_limpar_borda(self):
-        """Oculta a moldura de seleção e as sobreposições reutilizáveis."""
-        state = self._planilha_stage9_get_grid_state()
-        widgets = state.get("selection_widgets", [])
-        for widget in widgets:
-            try:
-                widget.place_forget()
-            except Exception:
-                pass
-        self._planilha_borda_widgets = widgets
-        self._stage9_borda_bbox = None
+        """Remove a seleção desenhada diretamente no Canvas da grade."""
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        if canvas is None:
+            return
+        try:
+            canvas.delete("planilha-selection")
+        except tk.TclError:
+            pass
 
     def _planilha_desenhar_borda(self):
         """Desenha a seleção diretamente no Canvas da grade, sem widgets sobrepostos."""

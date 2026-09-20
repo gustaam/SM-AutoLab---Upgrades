@@ -286,7 +286,7 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
     def test_virtualizacao_substitui_povoamento_incremental(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
         start = interface.index("def abrir_planilha")
-        end = interface.index("    def _planilha_stage9_get_grid_state", start)
+        end = interface.index("    def _planilha_desenhar_cabecalho_linhas", start)
         block = interface[start:end]
         self.assertIn("VirtualGridTree(", block)
         self.assertIn("value_provider=", block)
@@ -366,7 +366,7 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
     def test_selecao_multipla_tem_moldura_por_celula_em_selecoes_pequenas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _planilha_desenhar_borda")
-        end = source.index("    def _planilha_desenhar_grade", start)
+        end = source.index("    def _planilha_definir_selecao", start)
         block = source[start:end]
         self.assertIn("canvas.delete(\"planilha-selection\")", block)
         self.assertIn("canvas.create_rectangle(", block)

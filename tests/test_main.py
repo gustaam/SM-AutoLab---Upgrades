@@ -116,39 +116,25 @@ class TooltipRegressionTests(unittest.TestCase):
     def test_texto_generico_nao_recebe_descricao_inventada(self):
         self.assertIsNone(main._stage7_tooltip_text(self._FakeButton("Botão genérico")))
 
-    def test_menu_aparencia_tem_handler_para_filhos_internos(self):
+    def test_menu_aparencia_usa_comando_direto(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _mostrar_menu_configuracoes")
         end = source.index("def _mostrar_menu_aparencia", start)
         block = source[start:end]
-        self.assertIn("_iterar_descendentes_ui(aparencia)", block)
-        self.assertIn("_abrir_aparencia_por_clique", block)
-        self.assertIn('bind("<Button-1>", _abrir_aparencia_por_clique', block)
-
-    def test_menu_aparencia_usa_deteccao_global_do_cursor(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _mostrar_menu_configuracoes")
-        end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
-        block = source[start:end]
-        self.assertIn('self.app.bind(', block)
-        self.assertIn('" <Motion>"'.replace(" ",""), block)
-
-    def test_menu_aparencia_abre_por_hover(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _mostrar_menu_configuracoes")
-        end = source.index("def _mostrar_menu_aparencia", start)
-        block = source[start:end]
-        self.assertIn("_abrir_aparencia_por_hover", block)
-        self.assertIn("_garantir_menu_aparencia_aberto", block)
-        self.assertIn('bind("<Enter>", _abrir_aparencia_por_hover', block)
+        self.assertIn("command=self._mostrar_menu_aparencia", block)
+        self.assertNotIn('bind("<Button-1>"', block)
+        self.assertNotIn("_abrir_aparencia_por_hover", block)
+        self.assertNotIn("_hover_global_config", block)
 
     def test_historico_de_erros_tem_tooltip(self):
         source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
         self.assertIn('"histórico de erros":', source)
 
     def test_iniciar_preserva_legenda(self):
-        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
-        self.assertIn('text="▶  Iniciar"', source)
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('text="Iniciar"', source)
+        self.assertIn('text_color="#FFFFFF"', source)
+        self.assertNotIn('text="▶  Iniciar"', source)
 
     def test_tooltip_cobre_filhos_internos_do_ctkbutton(self):
         source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
