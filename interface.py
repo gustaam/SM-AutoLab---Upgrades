@@ -3360,10 +3360,10 @@ class App:
         self._planilha_drag_anchor = None
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
-        tree.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")
-        tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")
-        tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")
-        tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula, add="+")
+        tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
+        tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
+        tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
+        tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)
         tree.bind("<Return>", self._planilha_editar_selecao)
         tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
         tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
@@ -3954,15 +3954,25 @@ class App:
         self._planilha_marcar_alteracao()
 
     def _planilha_atualizar_grade(self):
-        tree=self._planilha_tree
-        if not tree:return
-        refresh=getattr(tree, "refresh", None)
+        tree = self._planilha_tree
+        if tree is None:
+            return
+        refresh = getattr(tree, "refresh", None)
         if callable(refresh):
             refresh()
+            try:
+                tree.after_idle(self._planilha_desenhar_borda)
+            except Exception:
+                self._planilha_desenhar_borda()
             return
         for iid in tree.get_children():
-            i=int(iid); vals=[self._planilha_data.get(f"{i},{c}","") for c in range(3)]; tree.item(iid,values=vals,tags=("even" if i % 2 == 0 else "odd",))
-
+            i = int(iid)
+            vals = [self._planilha_data.get(f"{i},{c}", "") for c in range(3)]
+            tree.item(
+                iid,
+                values=vals,
+                tags=("even" if i % 2 == 0 else "odd",),
+            )
     def _planilha_desfazer(self):
         state = undo_state(
             self._planilha_undo,
