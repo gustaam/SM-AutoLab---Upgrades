@@ -489,6 +489,32 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("for offset, slot in enumerate(self._pool):", refresh)
         self.assertNotIn("range(self._total_rows)", refresh)
 
+    def test_identify_cell_maps_every_column_after_scroll(self):
+        class CanvasStub:
+            def canvasx(self, value):
+                return float(value) + 40.0
+
+            def canvasy(self, value):
+                return float(value) + 280.0
+
+        grid = VirtualGridTree.__new__(VirtualGridTree)
+        grid._canvas = CanvasStub()
+        grid._row_height = 28
+        grid._total_rows = 10000
+        grid._columns = (
+            ("c1", "Data", 140, 100, "w", True),
+            ("c2", "Senha", 300, 160, "w", True),
+            ("c3", "Observação", 140, 100, "w", True),
+        )
+        grid._widths = {"c1": 140, "c2": 300, "c3": 140}
+
+        self.assertEqual(grid.identify_cell(5, 5), (10, 0))
+        self.assertEqual(grid.identify_cell(145, 5), (10, 1))
+        self.assertEqual(grid.identify_cell(445, 5), (10, 2))
+        self.assertEqual(grid.identify_cell(499, 27), (10, 2))
+        self.assertIsNone(grid.identify_cell(580, 5))
+        self.assertIsNone(grid.identify_cell(5, -100))
+
     def test_mouse_hit_testing_uses_canvas_coordinates_without_header_offset(self):
         root = Path(__file__).resolve().parents[1]
         source = (root / "interface.py").read_text(encoding="utf-8")
@@ -515,7 +541,7 @@ class PlanilhaEventOwnershipTests(unittest.TestCase):
         self.assertIn('Entry(tree._canvas, bd=1, relief="solid"', source)
         self.assertNotIn('Entry(tree, bd=1, relief="solid"', source)
 
-    def test_patch_nao_instala_clique_global_para_a_planilha(self):
-        source = (Path(__file__).resolve().parents[1] / "patch.py").read_text(encoding="utf-8")
-        self.assertNotIn('bind_all("<Button-1>", on_click', source)
-        self.assertNotIn("def _limpar_selecao_planilha_299", source)
+    def test_planilha_nao_instala_eventos_globais(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("bind_all", source)
+        self.assertNotIn('bind("<Button-1>", on_click', source)
