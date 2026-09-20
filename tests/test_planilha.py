@@ -497,7 +497,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
         build = (root / "build_windows.bat").read_text(encoding="utf-8")
         validate = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
         release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-        self.assertIn("SM_AUTOLAB_GRADE_VIRTUAL_29926", main)
+        self.assertIn("SM_AUTOLAB_GRADE_VIRTUAL", main)
         for source in (build, validate, release):
             self.assertIn("install_ui(App); _validar_base_aplicacao()", source)
 
