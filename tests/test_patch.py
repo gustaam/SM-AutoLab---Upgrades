@@ -310,7 +310,7 @@ class PlanilhaStage5Tests(unittest.TestCase):
             "for i in range(10000):\n            y_text = i * row_height",
             content,
         )
-        self.assertIn('state = getattr(self, "_stage9_row_header_state", None)', content)
+        self.assertIn('state = getattr(self, "_virtual_grid_row_header_state", None)', content)
         self.assertIn("canvas.create_text(", content)
         self.assertIn('tags=("rownum",)', content)
 
