@@ -293,6 +293,13 @@ def validate_architecture(root: Path) -> None:
             fail(f"build_windows.bat não contém o metadado esperado: {marker}")
 
 
+PRODUCTION_FILES = (
+    "main.py",
+    "interface.py",
+    "app.py",
+)
+
+
 def _module_name(relative: str) -> str:
     return Path(relative).stem
 
