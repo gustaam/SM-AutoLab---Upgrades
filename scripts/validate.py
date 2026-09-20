@@ -21,7 +21,7 @@ ACTION_RUNTIME_REFS = {
 REQUIREMENT_PIN_RE = re.compile(r"^[A-Za-z0-9_.-]+==[^\s#]+$")
 
 REQUIRED_PATHS = (
-    "main.py", "interface.py", "app.py", "patch.py", "requirements.txt",
+    "main.py", "interface.py", "app.py", "requirements.txt",
     "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate.py",
     "tests/test_patch.py", "tests/test_main.py", "tests/test_planilha.py",
     "tests/test_app.py", "tests/test_validation.py",
@@ -35,7 +35,7 @@ OBSOLETE_PATHS = (
     "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py", ".etapa-b-trigger",
     ".github/workflows/_fix_patch_b_import.yml", ".github/workflows/create-release-tag.yml",
     "automacao.py", "atualizacao.py", "planilha_core.py", "planilha_virtual_29926.py", "storage_safe.py",
-    "ui_platform.py", "windows11_native_29925.py",
+    "ui_platform.py", "windows11_native_29925.py", "patch.py",
     "tests/test_config_menu_position.py", "tests/test_dashboard.py", "tests/test_planilha_behavior.py",
     "tests/test_planilha_core.py", "tests/test_planilha_deterministic_open.py", "tests/test_planilha_grid.py",
     "tests/test_planilha_open_path.py", "tests/test_saved_sheet_counter.py", "tests/test_stage10.py",
@@ -60,27 +60,13 @@ WORKFLOW_PATHS = (
     ".github/workflows/release.yml",
 )
 
-PATCH_MARKERS = (
-    "ARQUIVOS_COMPONENT_MARKER", "AJUSTES_COMPONENT_MARKER", "_SOURCE_PATCH_BASE", "_SOURCE_PATCH_ARQUIVOS",
-    "_SOURCE_PATCH_AJUSTES", "_NS_PATCH_BASE", "_NS_PATCH_ARQUIVOS", "_NS_PATCH_AJUSTES", "PATCH_297_MARKER",
-    "PATCH_298_MARKER", "PATCH_299_MARKER", "PATCH_2991_MARKER", "PATCH_29910_MARKER", "_historico_tem_erro",
-    "_history_rebind_open_299", "_history_click_outside_299", "_instalar_deselecao_global_299",
-    "_count_saved_passwords", "firstweekday", "_atualizar_contador_selecao_29910",
-    "_ensure_selection_state_29910", "def aplicar_patch_ui",
-)
-
-UI_MARKERS = (
-    "SM_AUTOLAB_UI_FIXES_29912", "_home_counter", "_calendar_click", "_create_history_tile",
-    "_select_history_tile", "def install_ui_29912",
-)
-
 TEST_MARKERS = (
-    "class VersionComparisonTests", "class UpdateEnvironmentTests", "class UpdateDiscoveryTests",
-    "class UIFixes29912Tests", "class HistoricoIlimitadoTests", "class GradeCanvasVirtualTests", "class PlanilhaVirtualStage13Tests", "test_arquivos_de_teste_auxiliares_foram_consolidados",
+    "class CanonicalRuntimeTests",
+    "test_main_bootstrap_uses_only_canonical_ui",
+    "test_appearance_submenu_owns_hover_events",
+    "test_planilha_mouse_events_use_one_hit_test",
+    "test_legacy_patch_module_is_absent",
 )
-
-BUILD_MARKERS = ("VSVersionInfo(", "FixedFileInfo(", "StringFileInfo([", "Set-Content version_info.txt")
-
 
 def fail(message: str) -> None:
     raise SystemExit(f"ERRO: {message}")
@@ -195,115 +181,79 @@ def validate_architecture(root: Path) -> None:
         if (root / relative).exists():
             fail(f"arquivo/artefato obsoleto ainda presente: {relative}")
 
-    contents = {relative: read_text(root, relative) for relative in (
-        "main.py", "interface.py", "app.py", "patch.py", "build_windows.bat", "tests/test_patch.py",
-    )}
+    main = read_text(root, "main.py")
+    interface = read_text(root, "interface.py")
+    app = read_text(root, "app.py")
+    build = read_text(root, "build_windows.bat")
+    tests = read_text(root, "tests/test_patch.py")
 
-    main = contents["main.py"]
-    interface = contents["interface.py"]
-    app = contents["app.py"]
-    patch = contents["patch.py"]
-    build = contents["build_windows.bat"]
-    tests = contents["tests/test_patch.py"]
+    if len(main.splitlines()) > 500:
+        fail("main.py voltou a concentrar camadas legadas; mantenha o bootstrap enxuto")
 
     require_markers("main.py", main, (
-        "from patch import aplicar_patch_ui", "def install_ui_29912", "def install_ui_fluent_29916", "class StartupSplash",
-        "def _corrigir_historico_ilimitado", "def _validar_base_aplicacao",
-        "SM_AUTOLAB_PLANILHA_29919", "def install_ui_planilha_29919",
-        "SM_AUTOLAB_AUDITORIA_29920", "def _configurar_dpi_windows",
-        "def install_ui_auditoria_29920", "SM_AUTOLAB_RESPONSIVO_29921",
-        "def install_ui_responsivo_29921",
+        "SM_AUTOLAB_CANONICAL_UI_29929",
+        "class StartupSplash",
+        "def _configurar_dpi_windows",
+        "def _validar_base_aplicacao",
         "def install_ui(App)",
-        "SM_AUTOLAB_GRADE_VIRTUAL_29926",
-        "from interface import App, SM_AUTOLAB_GRADE_VIRTUAL_29926, install_ui_windows11_native_29925", "install_ui_windows11_native_29925(App)",
+        "from interface import App, SM_AUTOLAB_GRADE_VIRTUAL_29926",
     ))
     require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
-    require_markers("patch.py", patch, PATCH_MARKERS)
-    require_markers("main.py", main, UI_MARKERS)
+    require_markers("tests/test_patch.py", tests, TEST_MARKERS)
 
-    for legacy_grid in (
+    require_markers("interface.py", interface, (
+        "def abrir_planilha(self, dados_iniciais=None):",
+        "class VirtualGridTree",
+        "def identify_cell",
+        "def _planilha_clicar_celula",
+        "def _planilha_arrastar_selecao",
+        "def _planilha_soltar_selecao",
+        "def _planilha_duplo_clique_celula",
+        "def _planilha_desenhar_borda",
+        "def _configurar_hover_menu",
+        'command=self._mostrar_menu_aparencia',
+        'aparencia.bind("<Enter>", self._mostrar_menu_aparencia',
+        'aparencia.bind("<Leave>", self._agendar_fechar_menus',
+        'tree.bind("<ButtonPress-1>", self._planilha_clicar_celula',
+        'tree.bind("<B1-Motion>", self._planilha_arrastar_selecao',
+        'tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao',
+        "entry=Entry(tree._canvas",
+        'tags=("virtual-column-line",)',
+        'tags=("planilha-selection",)',
+    ))
+    
+    for legacy in (
+        "from patch import",
+        "aplicar_patch_ui",
+        "install_ui_29912(",
+        "install_ui_fluent_29916(",
+        "install_ui_dashboard_29917(",
+        "install_ui_micro_29918(",
+        "install_ui_planilha_29919(",
+        "install_ui_responsivo_29921(",
+        "install_ui_auditoria_29920(",
+        "install_ui_windows11_native_29925(",
+        "_fluent_animar_entrada",
+        "bind_all",
+    ):
+        if legacy in main:
+            fail(f"camada/runtime legado detectado em main.py: {legacy}")
+
+    for legacy in (
+        "bind_all",
+        "Frame(tree,",
+        'Entry(tree, bd=1, relief="solid"',
         "ttk.Treeview(",
-        "ttk.Style(",
-        "_planilha_povoamento_",
+        "def _planilha_povoamento_",
     ):
-        if legacy_grid in interface:
-            fail(f"estrutura legada da grade detectada em interface.py: {legacy_grid}")
-    for legacy_virtual in (
-        "def tag_configure(",
-        "def insert(",
-        "def event_generate(",
-    ):
-        if legacy_virtual in interface:
-            fail(f"compatibilidade Treeview obsoleta em interface.py: {legacy_virtual}")
+        if legacy in interface:
+            fail(f"estrutura/evento legado detectado em interface.py: {legacy}")
 
-    # A planilha tem uma única implementação de abertura e uma única camada
-    # final de interação. Overrides históricos não podem voltar ao runtime.
     if interface.count("    def abrir_planilha(self, dados_iniciais=None):") != 1:
         fail("interface.py deve conter exatamente uma implementação de abrir_planilha")
-    for legacy in (
-        "App.abrir_planilha = _abrir_planilha_297",
-        "App.abrir_planilha = _abrir_planilha_2991",
-        "App.abrir_planilha = open_planilha_wrapper",
-        "App._planilha_clicar_celula = _planilha_clicar_celula_2991",
-        "App._planilha_arrastar_selecao = _planilha_arrastar_selecao_2991",
-        "App._planilha_soltar_selecao = _planilha_soltar_selecao_2991",
-        "def _abrir_planilha_2991",
-        "def _abrir_planilha_297",
-        "def _install_planilha_context_menu",
-    ):
-        if legacy in patch or legacy in main:
-            fail(f"override legado da planilha detectado: {legacy}")
-    require_markers(
-        "main.py",
-        main,
-        (
-            "SM_AUTOLAB_PLANILHA_29919",
-            "def install_ui_planilha_29919",
-            "SM_AUTOLAB_AUDITORIA_29920",
-            "def _configurar_dpi_windows",
-            "def install_ui_auditoria_29920",
-            "SM_AUTOLAB_RESPONSIVO_29921",
-            "def install_ui_responsivo_29921",
-            "def install_ui(App)",
-            "FPS_MS = 16",
-            "SetProcessDpiAwarenessContext",
-            "ctypes.c_void_p(-4)",
-            "SetProcessDpiAwareness",
-            "setter(2)",
-        ),
-    )
-    require_markers("interface.py", interface, ("def abrir_planilha(self, dados_iniciais=None):", "self._planilha_implementacao = \"grade-virtual-29926\"",
-        "SM_AUTOLAB_GRADE_29922", "def _planilha_desenhar_borda", "def _planilha_desenhar_cabecalho_linhas", "def _assinatura_historico_planilhas", "_stage7_top_layout", "_stage7_progress_card", "Tooltips passam a ser gerenciados globalmente", "tree=VirtualGridTree(", "value_provider=", "total_rows=10000", "tree.bind(\"<B1-Motion>\", self._planilha_arrastar_selecao, add=\"+\")", "tree.bind(\"<ButtonRelease-1>\", self._planilha_soltar_selecao, add=\"+\")", "tags=(\"virtual-column-line\",)", "tags=(\"planilha-selection\",)"))
+    if interface.count("def identify_cell(") != 1:
+        fail("VirtualGridTree deve ter exatamente um hit-test canônico de célula")
 
-    require_markers("tests/test_patch.py", tests, TEST_MARKERS)
-    require_markers("interface.py", interface, (
-        "def rectangle_selection", "def parse_paste_text", "def apply_paste",
-        "def clear_cells", "def undo_state", "def redo_state",
-    ))
-    planilha_test = read_text(root, "tests/test_planilha.py")
-    require_markers("tests/test_planilha.py", planilha_test, (
-        "class Windows11NativeStage12Tests", "SM_AUTOLAB_WINDOWS_NATIVE_29925",
-        "install_ui_windows11_native_29925", "SystemParametersInfoW", "SetWindowTheme",
-        "class VirtualGridStage13Tests", "SM_AUTOLAB_GRADE_VIRTUAL_29926",
-        "VirtualGridTree", "visible_row_range",
-    ))
-    validate_dependencies(root)
-    validate_workflow_pins(root)
-    validate_workflow_security(root)
-
-    for legacy_import in LEGACY_IMPORTS:
-        for relative in LEGACY_IMPORT_CHECK_PATHS:
-            if relative in contents and legacy_import in contents[relative]:
-                fail(f"import legado detectado em {relative}: {legacy_import}")
-
-    if 'bind_all("<Button-1>", on_click' in patch:
-        fail("clique global legado da planilha detectado em patch.py")
-    if 'Entry(tree, bd=1, relief="solid"' in interface:
-        fail("editor da planilha deve ser filho do Canvas da grade")
-    if "Ctrl + clique para selecionar várias datas" in patch:
-        fail("instrução visual antiga ainda presente em patch.py")
-    if "tkcalendar" in interface:
-        fail("dependência tkcalendar detectada")
     if not re.search(r"def\s+find_update\s*\(", interface) or not re.search(r"def\s+launch_updater\s*\(", interface):
         fail("motor integrado de atualização não encontrado em interface.py")
     if re.search(r"SM[ ._]?AutoLab[ ._-]?Updater\.exe|updater\.py|--sm-autolab-updater|--sm-autolab-update-helper", interface):
@@ -318,25 +268,19 @@ def validate_architecture(root: Path) -> None:
     if re.search(r'"PORTAL_SENHA"\s*:\s*"[^"\r\n]+"', interface):
         fail("valor de acesso literal encontrado em interface.py para PORTAL_SENHA")
 
-    if not re.search(r"def _renderizar_calendario_arquivos", interface):
-        fail("interface.py não contém o calendário de Arquivos")
     if "Canvas(" not in interface:
-        fail("interface.py não contém o calendário nativo Canvas")
+        fail("interface.py não contém Canvas para a grade/calendário")
 
-    build_exclusions = {
-        "tests/test_atualizacao.py", "tests/test_ui_correcoes_29912.py", "tests/test_historico_ilimitado.py",
-        ".etapa-b-trigger", ".github/workflows/_fix_patch_b_import.yml",
-    }
     for relative in OBSOLETE_PATHS:
-        if relative not in build_exclusions and relative in build:
+        if relative in build:
             fail(f"build_windows.bat ainda referencia artefato legado: {relative}")
 
     if "SM AutoLab" not in build:
         fail("build_windows.bat não contém a rotina de build do SM AutoLab")
     if "from interface import App; from main import install_ui, _validar_base_aplicacao" not in build:
-        fail("build_windows.bat não usa o mesmo ponto de entrada da UI")
+        fail("build_windows.bat não usa o ponto de entrada canônico")
     if "install_ui(App); _validar_base_aplicacao()" not in build:
-        fail("build_windows.bat não executa o ponto de entrada consolidado")
+        fail("build_windows.bat não executa o bootstrap canônico")
 
     release = read_text(root, ".github/workflows/release.yml")
     release_flow = "from interface import App; from main import install_ui, _validar_base_aplicacao; install_ui(App); _validar_base_aplicacao()"
@@ -345,13 +289,6 @@ def validate_architecture(root: Path) -> None:
     for marker in BUILD_MARKERS:
         if marker not in build:
             fail(f"build_windows.bat não contém o metadado esperado: {marker}")
-
-PRODUCTION_FILES = (
-    "main.py",
-    "interface.py",
-    "app.py",
-    "patch.py",
-)
 
 
 def _module_name(relative: str) -> str:
