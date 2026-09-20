@@ -222,7 +222,8 @@ O arquivo intermediário de metadados é temporário e não faz parte da árvore
 
 ## Release
 
-O fluxo de release valida a base antes de publicar:
+O fluxo de release valida a base antes de publicar. A criação/alinhamento da tag e o disparo do build agora fazem parte do mesmo `validate-main.yml`; não existe um terceiro workflow dedicado a criar a tag.
+
 
 1. validação estrutural e de dependências;
 2. testes automatizados e integração;
