@@ -1,3 +1,4 @@
+# Núcleo operacional: automação Feegow/Selenium, resultados, checkpoints e persistência.
 from __future__ import annotations
 
 import hashlib
