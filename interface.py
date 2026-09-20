@@ -1996,10 +1996,17 @@ class App:
         )
         self.botao_parar.pack(side="left", padx=(0, 7))
         self.botao_iniciar = ctk.CTkButton(
-            buttons, text="▶  Iniciar", command=self.iniciar_thread,
-            width=150, height=46, corner_radius=8,
-            fg_color=self.ACCENT, hover_color=self.ACCENT_HOVER,
-            font=("Segoe UI", 14, "bold")
+            buttons,
+            text="Iniciar",
+            command=self.iniciar_thread,
+            width=150,
+            height=46,
+            corner_radius=8,
+            fg_color=self.ACCENT,
+            hover_color=self.ACCENT_HOVER,
+            text_color="#FFFFFF",
+            border_width=0,
+            font=("Segoe UI", 14, "bold"),
         )
         self.botao_iniciar.pack(side="left")
 

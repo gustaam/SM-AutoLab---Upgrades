@@ -356,11 +356,12 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
 
     def test_grade_e_reutilizavel_e_nao_percorre_10000_linhas_para_desenho(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _planilha_desenhar_grade")
-        end = source.index("    def _planilha_atualizar_contador", start)
+        start = source.index("def _planilha_desenhar_borda")
+        end = source.index("    def _planilha_definir_selecao", start)
         block = source[start:end]
         self.assertNotIn("range(10000)", block)
         self.assertIn("tree.bbox(", block)
+        self.assertIn('canvas.delete("planilha-selection")', block)
 
     def test_selecao_multipla_tem_moldura_por_celula_em_selecoes_pequenas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")

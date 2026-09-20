@@ -170,7 +170,8 @@ class VisualRegression29925Tests(unittest.TestCase):
     def test_botao_iniciar_nao_usa_glyph_que_pode_renderizar_area_vazia(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('text="Iniciar"', source)
-        self.assertIn('text_color="#FFFFFF"', (self.root / "main.py").read_text(encoding="utf-8"))
+        self.assertIn('text_color="#FFFFFF"', source)
+        self.assertNotIn('text="▶  Iniciar"', source)
 
     def test_menu_aparencia_usa_command_direto_sem_binding_de_clique_extra(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
