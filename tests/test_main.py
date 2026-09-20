@@ -161,3 +161,29 @@ class TooltipRegressionTests(unittest.TestCase):
         self.assertIn('child.bind("<Leave>"', block)
         self.assertIn("HIDE_GRACE_MS", block)
         self.assertIn("_pointer_inside_button", block)
+
+
+class VisualRegression29925Tests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(__file__).resolve().parents[1]
+
+    def test_botao_iniciar_nao_usa_glyph_que_pode_renderizar_area_vazia(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('text="Iniciar"', source)
+        self.assertIn('text_color="#FFFFFF"', (self.root / "main.py").read_text(encoding="utf-8"))
+
+    def test_menu_aparencia_usa_command_direto_sem_binding_de_clique_extra(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _mostrar_menu_configuracoes")
+        end = source.index("def _entrar_mudar_feegow", start)
+        block = source[start:end]
+        self.assertIn("command=self._mostrar_menu_aparencia", block)
+        self.assertNotIn('bind("<Button-1>"', block)
+        self.assertNotIn("def _abrir_aparencia_por_clique", block)
+        self.assertNotIn("def _hover_global_config", block)
+
+    def test_grade_nao_mantem_widgets_de_moldura_sobre_o_canvas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("self._planilha_stage9_get_grid_state()", source)
+        self.assertNotIn("self._planilha_stage9_reuse_frames", source)
+        self.assertNotIn("Frame(tree,", source)

@@ -333,10 +333,10 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
         patch = (self.root / "patch.py").read_text(encoding="utf-8")
         for marker in (
             'SM_AUTOLAB_GRADE_29922 = "SM-AUTOLAB-GRADE-PERFORMANCE-29922"',
-            "def _planilha_desenhar_grade",
-            "def _planilha_stage9_get_visible_rows",
             "def _planilha_desenhar_borda",
             "_planilha_celulas_selecionadas",
+            'tags=("planilha-selection",)',
+            'tags=("virtual-column-line",)',
         ):
             self.assertIn(marker, interface)
         self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
@@ -345,22 +345,31 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
         self.assertNotIn("_planilha_arrastar_selecao_2991", patch)
         self.assertNotIn("_planilha_soltar_selecao_2991", patch)
 
+    def test_grade_canvas_nao_cria_widgets_sobrepostos(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("class VirtualGridTree")
+        end = source.index("__all__ = (", start) if "__all__ = (" in source[start:] else source.index("__all__ =", start)
+        block = source[start:end]
+        self.assertIn('tags=("virtual-column-line",)', block)
+        self.assertNotIn("Frame(tree", block)
+        self.assertIn("canvas.create_rectangle(", source[source.index("def _planilha_desenhar_borda"):source.index("def _planilha_definir_selecao")])
+
     def test_grade_e_reutilizavel_e_nao_percorre_10000_linhas_para_desenho(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _planilha_desenhar_grade")
         end = source.index("    def _planilha_atualizar_contador", start)
         block = source[start:end]
-        self.assertIn("_planilha_stage9_get_visible_rows(tree)", block)
         self.assertNotIn("range(10000)", block)
+        self.assertIn("tree.bbox(", block)
 
     def test_selecao_multipla_tem_moldura_por_celula_em_selecoes_pequenas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _planilha_desenhar_borda")
         end = source.index("    def _planilha_desenhar_grade", start)
         block = source[start:end]
-        self.assertIn("len(normalized) <= 250", block)
-        self.assertIn("segmentos.extend", block)
-        self.assertIn("frame.lift()", block)
+        self.assertIn("canvas.delete(\"planilha-selection\")", block)
+        self.assertIn("canvas.create_rectangle(", block)
+        self.assertNotIn("frame.lift()", block)
 
 
 # tests/test_planilha_open_path.py
