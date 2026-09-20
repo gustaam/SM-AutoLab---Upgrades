@@ -222,8 +222,7 @@ O arquivo intermediário de metadados é temporário e não faz parte da árvore
 
 ## Release
 
-O fluxo de release valida a base antes de publicar. A criação/alinhamento da tag e o disparo do build agora fazem parte do mesmo `validate-main.yml`; não existe um terceiro workflow dedicado a criar a tag.
-
+O fluxo de release valida a base antes de publicar:
 
 1. validação estrutural e de dependências;
 2. testes automatizados e integração;
@@ -236,7 +235,7 @@ O fluxo de release valida a base antes de publicar. A criação/alinhamento da t
 9. geração do manifesto com SHA-256;
 10. publicação e verificação dos assets.
 
-A release atual publicada é **v2.99.24**.
+A release publicada anteriormente é **v2.99.23**. A próxima versão preparada pela base atual é **v2.99.24**, ainda dependente da validação completa e publicação.
 
 ## Histórico recente de consolidação
 
@@ -254,7 +253,7 @@ As principais reduções estruturais já concluídas foram:
 
 ## Consolidação da v2.99.24
 
-A `v2.99.24` é a primeira versão preparada sobre a árvore já consolidada em quatro módulos de produção, cinco arquivos de teste e dois workflows. O fluxo de release ficou integrado ao `validate-main.yml`, enquanto `release.yml` permanece dedicado ao build e à publicação do executável.
+A `v2.99.24` é a primeira versão preparada sobre a árvore consolidada em quatro módulos de produção, cinco arquivos de teste e dois workflows. O fluxo de release está integrado ao `validate-main.yml`, enquanto `release.yml` permanece dedicado ao build e à publicação do executável.
 
 ## Manutenção
 
