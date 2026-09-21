@@ -2071,7 +2071,7 @@ class App:
         self.sucesso_card.grid(row=0, column=0, sticky="ew", padx=(0, 5))
         self.erro_card = self._stat_card(stats, "!", "Não executados", "0", self.ERROR)
         self.erro_card.grid(row=0, column=1, sticky="ew", padx=5)
-        self.codigo_card = self._stat_card(stats, "›", "Código atual", "—", self.INFO)
+        self.codigo_card = self._stat_card(stats, "▥", "Código atual", "—", self.INFO)
         self.codigo_card.grid(row=0, column=2, sticky="ew", padx=(5, 0))
         self._execucao_progresso_card = None
 
@@ -2920,7 +2920,7 @@ class App:
         row = ctk.CTkFrame(card, fg_color="transparent")
         row.pack(fill="both", expand=True, padx=12, pady=8)
 
-        icon_sizes = {"✓": 20, "!": 21, "›": 29}
+        icon_sizes = {"✓": 20, "!": 21, "▥": 25, "›": 29}
         icon_font = icon_sizes.get(str(icon), 22)
         ctk.CTkLabel(
             row,
