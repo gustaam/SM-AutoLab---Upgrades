@@ -2058,7 +2058,7 @@ class App:
         eta_box.grid_propagate(False)
         ctk.CTkLabel(
             eta_box, text="Tempo estimado restante", text_color=self.SUBTEXT,
-            font=("Segoe UI", 7, "bold")
+            font=("Segoe UI", 8, "bold")
         ).pack(side="left", padx=(8, 4))
         self._tempo_estimado_label = ctk.CTkLabel(
             eta_box, text="—", text_color=self.TEXT,
@@ -2923,12 +2923,13 @@ class App:
         row.pack(fill="both", expand=True, padx=12, pady=8)
 
         icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 21}
-        icon_font = icon_sizes.get(str(icon), 22)
+        icon_font = icon_sizes.get(str(icon), 21)
+        icon_holder_size = 44
         icon_holder = ctk.CTkFrame(
             row,
-            width=44,
-            height=44,
-            corner_radius=22,
+            width=icon_holder_size,
+            height=icon_holder_size,
+            corner_radius=icon_holder_size // 2,
             fg_color=palette["icon"],
         )
         icon_holder.pack(side="left", padx=(0, 11))
@@ -2936,9 +2937,9 @@ class App:
         ctk.CTkLabel(
             icon_holder,
             text=icon,
-            width=44,
-            height=44,
-            corner_radius=22,
+            width=icon_holder_size,
+            height=icon_holder_size,
+            corner_radius=icon_holder_size // 2,
             fg_color="transparent",
             text_color="#FFFFFF",
             font=("Segoe UI", icon_font, "bold"),
