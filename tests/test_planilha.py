@@ -348,7 +348,7 @@ class PlanilhaOpenPathTests(unittest.TestCase):
         self.assertEqual(interface.count("    def abrir_planilha(self, dados_iniciais=None):"), 1)
         self.assertNotIn("from patch import", main)
         self.assertNotIn("bind_all", main)
-        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', interface)
+        self.assertIn('self._planilha_implementacao = "grade-virtual"', interface)
         self.assertIn("class VirtualGridTree", interface)
 
 
@@ -437,7 +437,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("VirtualGridTree(", block)
         self.assertIn("value_provider=", block)
         self.assertIn("total_rows=10000", block)
-        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', block)
+        self.assertIn('self._planilha_implementacao = "grade-virtual"', block)
         self.assertNotIn("ttk.Treeview(body", block)
         self.assertNotIn("range(10000)", block)
         self.assertNotIn("range(300)", block)
@@ -455,6 +455,32 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("visible_row_range(", refresh)
         self.assertIn("for offset, slot in enumerate(self._pool):", refresh)
         self.assertNotIn("range(self._total_rows)", refresh)
+
+    def test_cell_bbox_uses_logical_canvas_coordinates(self):
+        grid = VirtualGridTree.__new__(VirtualGridTree)
+        grid._row_height = 28
+        grid._total_rows = 10000
+        grid._columns = (
+            ("c1", "Data", 140, 100, "w", True),
+            ("c2", "Senha", 300, 160, "w", True),
+            ("c3", "Observação", 140, 100, "w", True),
+        )
+        grid._widths = {"c1": 140, "c2": 300, "c3": 140}
+
+        self.assertEqual(grid.cell_bbox("20", "#1"), (0, 560, 140, 28))
+        self.assertEqual(grid.cell_bbox("20", "#2"), (140, 560, 300, 28))
+        self.assertEqual(grid.cell_bbox("9999", "#3"), (440, 279972, 140, 28))
+        self.assertIsNone(grid.cell_bbox("-1", "#1"))
+        self.assertIsNone(grid.cell_bbox("20", "#4"))
+
+    def test_selection_overlay_uses_logical_cell_boxes(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _planilha_desenhar_borda")
+        end = source.index("    def _planilha_definir_selecao", start)
+        block = source[start:end]
+        self.assertIn("tree.cell_bbox(str(row), f\"#{col + 1}\")", block)
+        self.assertNotIn("bbox = tree.bbox(str(row), f\"#{col + 1}\")", block)
+        self.assertIn("visible_row_range(", block)
 
     def test_identify_cell_maps_every_column_after_scroll(self):
         class CanvasStub:
