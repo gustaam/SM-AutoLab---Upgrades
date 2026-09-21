@@ -5126,7 +5126,7 @@ class App:
         self._parar_metricas_execucao()
         if self._execucao_titulo_label is not None:
             self._execucao_titulo_label.configure(
-                text="Execução pausada" if self._parar else "Execução concluída"
+                text="Execução interrompida" if self._parar else "Execução concluída"
             )
         if self._execucao_subtitulo_label is not None:
             self._execucao_subtitulo_label.configure(
@@ -5134,7 +5134,7 @@ class App:
             )
         if self._execucao_indicador_label is not None:
             self._execucao_indicador_label.configure(
-                text="●  Pausada" if self._parar else "●  Concluída",
+                text="●  Interrompida" if self._parar else "●  Concluída",
                 text_color=self.WARNING if self._parar else self.SUCCESS
             )
         self.botao_iniciar.configure(state="normal")
