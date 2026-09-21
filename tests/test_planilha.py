@@ -333,7 +333,7 @@ class PlanilhaGridSelectionTests(unittest.TestCase):
     def test_grade_canvas_nao_cria_widgets_sobrepostos(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("class VirtualGridTree")
-        end = source.index("import ctypes", start)
+        end = source.index("DWMWA_SYSTEMBACKDROP_TYPE", start)
         block = source[start:end]
         self.assertIn("self._canvas = tk.Canvas(", block)
         self.assertNotIn("tk.Entry(", block)
