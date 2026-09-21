@@ -21,6 +21,7 @@ from tkinter import Canvas, Entry, Frame, messagebox, ttk
 import customtkinter as ctk
 
 from app import (
+    atomic_write_json,
     carregar_configuracoes,
     excluir_checkpoint_interno,
     ler_checkpoint,
