@@ -3420,10 +3420,11 @@ class App:
         titulo = "Em andamento" if atual else status
         icone = "📁"
 
-        ctk.CTkLabel(
+        icone_widget = ctk.CTkLabel(
             tile, text=icone, font=("Segoe UI Emoji", 20),
             text_color=self.ACCENT
-        ).pack(pady=(7, 1))
+        )
+        icone_widget.pack(pady=(7, 1))
         ctk.CTkLabel(
             tile,
             text=inicio.split(" ")[0] if inicio else "",
@@ -3465,7 +3466,7 @@ class App:
             # keep selection highlight if selected; otherwise restore neutral
             if tile.cget("border_color") not in (self.ACCENT,):
                 tile.configure(border_color=self.BORDER, fg_color=("#FFFFFF", "#2D3338"))
-        for w in (tile,icone):
+        for w in (tile,icone_widget):
             try:
                 w.configure(cursor="hand2")
             except Exception:
