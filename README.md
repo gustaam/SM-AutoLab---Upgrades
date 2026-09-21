@@ -88,6 +88,8 @@ O executável recebe ícone, assets, versão e metadados do produto durante a ge
 
 A release atualmente publicada é **v2.99.37**.
 
+A próxima versão preparada no `main` é a **v2.99.38**.
+
 A **v2.99.32** restaura os tooltips da interface e o efeito de hover dos cards **Executados**, **Não executados** e **Código atual**, mantendo a aba **Não executados** removida.
 
 A **v2.99.33** restaura a numeração visível das linhas no cabeçalho lateral da planilha, inclusive após reabrir a planilha.
