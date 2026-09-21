@@ -17,7 +17,7 @@ import urllib.request
 from ctypes import wintypes
 from datetime import datetime, timedelta
 from pathlib import Path
-from tkinter import Canvas, Entry, Frame, messagebox, ttk
+from tkinter import Canvas, Entry, Frame, Menu, messagebox, ttk
 
 import customtkinter as ctk
 
@@ -46,7 +46,7 @@ _UI_TOOLTIP_MESSAGES = {
     "parar": "Interrompe a automação com parada segura após o código atual.",
     "configurações": "Abre as configurações do aplicativo.",
     "aparência ›": "Abre as opções de tema claro, escuro e automático.",
-    "mudar o feegow": "Altera o endereço e os dados de acesso do Feegow.",
+    "ajustes do feegow": "Altera o endereço e os dados de acesso do Feegow.",
     "verificar atualizações": "Procura uma versão mais recente do SM AutoLab.",
     "abrir": "Abre a planilha interna.",
     "arquivos": "Abre o histórico de planilhas salvas.",
@@ -1781,6 +1781,8 @@ class App:
         self._planilha_undo = []
         self._planilha_redo = []
         self._planilha_edit_entry = None
+        self._planilha_edit_context = None
+        self._planilha_context_menu = None
         self._planilha_celula_ativa = None
         self._planilha_linhas_selecionadas = set()
         # Cache de leitura do histórico para evitar I/O e JSON.loads repetidos.
@@ -1848,6 +1850,10 @@ class App:
         x = max((tela_w - largura) // 2, 0)
         y = max((tela_h - altura) // 2, 0)
         self.app.geometry(f"{largura}x{altura}+{x}+{y}")
+        try:
+            self.app.state("zoomed")
+        except Exception:
+            pass
 
         # Cabeçalho Fluent 2: maior e com ações de configuração.
         header = ctk.CTkFrame(
@@ -2436,7 +2442,7 @@ class App:
 
         mudar = ctk.CTkButton(
             menu,
-            text="Mudar o Feegow",
+            text="Ajustes do Feegow",
             command=self._abrir_popup_feegow,
             width=202,
             height=40,
@@ -2651,7 +2657,7 @@ class App:
             }
 
         popup = ctk.CTkToplevel(self.app)
-        popup.title("Mudar o Feegow")
+        popup.title("Ajustes do Feegow")
         popup.geometry("560x420")
         popup.resizable(False, False)
         popup.transient(self.app)
@@ -2675,7 +2681,7 @@ class App:
         popup_header.pack_propagate(False)
 
         ctk.CTkLabel(
-            popup_header, text="Mudar o Feegow",
+            popup_header, text="Ajustes do Feegow",
             text_color=self.TEXT, font=("Segoe UI", 19, "bold")
         ).pack(anchor="w", padx=22, pady=(19, 2))
 
@@ -2920,7 +2926,7 @@ class App:
         row = ctk.CTkFrame(card, fg_color="transparent")
         row.pack(fill="both", expand=True, padx=12, pady=8)
 
-        icon_sizes = {"✓": 20, "!": 21, "▥": 25, "›": 29}
+        icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 29}
         icon_font = icon_sizes.get(str(icon), 22)
         ctk.CTkLabel(
             row,
@@ -3832,11 +3838,23 @@ class App:
                 self._planilha_definir_selecao({current}, active=current)
                 tree.focus(str(row))
                 tree.focus_set()
+            try:
+                self._planilha_fechar_edicao()
+                self._atualizar_menu_contexto_planilha()
+                if self._planilha_context_menu is not None:
+                    self._planilha_context_menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                try:
+                    if self._planilha_context_menu is not None:
+                        self._planilha_context_menu.grab_release()
+                except Exception:
+                    pass
             return "break"
         tree.bind("<Button-3>", _planilha_botao_direito)
         tree.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
         self._planilha_tree=tree
         self._planilha_row_header=row_header
+        self._planilha_context_menu = self._criar_menu_contexto_planilha(tree)
         self._planilha_implementacao = "grade-virtual"
         tree.refresh()
         # Todos os atalhos da planilha ficam limitados ao Canvas/Entry.
@@ -4197,9 +4215,7 @@ class App:
         tree=self._planilha_tree
         if tree is None:return
         if self._planilha_edit_entry is not None:
-            try:self._planilha_edit_entry.destroy()
-            except Exception:pass
-            self._planilha_edit_entry=None
+            self._planilha_commit_edit(True)
         bbox=tree.bbox(iid,f"#{col_index+1}")
         if not bbox:return
         self._planilha_celula_ativa=(iid,col_index)
@@ -4210,6 +4226,12 @@ class App:
         entry=Entry(tree._canvas, bd=1, relief="solid", justify="left", font=("Segoe UI",11), highlightthickness=0)
         entry.insert(0,old); entry.place(x=x+1,y=y+1,width=max(w-2,40),height=max(h-2,24))
         self._planilha_edit_entry=entry
+        self._planilha_edit_context = {
+            "entry": entry,
+            "iid": str(iid),
+            "col_index": int(col_index),
+            "old": old,
+        }
         entry.focus_set()
         entry.select_range(0,"end")
         entry.bind("<Control-KeyPress-v>", self._planilha_colar_entry, add="+")
@@ -4217,21 +4239,10 @@ class App:
         entry.bind("<<Paste>>", self._planilha_colar_entry, add="+")
         # Os demais atalhos permanecem nativos enquanto a célula está sendo editada.
         def finish(save=True):
-            if self._planilha_edit_entry is not entry:return
-            new=entry.get() if save else old
-            try: entry.destroy()
-            except Exception: pass
-            self._planilha_edit_entry=None
-            self._planilha_desenhar_borda()
-            if save and new!=old:
-                self._planilha_push_undo(); self._planilha_redo=[]
-                vals[col_index]=new
-                tree.item(iid,values=vals)
-                key=f"{int(iid)},{col_index}"
-                if new: self._planilha_data[key]=new
-                else: self._planilha_data.pop(key,None)
-                self._planilha_marcar_alteracao()
-        entry.bind("<Return>",lambda e:(finish(True),"break")[1]); entry.bind("<Escape>",lambda e:(finish(False),"break")[1]); entry.bind("<FocusOut>",lambda e:finish(True))
+            self._planilha_commit_edit(save)
+        entry.bind("<Return>",lambda e:(finish(True),"break")[1])
+        entry.bind("<Escape>",lambda e:(finish(False),"break")[1])
+        entry.bind("<FocusOut>",lambda e:finish(True))
 
     def _planilha_tem_entry_em_foco(self):
         entry = getattr(self, "_planilha_edit_entry", None)
@@ -4303,6 +4314,47 @@ class App:
         if self._planilha_tem_entry_em_foco():
             return None
         return self._planilha_limpar_celulas_selecionadas()
+
+    def _criar_menu_contexto_planilha(self, tree):
+        menu = Menu(
+            tree,
+            tearoff=False,
+            font=("Segoe UI", 10),
+            borderwidth=0,
+            relief="flat",
+        )
+        menu.add_command(label="Editar", command=lambda: self._planilha_editar_selecao())
+        menu.add_separator()
+        menu.add_command(label="Desfazer", command=self._planilha_desfazer)
+        menu.add_command(label="Refazer", command=self._planilha_refazer)
+        menu.add_separator()
+        menu.add_command(label="Cortar", command=self._planilha_recortar)
+        menu.add_command(label="Copiar", command=self._planilha_copiar)
+        menu.add_command(label="Colar", command=self._planilha_colar)
+        menu.add_command(label="Excluir", command=self._planilha_limpar_celulas_selecionadas)
+        menu.add_separator()
+        menu.add_command(label="Selecionar tudo", command=self._planilha_selecionar_tudo)
+        return menu
+
+    def _atualizar_menu_contexto_planilha(self):
+        menu = getattr(self, "_planilha_context_menu", None)
+        if menu is None:
+            return
+        try:
+            tem_celula = bool(
+                getattr(self, "_planilha_celulas_selecionadas", set())
+                or getattr(self, "_planilha_celula_ativa", None)
+            )
+            tem_undo = bool(getattr(self, "_planilha_undo", []))
+            tem_redo = bool(getattr(self, "_planilha_redo", []))
+            menu.entryconfig("Editar", state="normal" if tem_celula else "disabled")
+            menu.entryconfig("Cortar", state="normal" if tem_celula else "disabled")
+            menu.entryconfig("Copiar", state="normal" if tem_celula else "disabled")
+            menu.entryconfig("Excluir", state="normal" if tem_celula else "disabled")
+            menu.entryconfig("Desfazer", state="normal" if tem_undo else "disabled")
+            menu.entryconfig("Refazer", state="normal" if tem_redo else "disabled")
+        except Exception:
+            pass
 
     def _planilha_copiar(self,event=None):
         tree=self._planilha_tree
@@ -4474,11 +4526,55 @@ class App:
         self._planilha_atualizar_grade()
         self._planilha_marcar_alteracao()
 
+    def _planilha_commit_edit(self, save=True):
+        entry = getattr(self, "_planilha_edit_entry", None)
+        context = getattr(self, "_planilha_edit_context", None)
+        if entry is None or not isinstance(context, dict):
+            return
+        if context.get("entry") is not entry:
+            return
+
+        iid = str(context.get("iid", ""))
+        col_index = int(context.get("col_index", 0))
+        old = str(context.get("old", ""))
+        try:
+            new = entry.get() if save else old
+        except Exception:
+            new = old
+
+        tree = getattr(self, "_planilha_tree", None)
+        try:
+            entry.destroy()
+        except Exception:
+            pass
+        self._planilha_edit_entry = None
+        self._planilha_edit_context = None
+
+        if tree is not None and save and new != old:
+            try:
+                vals = list(tree.item(iid, "values"))
+                while len(vals) < 3:
+                    vals.append("")
+                vals[col_index] = new
+                tree.item(iid, values=vals)
+                self._planilha_push_undo()
+                self._planilha_redo = []
+                key = f"{int(iid)},{col_index}"
+                if new:
+                    self._planilha_data[key] = new
+                else:
+                    self._planilha_data.pop(key, None)
+                self._planilha_marcar_alteracao()
+            except Exception:
+                pass
+
+        try:
+            self._planilha_desenhar_borda()
+        except Exception:
+            pass
+
     def _planilha_fechar_edicao(self):
-        if self._planilha_edit_entry is not None:
-            try:self._planilha_edit_entry.destroy()
-            except Exception:pass
-            self._planilha_edit_entry=None
+        self._planilha_commit_edit(True)
 
     def _planilha_encerrar_janela(self):
         """Fecha a janela da planilha de forma robusta, sem depender do foco."""
@@ -4487,6 +4583,13 @@ class App:
         self._planilha_tree=None
         self._planilha_row_header=None
         self._planilha_edit_entry=None
+        self._planilha_edit_context=None
+        if self._planilha_context_menu is not None:
+            try:
+                self._planilha_context_menu.destroy()
+            except Exception:
+                pass
+        self._planilha_context_menu=None
 
         if win is None:
             return
