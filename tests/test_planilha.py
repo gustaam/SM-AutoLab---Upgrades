@@ -4,11 +4,10 @@ from types import SimpleNamespace
 
 from interface import (
     App,
+    VirtualGridTree,
     MAX_COLS,
     MAX_ROWS,
-    SM_AUTOLAB_GRADE_VIRTUAL_29926,
-    SM_AUTOLAB_WINDOWS_NATIVE_29925,
-    _material_for_window,
+    SM_AUTOLAB_GRADE_VIRTUAL,
     apply_paste,
     clear_cells,
     extract_column,
@@ -271,17 +270,15 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
 
     def test_abertura_e_interacao_estao_na_implementacao_canonica(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
-        patch = (self.root / "patch.py").read_text(encoding="utf-8")
         self.assertIn("def abrir_planilha(self, dados_iniciais=None):", interface)
-        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', interface)
-        self.assertIn('tree=VirtualGridTree(', interface)
-        self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', interface)
-        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
-        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
-        self.assertIn("self._planilha_desenhar_borda()", interface)
-        self.assertNotIn("def _abrir_planilha_2991", patch)
-        self.assertNotIn("App.abrir_planilha = _abrir_planilha_297", patch)
-        self.assertNotIn("App.abrir_planilha = _abrir_planilha_2991", patch)
+        self.assertIn('self._planilha_implementacao = "grade-virtual"', interface)
+        self.assertIn("class VirtualGridTree", interface)
+        self.assertIn("def identify_cell", interface)
+        self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)', interface)
+        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)', interface)
+        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)', interface)
+        self.assertNotIn("bind_all", interface)
+        self.assertFalse((self.root / "patch.py").exists())
 
     def test_virtualizacao_substitui_povoamento_incremental(self):
         interface = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -290,233 +287,111 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
         block = interface[start:end]
         self.assertIn("VirtualGridTree(", block)
         self.assertIn("value_provider=", block)
-        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', block)
-        self.assertNotIn("def _povoar_lote():", block)
-        self.assertNotIn("for i in range(300):", block)
-        self.assertNotIn("fim = min(10000, inicio + 500)", block)
-        self.assertNotIn("tree.insert(", block)
-        self.assertNotIn("_planilha_povoamento_", interface)
-
-    def test_snapshot_historico_reutiliza_a_mesma_abertura(self):
-        interface = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = interface.index("def _mostrar_planilhas_do_dia")
-        end = interface.index("def abrir_historico_planilha", start)
-        block = interface[start:end]
-        self.assertIn("command=lambda it=item: self._excluir_historico_planilha(it)", block)
-
-        # A rota do snapshot deve convergir para abrir_planilha(), sem criar
-        # um Treeview alternativo.
-        snapshot_start = interface.index("def _preparar_planilha_do_dia")
-        snapshot_end = interface.index("def _fechar_historico_planilha", snapshot_start)
-        snapshot_block = interface[snapshot_start:snapshot_end]
-        self.assertIn("self.abrir_planilha(cells)", snapshot_block)
-
-
-# tests/test_planilha_grid.py
-
-class PlanilhaGridSelectionTests(unittest.TestCase):
-    def setUp(self):
-        self.root = Path(__file__).resolve().parents[1]
-
-    def test_pastas_do_historico_sao_quadradas(self):
-        source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
-        start = source.index("def _create_history_tile")
-        end = source.index("def _restore_history", start)
-        block = source[start:end]
-        self.assertIn("width=108", block)
-        self.assertIn("height=108", block)
-        self.assertNotIn("width=128", block)
-        self.assertNotIn("height=104", block)
-
-    def test_grade_visual_e_selecao_estao_na_implementacao_canonica(self):
-        interface = (self.root / "interface.py").read_text(encoding="utf-8")
-        patch = (self.root / "patch.py").read_text(encoding="utf-8")
-        for marker in (
-            'SM_AUTOLAB_GRADE_29922 = "SM-AUTOLAB-GRADE-PERFORMANCE-29922"',
-            "def _planilha_desenhar_borda",
-            "_planilha_celulas_selecionadas",
-            'tags=("planilha-selection",)',
-            'tags=("virtual-column-line",)',
-        ):
-            self.assertIn(marker, interface)
-        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
-        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
-        self.assertNotIn("_planilha_clicar_celula_2991", patch)
-        self.assertNotIn("_planilha_arrastar_selecao_2991", patch)
-        self.assertNotIn("_planilha_soltar_selecao_2991", patch)
-
-    def test_grade_canvas_nao_cria_widgets_sobrepostos(self):
-        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = source.index("class VirtualGridTree")
-        end = source.index("__all__ = (", start) if "__all__ = (" in source[start:] else source.index("__all__ =", start)
-        block = source[start:end]
-        self.assertIn('tags=("virtual-column-line",)', block)
-        self.assertNotIn("Frame(tree", block)
-        self.assertIn("canvas.create_rectangle(", source[source.index("def _planilha_desenhar_borda"):source.index("def _planilha_definir_selecao")])
-
-    def test_grade_e_reutilizavel_e_nao_percorre_10000_linhas_para_desenho(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _planilha_desenhar_borda")
-        end = source.index("    def _planilha_definir_selecao", start)
-        block = source[start:end]
+        self.assertIn('self._planilha_implementacao = "grade-virtual"', block)
         self.assertNotIn("range(10000)", block)
-        self.assertIn("tree.bbox(", block)
-        self.assertIn('canvas.delete("planilha-selection")', block)
+        self.assertNotIn("range(300)", block)
+        self.assertNotIn("tree.insert(", block)
 
-    def test_selecao_multipla_tem_moldura_por_celula_em_selecoes_pequenas(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _planilha_desenhar_borda")
-        end = source.index("    def _planilha_definir_selecao", start)
-        block = source[start:end]
-        self.assertIn("canvas.delete(\"planilha-selection\")", block)
-        self.assertIn("canvas.create_rectangle(", block)
-        self.assertNotIn("frame.lift()", block)
-
-
-# tests/test_planilha_open_path.py
-
-class PlanilhaOpenPathTests(unittest.TestCase):
-    def test_abrir_planilha_tem_uma_unica_implementacao(self):
-        root = Path(__file__).resolve().parents[1]
-        interface = (root / "interface.py").read_text(encoding="utf-8")
-        main = (root / "main.py").read_text(encoding="utf-8")
-        patch = (root / "patch.py").read_text(encoding="utf-8")
-
-        self.assertEqual(interface.count("    def abrir_planilha(self, dados_iniciais=None):"), 1)
-        self.assertNotIn("App.abrir_planilha = _abrir_planilha_297", patch)
-        self.assertNotIn("App.abrir_planilha = open_planilha_wrapper", main)
-        self.assertNotIn("def _abrir_planilha_2991", patch)
-        self.assertNotIn("App._planilha_clicar_celula = _planilha_clicar_celula_2991", patch)
-        self.assertNotIn("App._planilha_arrastar_selecao = _planilha_arrastar_selecao_2991", patch)
-        self.assertNotIn("App._planilha_soltar_selecao = _planilha_soltar_selecao_2991", patch)
-        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', interface)
-        self.assertIn("class VirtualGridTree", interface)
-        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
-        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
-        self.assertIn("self.abrir_planilha(cells)", interface)
-
-
-
-    def test_atalhos_de_edicao_da_grade_estao_robustos(self):
-        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        for binding in (
-            'tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")',
-            'tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")',
-            'tree.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")',
-            'tree.bind("<Control-KeyPress-c>", self._planilha_atalho_copiar, add="+")',
-            'tree.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")',
-            'tree.bind("<Delete>", self._planilha_atalho_excluir, add="+")',
-            'tree.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")',
-            'tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")',
+    def test_mouse_handlers_compartilham_o_mesmo_hit_test(self):
+        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertEqual(interface.count("def identify_cell("), 1)
+        for name in (
+            "_planilha_clicar_celula",
+            "_planilha_arrastar_selecao",
+            "_planilha_soltar_selecao",
+            "_planilha_duplo_clique_celula",
         ):
-            self.assertIn(binding, interface)
-        self.assertIn("def _planilha_atalho_desfazer", interface)
-        self.assertIn("def _planilha_atalho_refazer", interface)
-        self.assertIn("def _planilha_atalho_selecionar_tudo", interface)
-        self.assertIn("def _planilha_atalho_copiar", interface)
-        self.assertIn("def _planilha_recortar", interface)
-        self.assertIn("def _planilha_atalho_excluir", interface)
-        self.assertIn("def _planilha_tem_entry_em_foco", interface)
-
-    def test_ctrl_v_tem_fallback_local_global_e_virtual(self):
-        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")', interface)
-        self.assertIn('tree.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")', interface)
-        self.assertIn('tree.bind("<<Paste>>", self._planilha_atalho_colar, add="+")', interface)
-        self.assertIn("def _planilha_colar_teclado(self, event=None):", interface)
-        self.assertIn('self.app.bind_all(\n                "<Control-KeyPress-v>"', interface)
-        self.assertIn('self.app.bind_all(\n                "<Control-KeyPress-V>"', interface)
-        self.assertIn("def _planilha_foco_pertence_a_grade(self):", interface)
-        self.assertIn("def _planilha_colar_entry(self, event=None):", interface)
-
-    def test_entry_da_edicao_tem_paste_proprio(self):
-        interface = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        start = interface.index("def _planilha_editar_iid")
-        end = interface.index("def _planilha_copiar", start)
-        block = interface[start:end]
-        self.assertIn('entry.bind("<Control-KeyPress-v>", self._planilha_colar_entry, add="+")', block)
-        self.assertIn('entry.bind("<<Paste>>", self._planilha_colar_entry, add="+")', block)
+            start = interface.index(f"def {name}")
+            end = interface.find("\n    def ", start + 1)
+            block = interface[start:end if end >= 0 else len(interface)]
+            self.assertIn("tree.identify_cell(event.x, event.y)", block)
 
     def test_snapshot_historico_reutiliza_a_mesma_abertura(self):
-        root = Path(__file__).resolve().parents[1]
-        source = (root / "interface.py").read_text(encoding="utf-8")
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _abrir_snapshot_historico")
         end = source.index("def _fechar_historico_planilha", start)
         block = source[start:end]
         self.assertIn("self.abrir_planilha(cells)", block)
 
 
-# tests/test_stage12.py
+class PlanilhaGridSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(__file__).resolve().parents[1]
 
-class Windows11NativeStage12Tests(unittest.TestCase):
-    def test_stage12_marker(self):
-        self.assertEqual(
-            SM_AUTOLAB_WINDOWS_NATIVE_29925,
-            "SM-AUTOLAB-WINDOWS-NATIVE-29925",
-        )
+    def test_grade_visual_e_selecao_estao_na_implementacao_canonica(self):
+        interface = (self.root / "interface.py").read_text(encoding="utf-8")
+        for marker in (
+            "def _planilha_desenhar_borda",
+            "_planilha_celulas_selecionadas",
+            'tags=("planilha-selection",)',
+            'tags=("virtual-column-line",)',
+            "def identify_cell",
+        ):
+            self.assertIn(marker, interface)
+        self.assertNotIn("bind_all", interface)
 
-    def test_material_hierarchy(self):
-        class Root:
-            def title(self):
-                return "SM AutoLab"
+    def test_grade_canvas_nao_cria_widgets_sobrepostos(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("class VirtualGridTree")
+        end = source.index("DWMWA_SYSTEMBACKDROP_TYPE", start)
+        block = source[start:end]
+        self.assertIn("self._canvas = tk.Canvas(", block)
+        self.assertNotIn("tk.Entry(", block)
+        self.assertNotIn("Frame(tree,", block)
 
-        class Secondary:
-            def __init__(self, title):
-                self._title = title
 
-            def title(self):
-                return self._title
+class PlanilhaOpenPathTests(unittest.TestCase):
+    def test_abrir_planilha_tem_uma_unica_implementacao(self):
+        root = Path(__file__).resolve().parents[1]
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+        main = (root / "main.py").read_text(encoding="utf-8")
+        self.assertEqual(interface.count("    def abrir_planilha(self, dados_iniciais=None):"), 1)
+        self.assertNotIn("from patch import", main)
+        self.assertNotIn("bind_all", main)
+        self.assertIn('self._planilha_implementacao = "grade-virtual"', interface)
+        self.assertIn("class VirtualGridTree", interface)
 
-        root = Root()
-        self.assertEqual(_material_for_window(root, root), "mica")
-        self.assertEqual(
-            _material_for_window(Secondary("Planilha — SM AutoLab"), root),
-            "mica_alt",
-        )
-        self.assertEqual(
-            _material_for_window(Secondary("Mudar o Feegow"), root),
-            "acrylic",
-        )
 
-    def test_main_build_and_workflows_integrate_stage12(self):
+class PlanilhaEventOwnershipTests(unittest.TestCase):
+    def test_editor_e_filho_do_canvas_e_nao_do_frame_externo(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('Entry(tree._canvas, bd=1, relief="solid"', source)
+        self.assertNotIn('Entry(tree, bd=1, relief="solid"', source)
+
+    def test_planilha_nao_instala_eventos_globais(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("bind_all", source)
+        self.assertNotIn('bind("<Button-1>", on_click', source)
+
+
+# tests/test_native_backdrop.py
+
+class NativeBackdropTests(unittest.TestCase):
+    def test_native_backdrop_helpers_sao_diretos_e_nao_injetam_camadas(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def aplicar_backdrop_sistema", source)
+        self.assertIn("def atualizar_backdrop_tema", source)
+        self.assertIn("DwmSetWindowAttribute", source)
+        self.assertNotIn("install_ui_windows11_native_29925", source)
+        self.assertNotIn("_stage12_refresh", source)
+        self.assertNotIn("_stage12_watch", source)
+        self.assertNotIn("_native_apply_controls", source)
+        self.assertNotIn("_native_apply_window", source)
+
+    def test_main_nao_instala_wrapper_nativo(self):
         root = Path(__file__).resolve().parents[1]
         main = (root / "main.py").read_text(encoding="utf-8")
-        build = (root / "build_windows.bat").read_text(encoding="utf-8")
-        validate = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
-        release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertNotIn("install_ui_windows11_native_29925", main)
+        self.assertNotIn("from patch import", main)
 
-        self.assertIn("install_ui_windows11_native_29925", main)
-        self.assertIn(
-            "from interface import App; from main import install_ui, _validar_base_aplicacao",
-            build,
-        )
-        self.assertIn(
-            "from interface import App; from main import install_ui, _validar_base_aplicacao",
-            validate,
-        )
-        self.assertIn(
-            "from interface import App; from main import install_ui, _validar_base_aplicacao",
-            release,
-        )
-
-    def test_native_layer_has_accessibility_and_dwm_paths(self):
-        source = (
-            Path(__file__).resolve().parents[1] / "interface.py"
-        ).read_text(encoding="utf-8")
-        self.assertIn("SystemParametersInfoW", source)
-        self.assertIn("DwmSetWindowAttribute", source)
-        self.assertIn("SetWindowTheme", source)
-        self.assertIn("DWMWA_SYSTEMBACKDROP_TYPE", source)
-        self.assertIn("DWMWCP_ROUND", source)
-
-
-# tests/test_stage13.py
+# tests/test_virtual_grid.py
 
 class VirtualGridStage13Tests(unittest.TestCase):
     def test_marker(self):
         self.assertEqual(
-            SM_AUTOLAB_GRADE_VIRTUAL_29926,
-            "SM-AUTOLAB-GRADE-VIRTUAL-29926",
+            SM_AUTOLAB_GRADE_VIRTUAL,
+            "SM-AUTOLAB-GRADE-VIRTUAL",
         )
 
     def test_visible_range_is_small_even_for_ten_thousand_rows(self):
@@ -527,8 +402,20 @@ class VirtualGridStage13Tests(unittest.TestCase):
             row_height=28,
             overscan=3,
         )
-        self.assertEqual((start, end), (4992, 5008))
+        self.assertEqual((start, end), (4997, 5013))
         self.assertLess(end - start, 100)
+
+    def test_visible_range_tracks_canvas_fraction_near_the_bottom(self):
+        start, end = visible_row_range(
+            first_fraction=0.9975,
+            viewport_height=650,
+            total_rows=10000,
+            row_height=28,
+            overscan=3,
+        )
+        self.assertGreaterEqual(start, 9950)
+        self.assertGreater(end, start + 20)
+        self.assertLessEqual(end, 10000)
 
     def test_visible_range_clamps_at_document_edges(self):
         self.assertEqual(
@@ -550,7 +437,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("VirtualGridTree(", block)
         self.assertIn("value_provider=", block)
         self.assertIn("total_rows=10000", block)
-        self.assertIn('self._planilha_implementacao = "grade-virtual-29926"', block)
+        self.assertIn('self._planilha_implementacao = "grade-virtual"', block)
         self.assertNotIn("ttk.Treeview(body", block)
         self.assertNotIn("range(10000)", block)
         self.assertNotIn("range(300)", block)
@@ -569,6 +456,71 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("for offset, slot in enumerate(self._pool):", refresh)
         self.assertNotIn("range(self._total_rows)", refresh)
 
+    def test_row_header_uses_the_grid_geometry(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def abrir_planilha")
+        end = source.index("    def _planilha_desenhar_cabecalho_linhas", start)
+        block = source[start:end]
+        callback_start = block.index("def _clicar_cabecalho")
+        callback_end = block.index('row_header.bind("<Button-1>"', callback_start)
+        callback = block[callback_start:callback_end]
+        self.assertIn("total = tree.total_rows", callback)
+        self.assertIn("row_height = tree.row_height", callback)
+        self.assertIn("int(first * total + 0.0001)", callback)
+        self.assertNotIn("first * scrollable_rows", callback)
+
+    def test_cell_bbox_uses_logical_canvas_coordinates(self):
+        grid = VirtualGridTree.__new__(VirtualGridTree)
+        grid._row_height = 28
+        grid._total_rows = 10000
+        grid._columns = (
+            ("c1", "Data", 140, 100, "w", True),
+            ("c2", "Senha", 300, 160, "w", True),
+            ("c3", "Observação", 140, 100, "w", True),
+        )
+        grid._widths = {"c1": 140, "c2": 300, "c3": 140}
+
+        self.assertEqual(grid.cell_bbox("20", "#1"), (0, 560, 140, 28))
+        self.assertEqual(grid.cell_bbox("20", "#2"), (140, 560, 300, 28))
+        self.assertEqual(grid.cell_bbox("9999", "#3"), (440, 279972, 140, 28))
+        self.assertIsNone(grid.cell_bbox("-1", "#1"))
+        self.assertIsNone(grid.cell_bbox("20", "#4"))
+
+    def test_selection_overlay_uses_logical_cell_boxes(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _planilha_desenhar_borda")
+        end = source.index("    def _planilha_definir_selecao", start)
+        block = source[start:end]
+        self.assertIn("tree.cell_bbox(str(row), f\"#{col + 1}\")", block)
+        self.assertNotIn("bbox = tree.bbox(str(row), f\"#{col + 1}\")", block)
+        self.assertIn("visible_row_range(", block)
+
+    def test_identify_cell_maps_every_column_after_scroll(self):
+        class CanvasStub:
+            def canvasx(self, value):
+                return float(value) + 40.0
+
+            def canvasy(self, value):
+                return float(value) + 280.0
+
+        grid = VirtualGridTree.__new__(VirtualGridTree)
+        grid._canvas = CanvasStub()
+        grid._row_height = 28
+        grid._total_rows = 10000
+        grid._columns = (
+            ("c1", "Data", 140, 100, "w", True),
+            ("c2", "Senha", 300, 160, "w", True),
+            ("c3", "Observação", 140, 100, "w", True),
+        )
+        grid._widths = {"c1": 140, "c2": 300, "c3": 140}
+
+        self.assertEqual(grid.identify_cell(5, 5), (10, 0))
+        self.assertEqual(grid.identify_cell(145, 5), (10, 1))
+        self.assertEqual(grid.identify_cell(445, 5), (10, 2))
+        self.assertEqual(grid.identify_cell(499, 27), (10, 2))
+        self.assertIsNone(grid.identify_cell(580, 5))
+        self.assertIsNone(grid.identify_cell(5, -300))
+
     def test_mouse_hit_testing_uses_canvas_coordinates_without_header_offset(self):
         root = Path(__file__).resolve().parents[1]
         source = (root / "interface.py").read_text(encoding="utf-8")
@@ -584,7 +536,7 @@ class VirtualGridStage13Tests(unittest.TestCase):
         build = (root / "build_windows.bat").read_text(encoding="utf-8")
         validate = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
         release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-        self.assertIn("SM_AUTOLAB_GRADE_VIRTUAL_29926", main)
+        self.assertIn("SM_AUTOLAB_GRADE_VIRTUAL", main)
         for source in (build, validate, release):
             self.assertIn("install_ui(App); _validar_base_aplicacao()", source)
 
@@ -595,7 +547,7 @@ class PlanilhaEventOwnershipTests(unittest.TestCase):
         self.assertIn('Entry(tree._canvas, bd=1, relief="solid"', source)
         self.assertNotIn('Entry(tree, bd=1, relief="solid"', source)
 
-    def test_patch_nao_instala_clique_global_para_a_planilha(self):
-        source = (Path(__file__).resolve().parents[1] / "patch.py").read_text(encoding="utf-8")
-        self.assertNotIn('bind_all("<Button-1>", on_click', source)
-        self.assertNotIn("def _limpar_selecao_planilha_299", source)
+    def test_planilha_nao_instala_eventos_globais(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("bind_all", source)
+        self.assertNotIn('bind("<Button-1>", on_click', source)

@@ -303,8 +303,6 @@ class Automacao:
             except Exception: pass
             self.driver=None
 
-SM_AUTOLAB_EXECUCAO_29923 = "SM-AUTOLAB-EXECUCAO-PERFORMANCE-29923"
-
 
 class PlanilhaError(Exception):
     """Erro de leitura ou validação da planilha de códigos."""
