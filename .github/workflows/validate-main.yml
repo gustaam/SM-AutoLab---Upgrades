@@ -1,3 +1,4 @@
+# Validação contínua da main.
 name: Validate main for release
 
 # CI trigger validation
