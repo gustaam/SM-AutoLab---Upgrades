@@ -20,35 +20,35 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 
 | Arquivo | Função |
 |---|---|
-| `main.py` | Ponto de entrada da aplicação: configura o ambiente do Windows, executa o splash e inicializa a interface principal. |
-| `interface.py` | Camada de interface desktop: janela principal, planilha, histórico, configurações, atualização integrada e integração visual com o Windows. |
-| `app.py` | Núcleo operacional: automação Selenium/Feegow, leitura de dados, resultados, checkpoints e persistência de configurações. |
-| `scripts/validate.py` | Validador do projeto: arquitetura, dependências, workflows, versão e integridade do executável. |
-| `build_windows.bat` | Script de build para Windows: valida o ambiente, executa testes e gera o executável com PyInstaller. |
-| `requirements.txt` | Define as dependências Python do projeto com suas versões utilizadas no ambiente de execução e build. |
-| `VERSION` | Armazena a versão oficial do aplicativo usada pelo build, CI e release. |
-| `SM AutoLab.ico` | Arquivo de identidade visual usado como ícone do aplicativo e do executável. |
+| `main.py` | Inicialização e splash |
+| `interface.py` | Interface desktop e planilha |
+| `app.py` | Automação e persistência |
+| `scripts/validate.py` | Validação estrutural e de release |
+| `build_windows.bat` | Build do executável Windows |
+| `requirements.txt` | Dependências do projeto |
+| `VERSION` | Versão oficial do aplicativo |
+| `SM AutoLab.ico` | Ícone do aplicativo e executável |
 
 ### Testes
 
 | Arquivo | Escopo |
 |---|---|
-| `tests/test_app.py` | Testes do núcleo operacional, resultados, checkpoints e persistência. |
-| `tests/test_main.py` | Testes do ponto de entrada, inicialização e integração da aplicação. |
-| `tests/test_planilha.py` | Testes da planilha, seleção, edição, navegação e comportamento da grade. |
-| `tests/test_patch.py` | Testes de regressão da arquitetura e das regras de compatibilidade do projeto. |
-| `tests/test_validation.py` | Testes das regras de validação estrutural, versão, qualidade e release. |
+| `tests/test_app.py` | Testes do núcleo operacional |
+| `tests/test_main.py` | Testes de inicialização |
+| `tests/test_planilha.py` | Testes da planilha e grade |
+| `tests/test_patch.py` | Testes de regressão arquitetural |
+| `tests/test_validation.py` | Testes de validação e release |
 
 ### Workflows e assets
 
 | Caminho | Função |
 |---|---|
-| `.github/workflows/validate-main.yml` | CI da `main`: arquitetura, dependências, sintaxe, testes, integração e Defender; também prepara a release quando aplicável. |
-| `.github/workflows/release.yml` | Build oficial, validação do PE/metadados, geração do manifesto, SHA-256 e publicação da release. |
-| `assets/feegow_powered.png` | Identidade visual exibida na interface. |
-| `assets/laboratorio_principal.png` | Imagem principal usada na interface/splash. |
-| `.gitignore` | Arquivos temporários e artefatos que não devem ser versionados. |
-| `README.md` | Documentação e mapa rápido da base. |
+| `.github/workflows/validate-main.yml` | Validação contínua da main |
+| `.github/workflows/release.yml` | Build e publicação da release |
+| `assets/feegow_powered.png` | Identidade visual |
+| `assets/laboratorio_principal.png` | Imagem principal da interface |
+| `.gitignore` | Exclusões do versionamento |
+| `README.md` | Documentação do projeto |
 
 ## Arquitetura
 
