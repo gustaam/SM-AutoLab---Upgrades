@@ -250,7 +250,23 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("read_json_with_backup,", imports)
         self.assertIn("read_json_with_backup(", source)
 
-    def test_planilha_salva_e_recarrega_dados_pelo_mesmo_caminho(self):,        import tempfile,        import interface,,        with tempfile.TemporaryDirectory() as temp_dir:,            obj = object.__new__(interface.App),            obj._planilha_arquivo = Path(temp_dir) / "planilha_interna.json",            cells = {,                "0,0": "1",,                "0,1": "B06A91P89YOB",,                "0,2": "Hemograma",,            },            obj._planilha_data = dict(cells),            obj._salvar_planilha_interna_data(),            self.assertEqual(obj._carregar_planilha_interna(), cells),    def test_planilha_botao_direito_esta_ligado_ao_canvas_interno(self):
+    def test_planilha_salva_e_recarrega_dados_pelo_mesmo_caminho(self):
+        import tempfile
+        import interface
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            obj = object.__new__(interface.App)
+            obj._planilha_arquivo = Path(temp_dir) / "planilha_interna.json"
+            cells = {
+                "0,0": "1",
+                "0,1": "B06A91P89YOB",
+                "0,2": "Hemograma",
+            }
+            obj._planilha_data = dict(cells)
+            obj._salvar_planilha_interna_data()
+            self.assertEqual(obj._carregar_planilha_interna(), cells)
+
+    def test_planilha_botao_direito_esta_ligado_ao_canvas_interno(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('tree.bind("<Button-3>", _planilha_botao_direito)', source)
         self.assertIn('tree._canvas.bind("<Button-3>", _planilha_botao_direito, add="+")', source)
