@@ -356,6 +356,17 @@ class PlanilhaOpenPathTests(unittest.TestCase):
         self.assertIn("class VirtualGridTree", interface)
 
 
+    def test_cabecalho_de_linhas_recria_itens_quando_o_canvas_muda(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _planilha_desenhar_cabecalho_linhas")
+        end = source.index("    def _planilha_limpar_borda", start)
+        block = source[start:end]
+        self.assertIn('state.get("canvas") is not canvas', block)
+        self.assertIn('state = {"canvas": canvas, "items": []}', block)
+        self.assertIn("canvas.create_text(", block)
+        self.assertIn("text=str(logical_row + 1)", block)
+
 class PlanilhaEventOwnershipTests(unittest.TestCase):
     def test_editor_e_filho_do_canvas_e_nao_do_frame_externo(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
