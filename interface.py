@@ -2922,7 +2922,7 @@ class App:
         row = ctk.CTkFrame(card, fg_color="transparent")
         row.pack(fill="both", expand=True, padx=12, pady=8)
 
-        icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 29}
+        icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 21}
         icon_font = icon_sizes.get(str(icon), 22)
         icon_holder = ctk.CTkFrame(
             row,
@@ -3142,9 +3142,9 @@ class App:
                 unicos[chave] = item
 
             self._tema = tema
-            self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(
-                list(unicos.values())
-            )
+            # O histórico armazenado é permanente. O limite de 60 dias é apenas
+            # uma regra de exibição/navegação, nunca de exclusão do arquivo.
+            self._historico_execucoes = list(unicos.values())
 
             # Reconstrói o índice de erros a partir das próprias execuções salvas.
             # Assim, mesmo que a lista auxiliar esteja vazia ou antiga, os códigos
@@ -3174,7 +3174,7 @@ class App:
 
     def _salvar_estado_persistente(self):
         try:
-            self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(self._historico_execucoes)
+            # Nunca excluir registros antigos durante um simples salvamento.
             dados = {
                 "version": 2,
                 "historico_execucoes": self._historico_execucoes,
@@ -3602,7 +3602,11 @@ class App:
         atomic_write_json(self._planilha_arquivo, payload)
 
         # Confirma a persistência real antes de registrar a operação como salva.
-        confirm = read_json_with_backup(self._planilha_arquivo, {})
+        try:
+            with self._planilha_arquivo.open("r", encoding="utf-8") as handle:
+                confirm = json.load(handle)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise IOError("A planilha foi gravada, mas não foi possível conferir o arquivo principal.") from exc
         saved = confirm.get("cells", {}) if isinstance(confirm, dict) else {}
         if not isinstance(saved, dict):
             saved = {}
@@ -4807,10 +4811,6 @@ class App:
     def _carregar_historico_planilhas(self):
         self._garantir_pasta_planilha()
         assinatura = self._assinatura_historico_planilhas()
-        if assinatura is None:
-            self._invalidar_cache_historico_planilhas()
-            return []
-
         if (
             self._planilha_historico_cache is not None
             and self._planilha_historico_cache_signature == assinatura
@@ -4824,26 +4824,23 @@ class App:
                 self._invalidar_cache_historico_planilhas()
                 return []
 
-            filtrados = self._filtrar_arquivos_60_dias(itens)
-            if filtrados != itens:
-                try:
-                    self._salvar_historico_planilhas(filtrados)
-                    return list(filtrados)
-                except Exception:
-                    pass
+            # O arquivo é permanente. Registros antigos não são removidos aqui.
+            validos = [item for item in itens if isinstance(item, dict)]
+            validos.sort(key=lambda item: str(item.get("saved_at", "")))
 
-            self._planilha_historico_cache = list(filtrados)
+            self._planilha_historico_cache = list(validos)
             self._planilha_historico_cache_signature = (
                 self._assinatura_historico_planilhas() or assinatura
             )
-            return list(filtrados)
+            return list(validos)
         except Exception:
             self._invalidar_cache_historico_planilhas()
             return []
 
     def _salvar_historico_planilhas(self, itens):
         self._garantir_pasta_planilha()
-        validos = self._filtrar_arquivos_60_dias(itens)
+        validos = [item for item in (itens or []) if isinstance(item, dict)]
+        validos.sort(key=lambda item: str(item.get("saved_at", "")))
         payload = {"version": 3, "items": validos}
         atomic_write_json(self._planilha_historico_arquivo, payload)
         self._planilha_historico_cache = list(validos)
@@ -4892,7 +4889,7 @@ class App:
         self._salvar_historico_planilhas(itens)
 
     def _preparar_planilha_do_dia(self):
-        """Rota a planilha salva de dia anterior para o histórico de Arquivos."""
+        """Arquiva uma versão anterior sem apagar a planilha atualmente salva."""
         self._garantir_pasta_planilha()
         if not self._planilha_arquivo.exists():
             return
@@ -4904,9 +4901,10 @@ class App:
                 return
             salvo = datetime.fromisoformat(str(updated_at))
             if salvo.date() < datetime.now().date():
+                # Cria o snapshot histórico da versão anterior, mas mantém a
+                # planilha salva como está para que nenhum dado do usuário seja
+                # perdido somente porque o aplicativo foi aberto em outro dia.
                 self._registrar_historico_planilha(cells, salvo)
-                payload = {"version": 1, "updated_at": datetime.now().isoformat(timespec="seconds"), "cells": {}}
-                atomic_write_json(self._planilha_arquivo, payload)
         except Exception:
             pass
 
@@ -5080,6 +5078,24 @@ class App:
         agora = datetime.now()
         return datetime(agora.year, agora.month, 1)
 
+    def _historico_planilhas_visiveis(self):
+        """Retorna somente os registros dentro da janela de navegação do calendário.
+        
+        O filtro é aplicado apenas à interface. O arquivo de histórico permanece
+        completo para evitar perda de dados durante reinicializações/atualizações.
+        """
+        agora = datetime.now()
+        limite = agora - timedelta(days=ARQUIVOS_DIAS)
+        visiveis = []
+        for item in self._carregar_historico_planilhas():
+            try:
+                salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
+            except Exception:
+                continue
+            if limite <= salvo <= agora:
+                visiveis.append(item)
+        return visiveis
+
     def _renderizar_calendario_arquivos(self):
         """Renderiza um calendário Fluent 2 nativo, sem dependências externas."""
         if self._arquivos_body is None:
@@ -5093,7 +5109,7 @@ class App:
 
         hoje = datetime.now().date()
         limite = hoje - timedelta(days=ARQUIVOS_DIAS)
-        itens = self._carregar_historico_planilhas()
+        itens = self._historico_planilhas_visiveis()
         por_dia = {}
         for item in itens:
             try:
@@ -5179,7 +5195,7 @@ class App:
             mes = self._mes_atual_arquivos()
             self._arquivos_mes = mes
 
-        itens = self._carregar_historico_planilhas()
+        itens = self._historico_planilhas_visiveis()
         por_dia = {}
         for item in itens:
             try:
@@ -5951,6 +5967,14 @@ class App:
                     )
                 except Exception:
                     pass
+
+        # Consolida também o histórico quando o aplicativo é fechado sem uma
+        # execução ativa, garantindo a migração do arquivo legado para o arquivo
+        # canônico e evitando perda de dados após atualizações/reinicializações.
+        try:
+            self._salvar_estado_persistente()
+        except Exception:
+            pass
 
         # Fechar o navegador associado à execução antes de destruir a interface.
         auto = getattr(self, "_automacao_atual", None)
