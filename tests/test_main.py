@@ -211,7 +211,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('"icon": ("#E53935", "#F15B5B")', block)
         self.assertIn('"icon": ("#1976D2", "#3F9BEF")', block)
         self.assertIn('self.codigo_card = self._stat_card(stats, "▥", "Código atual"', source)
-        self.assertIn('icon_sizes = {"✓": 20, "!": 21, "▥": 25, "›": 29}', block)
+        self.assertIn('icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 29}', block)
 
     def test_planilha_sincroniza_edicao_antes_de_salvar(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
