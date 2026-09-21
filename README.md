@@ -23,8 +23,7 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 | `main.py` | Bootstrap enxuto da aplicação. Configura DPI, executa o splash e valida/inicializa o runtime canônico da interface. |
 | `interface.py` | Interface principal. Reúne a planilha virtualizada, histórico/calendário, edição, undo/redo, atualização integrada e integração visual com o Windows. |
 | `app.py` | Núcleo operacional. Controla Selenium/Feegow, leitura de planilhas, resultados, checkpoints e configuração persistente. |
-| `patch.py` | Camada única de compatibilidade. Mantém correções históricas consolidadas e aplica sua sequência sem voltar a criar módulos paralelos. |
-| `scripts/validate.py` | Validador central de arquitetura, versão, dependências, workflows e executável. |
+| `scripts/validate.py` | Validador central da arquitetura, versão, dependências, workflows e executável. |
 | `build_windows.bat` | Build manual para Windows, com validações, testes, metadados e geração do executável via PyInstaller. |
 | `requirements.txt` | Dependências de runtime com versões fixadas. |
 | `VERSION` | Versão oficial usada pelo build, CI e release. |
@@ -37,7 +36,7 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 | `tests/test_app.py` | Automação, resultados, checkpoints e persistência. |
 | `tests/test_main.py` | Bootstrap, dashboard e integração da camada principal. |
 | `tests/test_planilha.py` | Planilha virtualizada, histórico, calendário e interações da grade. |
-| `tests/test_patch.py` | Compatibilidade e aplicação das correções consolidadas. |
+| `tests/test_patch.py` | Regressões da consolidação do runtime canônico e das regras de compatibilidade. |
 | `tests/test_validation.py` | Regras do validador estrutural e de release. |
 
 ### Workflows e assets
@@ -53,14 +52,13 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 
 ## Arquitetura
 
-A produção foi compactada em quatro módulos:
+A produção foi compactada em três módulos:
 
-`main.py` → inicialização e integração da UI  
-`interface.py` → interface e planilha  
-`app.py` → automação e persistência  
-`patch.py` → compatibilidade histórica
+`main.py` → inicialização e splash  
+`interface.py` → interface, planilha, histórico e atualização integrada  
+`app.py` → automação e persistência
 
-A regra de manutenção é evitar implementações paralelas: novos ajustes devem entrar na implementação canônica correspondente.
+As correções históricas agora estão consolidadas diretamente nesses módulos. A regra de manutenção é evitar implementações paralelas: novos ajustes devem entrar na implementação canônica correspondente.
 
 ## Validação e qualidade
 
