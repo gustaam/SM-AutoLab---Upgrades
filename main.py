@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes
+import os
 import sys
 import time
 import tkinter as tk
@@ -235,6 +236,22 @@ class StartupSplash:
         self.root.mainloop()
 
 
+def _sinalizar_inicializacao_atualizacao_sucesso():
+    """Sinaliza ao mecanismo de atualização que a nova versão inicializou."""
+    caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_HEALTH", "")).strip()
+    if not caminho:
+        return
+    try:
+        destino = Path(caminho)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_text(
+            f"pid={os.getpid()}\\n",
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
 def run_splash():
     StartupSplash().run()
 
@@ -288,4 +305,5 @@ if __name__ == "__main__":
     _validar_base_aplicacao()
     run_splash()
     app = App()
+    _sinalizar_inicializacao_atualizacao_sucesso()
     app.app.mainloop()
