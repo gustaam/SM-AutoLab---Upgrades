@@ -3465,7 +3465,7 @@ class App:
             # keep selection highlight if selected; otherwise restore neutral
             if tile.cget("border_color") not in (self.ACCENT,):
                 tile.configure(border_color=self.BORDER, fg_color=("#FFFFFF", "#2D3338"))
-        for w in (tile,icon):
+        for w in (tile,icone):
             try:
                 w.configure(cursor="hand2")
             except Exception:
