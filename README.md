@@ -4,7 +4,7 @@
 
 Automação de autorizações no Feegow em um aplicativo desktop para Windows, com planilha virtualizada, histórico, recuperação de execução, atualização integrada e interface moderna.
 
-**Versão em preparação:** `2.99.36`  
+**Versão em preparação:** `2.99.37`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
