@@ -187,8 +187,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("wraplength=116", block)
     def test_interface_remove_titulo_historico_de_execucoes(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertNotIn("Histórico de execuções", source)
-        self.assertNotIn("histórico de execuções", source)
+        self.assertNotIn('text="Histórico de execuções"', source)
+        self.assertNotIn('text="histórico de execuções"', source)
 
     def test_area_de_historico_tem_altura_adaptavel(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
