@@ -139,6 +139,52 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("_sinalizar_inicializacao_atualizacao_sucesso()", source)
         self.assertLess(len(source.splitlines()), 500)
 
+    def test_dashboard_retorna_ao_layout_base_com_tempos_no_card_de_progresso(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("top = ctk.CTkFrame(main, fg_color=\"transparent\")")
+        end = source.index("stats = ctk.CTkFrame(main, fg_color=\"transparent\")", start)
+        block = source[start:end]
+        self.assertIn('self._tempo_decorrido_label = ctk.CTkLabel(', block)
+        self.assertIn('text="Tempo decorrido"', block)
+        self.assertIn('text="Tempo estimado restante"', block)
+        self.assertIn("time_row = ctk.CTkFrame(progress, fg_color=\"transparent\")", block)
+        self.assertNotIn("execution_header = self._card(main)", block)
+
+    def test_dashboard_nao_tem_card_separado_de_progresso(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn('self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso"', source)
+        self.assertIn('self.codigo_card = self._stat_card(stats, "›", "Código atual"', source)
+        self.assertIn('self.erro_card = self._stat_card(stats, "!", "Não executados"', source)
+
+    def test_historico_execucao_migra_e_reconstroi_erros(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _carregar_estado_persistente")
+        end = source.index("def _salvar_estado_persistente", start)
+        block = source[start:end]
+        self.assertIn("self._historico_arquivo_legado", block)
+        self.assertIn("registros.extend", block)
+        self.assertIn("unicos =", block)
+        self.assertIn('execucao.get("codigos_erros", [])', block)
+        self.assertIn("self._erros_codigos = erros_reconstruidos[-200:]", block)
+
+    def test_historico_planilha_mesmo_conteudo_em_dias_diferentes_cria_novo_registro(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _registrar_historico_planilha")
+        end = source.index("def _preparar_planilha_do_dia", start)
+        block = source[start:end]
+        self.assertIn("ultimo_data == agora.date()", block)
+        self.assertIn("itens.append(entrada)", block)
+        self.assertIn("ultimo.get(\"cells\") == cells", block)
+
+    def test_historico_pastas_tem_dimensao_e_layout_responsivos(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_pasta_historico")
+        end = source.index("def _abrir_detalhe_historico", start)
+        block = source[start:end]
+        self.assertIn("width=132", block)
+        self.assertIn("height=102", block)
+        self.assertIn("colunas = max(3, min(6", block)
+        self.assertIn("wraplength=116", block)
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
