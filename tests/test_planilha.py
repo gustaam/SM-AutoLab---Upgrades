@@ -456,6 +456,20 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("for offset, slot in enumerate(self._pool):", refresh)
         self.assertNotIn("range(self._total_rows)", refresh)
 
+    def test_row_header_uses_the_grid_geometry(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def abrir_planilha")
+        end = source.index("    def _planilha_desenhar_cabecalho_linhas", start)
+        block = source[start:end]
+        callback_start = block.index("def _clicar_cabecalho")
+        callback_end = block.index('row_header.bind("<Button-1>"', callback_start)
+        callback = block[callback_start:callback_end]
+        self.assertIn("total = tree.total_rows", callback)
+        self.assertIn("row_height = tree.row_height", callback)
+        self.assertIn("int(first * total + 0.0001)", callback)
+        self.assertNotIn("first * scrollable_rows", callback)
+        self.assertNotIn("(viewport_height + row_height - 1) // row_height", callback.replace("viewport_rows = max(1, ", "", 1))
+
     def test_cell_bbox_uses_logical_canvas_coordinates(self):
         grid = VirtualGridTree.__new__(VirtualGridTree)
         grid._row_height = 28
