@@ -270,6 +270,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("validos = [item for item in itens if isinstance(item, dict)]", sheet_block)
         self.assertNotIn("_salvar_historico_planilhas(filtrados)", sheet_block)
 
+    def test_tempo_estimado_usa_mesma_fonte_do_tempo_decorrido(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("elapsed_box = ctk.CTkFrame(")
+        end = source.index("stats = ctk.CTkFrame(main", start)
+        block = source[start:end]
+        self.assertIn('text="Tempo decorrido"', block)
+        self.assertIn('text="Tempo estimado restante"', block)
+        self.assertIn('font=("Segoe UI", 8, "bold")', block)
+
     def test_planilha_salva_e_recarrega_dados_pelo_mesmo_caminho(self):
         import tempfile
         import interface
@@ -302,7 +311,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("icon_holder = ctk.CTkFrame(", block)
         self.assertIn("width=44,", block)
         self.assertIn("height=44,", block)
-        self.assertIn("corner_radius=22,", block)
+        self.assertIn("icon_holder_size = 44", block)
+        self.assertIn("corner_radius=icon_holder_size // 2", block)
         self.assertIn("icon_holder.pack_propagate(False)", block)
         self.assertIn('fg_color="transparent"', block)
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
