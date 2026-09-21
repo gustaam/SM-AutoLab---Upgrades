@@ -84,8 +84,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Execução em andamento"', source)
         self.assertIn('text="Tempo decorrido"', source)
         self.assertIn('text="Tempo estimado restante"', source)
-        self.assertIn('self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso"', source)
         self.assertIn('self.erro_card = self._stat_card(stats, "!", "Não executados"', source)
+        self.assertNotIn('self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso"', source)
 
     def test_dashboard_formatador_de_tempo_e_seguro(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
