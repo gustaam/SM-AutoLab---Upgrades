@@ -75,6 +75,32 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("atomic_write_json,", imports)
         self.assertIn("atomic_write_json(", source)
 
+    def test_dashboard_execucao_tem_metricas_de_tempo_e_progresso(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("self._tempo_decorrido_label", source)
+        self.assertIn("self._tempo_estimado_label", source)
+        self.assertIn("def _iniciar_metricas_execucao", source)
+        self.assertIn("def _atualizar_metricas_execucao", source)
+        self.assertIn('text="Execução em andamento"', source)
+        self.assertIn('text="Tempo decorrido"', source)
+        self.assertIn('text="Tempo estimado restante"', source)
+        self.assertIn('self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso"', source)
+        self.assertIn('self.erro_card = self._stat_card(stats, "!", "Não executados"', source)
+
+    def test_dashboard_formatador_de_tempo_e_seguro(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('return f"{horas:02d}:{minutos:02d}:{segundos:02d}"', source)
+        self.assertIn("restantes = max(0, int(self._execucao_total) - processados)", source)
+        self.assertIn('self._tempo_estimado_label.configure(text="—")', source)
+
+    def test_finalizacao_nao_tenta_abrir_aba_removida(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _finalizar(self, resultado):")
+        end = source.index("def parar(self):", start)
+        block = source[start:end]
+        self.assertIn('self._selecionar_aba("Atividade")', block)
+        self.assertNotIn('self._selecionar_aba("Não executados"', block)
+
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
