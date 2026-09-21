@@ -23,6 +23,7 @@ import customtkinter as ctk
 
 from app import (
     atomic_write_json,
+    read_json_with_backup,
     carregar_configuracoes,
     excluir_checkpoint_interno,
     ler_checkpoint,
@@ -1850,11 +1851,6 @@ class App:
         x = max((tela_w - largura) // 2, 0)
         y = max((tela_h - altura) // 2, 0)
         self.app.geometry(f"{largura}x{altura}+{x}+{y}")
-        try:
-            self.app.state("zoomed")
-        except Exception:
-            pass
-
         # Cabeçalho Fluent 2: maior e com ações de configuração.
         header = ctk.CTkFrame(
             self.app,
@@ -2928,16 +2924,25 @@ class App:
 
         icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 29}
         icon_font = icon_sizes.get(str(icon), 22)
-        ctk.CTkLabel(
+        icon_holder = ctk.CTkFrame(
             row,
-            text=icon,
             width=44,
             height=44,
             corner_radius=22,
             fg_color=palette["icon"],
+        )
+        icon_holder.pack(side="left", padx=(0, 11))
+        icon_holder.pack_propagate(False)
+        ctk.CTkLabel(
+            icon_holder,
+            text=icon,
+            width=44,
+            height=44,
+            corner_radius=22,
+            fg_color="transparent",
             text_color="#FFFFFF",
             font=("Segoe UI", icon_font, "bold"),
-        ).pack(side="left", padx=(0, 11))
+        ).place(relx=0.5, rely=0.5, anchor="center")
 
         text_box = ctk.CTkFrame(row, fg_color="transparent")
         text_box.pack(side="left", fill="both", expand=True)
@@ -3851,6 +3856,7 @@ class App:
                     pass
             return "break"
         tree.bind("<Button-3>", _planilha_botao_direito)
+        tree._canvas.bind("<Button-3>", _planilha_botao_direito, add="+")
         tree.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
         self._planilha_tree=tree
         self._planilha_row_header=row_header
