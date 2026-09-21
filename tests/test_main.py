@@ -211,7 +211,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('"icon": ("#E53935", "#F15B5B")', block)
         self.assertIn('"icon": ("#1976D2", "#3F9BEF")', block)
         self.assertIn('self.codigo_card = self._stat_card(stats, "▥", "Código atual"', source)
-        self.assertIn('icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 29}', block)
+        self.assertIn('icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 21}', block)
 
     def test_planilha_sincroniza_edicao_antes_de_salvar(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -249,6 +249,26 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("atomic_write_json,", imports)
         self.assertIn("read_json_with_backup,", imports)
         self.assertIn("read_json_with_backup(", source)
+
+    def test_historicos_nao_sao_excluidos_pelo_limite_de_60_dias(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _carregar_estado_persistente")
+        end = source.index("def _salvar_estado_persistente", start)
+        load_block = source[start:end]
+        self.assertIn("self._historico_execucoes = list(unicos.values())", load_block)
+        self.assertNotIn("_filtrar_historico_execucoes_60_dias(list(unicos.values()))", load_block)
+
+        start = source.index("def _salvar_estado_persistente")
+        end = source.index("def _criar_botao_erro", start)
+        save_block = source[start:end]
+        self.assertIn('"historico_execucoes": self._historico_execucoes', save_block)
+        self.assertNotIn("_filtrar_historico_execucoes_60_dias(self._historico_execucoes)", save_block)
+
+        start = source.index("def _carregar_historico_planilhas")
+        end = source.index("def _registrar_historico_planilha", start)
+        sheet_block = source[start:end]
+        self.assertIn("validos = [item for item in itens if isinstance(item, dict)]", sheet_block)
+        self.assertNotIn("_salvar_historico_planilhas(filtrados)", sheet_block)
 
     def test_planilha_salva_e_recarrega_dados_pelo_mesmo_caminho(self):
         import tempfile
