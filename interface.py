@@ -1053,6 +1053,28 @@ class VirtualGridTree(tk.Frame):
         except (ValueError, IndexError, TypeError, tk.TclError):
             return None
 
+    def cell_bbox(self, iid: str, column: str) -> tuple[int, int, int, int] | None:
+        """Retorna a caixa da célula em coordenadas lógicas do Canvas.
+        
+        Diferente de bbox(), os valores não são relativos à viewport. Isso é
+        necessário para desenhar a seleção como item nativo do Canvas, que usa
+        coordenadas do scrollregion e acompanha a rolagem automaticamente.
+        """
+        try:
+            row = int(str(iid))
+            if row < 0 or row >= self._total_rows:
+                return None
+            index = int(str(column).lstrip("#")) - 1
+            if index < 0 or index >= len(self._columns):
+                return None
+            name = self._columns[index][0]
+            x = self._column_left(name)
+            y = row * self._row_height
+            width = self._widths.get(name, 1)
+            return int(x), int(y), int(width), int(self._row_height)
+        except (ValueError, IndexError, TypeError):
+            return None
+
     def identify_row(self, y: int | float) -> str:
         """Identifica a linha usando coordenadas relativas ao Canvas da grade.
         Os bindings de mouse da planilha são instalados no Canvas interno; por
@@ -1646,9 +1668,14 @@ class App:
 
         self._selecionar_aba("Atividade")
 
-        actions = ctk.CTkFrame(self.app, fg_color=self.CARD, corner_radius=0)
-        actions.pack(fill="x", side="bottom", pady=(0, 0))
-        actions.configure(height=72)
+        actions = ctk.CTkFrame(
+            self.app,
+            fg_color="transparent",
+            corner_radius=0,
+            height=68,
+        )
+        actions.pack(fill="x", side="bottom")
+        actions.pack_propagate(False)
         actions.pack_propagate(False)
         self.status_label = ctk.CTkLabel(
             actions, text="Pronto para iniciar", text_color=self.SUBTEXT,
@@ -1946,9 +1973,20 @@ class App:
         # O binding é instalado depois que os filhos existem, para cobrir todo
         # o submenu sem depender de eventos globais.
         self._configurar_hover_menu(self._menu_config)
+        # Captura o hover no botão e também nos widgets internos criados
+        # pelo CustomTkinter, evitando perder o evento ao passar sobre o canvas
+        # interno do botão.
         aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
         aparencia.bind("<Leave>", self._agendar_fechar_menus, add="+")
-        
+        for widget in self._iterar_descendentes_ui(aparencia):
+            if widget is aparencia:
+                continue
+            try:
+                widget.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
+                widget.bind("<Leave>", self._agendar_fechar_menus, add="+")
+            except Exception:
+                pass
+
         self.app.update_idletasks()
         self._reposicionar_menus()
 
@@ -3182,8 +3220,23 @@ class App:
             return
 
         cor = self._cor_fluente(self.ACCENT)
+        try:
+            visible_start, visible_end = visible_row_range(
+                float(canvas.yview()[0]),
+                max(1, int(canvas.winfo_height())),
+                MAX_ROWS,
+                tree.row_height,
+                DEFAULT_OVERSCAN,
+            )
+        except (tk.TclError, TypeError, ValueError):
+            visible_start, visible_end = 0, MAX_ROWS
+
         for row, col in sorted(normalized):
-            bbox = tree.bbox(str(row), f"#{col + 1}")
+            # Só desenha o que está na viewport; a seleção continua sendo
+            # armazenada integralmente no estado canônico.
+            if row < visible_start or row >= visible_end:
+                continue
+            bbox = tree.cell_bbox(str(row), f"#{col + 1}")
             if not bbox:
                 continue
             x, y, width, height = bbox
