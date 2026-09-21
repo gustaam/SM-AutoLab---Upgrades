@@ -1,3 +1,5 @@
+# Testes de validação e release.
+
 import struct
 import tempfile
 import unittest
