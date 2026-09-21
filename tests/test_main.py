@@ -101,6 +101,44 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('self._selecionar_aba("Atividade")', block)
         self.assertNotIn('self._selecionar_aba("Não executados"', block)
 
+    def test_validacao_pre_execucao_da_planilha_estah_integrada(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _validar_planilha_antes_execucao")
+        end = source.index("def _filtrar_arquivos_60_dias", start)
+        block = source[start:end]
+        self.assertIn("rows = {}", block)
+        self.assertIn("codigos_por_chave", block)
+        self.assertIn("quantidade_valida", block)
+        self.assertIn("messagebox.askyesno", block)
+        self.assertIn("Linha {numero_linha}: não possui código", block)
+        self.assertIn("será executado uma vez por ocorrência", block)
+        self.assertIn("if not self._validar_planilha_antes_execucao():", source)
+        self.assertGreaterEqual(source.count("if not self._validar_planilha_antes_execucao():"),
+                                2)
+
+    def test_atualizador_tem_backup_health_check_e_rollback(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _schedule_replace_after_exit")
+        end = source.index("def launch_updater", start)
+        block = source[start:end]
+        self.assertIn(".sm_autolab_backup", block)
+        self.assertIn(".sm_autolab_failed", block)
+        self.assertIn("startup.ok", block)
+        self.assertIn("rollback", block.lower())
+        self.assertIn("Start-Process -FilePath $env:SM_TARGET -PassThru", block)
+        self.assertIn('if exist "%SM_HEALTH%" goto success', block)
+        self.assertIn('taskkill /PID %SM_PID%', block)
+        self.assertIn('move /Y "%SM_BACKUP%" "%SM_TARGET%"', block)
+        self.assertIn('restart_env["SM_AUTOLAB_UPDATE_HEALTH"]', block)
+
+    def test_bootstrap_sinaliza_inicio_bem_sucedido_para_atualizacao(self):
+        source = (self.root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso", source)
+        self.assertIn("SM_AUTOLAB_UPDATE_HEALTH", source)
+        self.assertIn("os.getpid()", source)
+        self.assertIn("_sinalizar_inicializacao_atualizacao_sucesso()", source)
+        self.assertLess(len(source.splitlines()), 500)
+
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
