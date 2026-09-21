@@ -3489,8 +3489,14 @@ class App:
         canvas.configure(bg=bg, highlightbackground=border)
 
         state = getattr(self, "_virtual_grid_row_header_state", None)
-        if not isinstance(state, dict):
-            state = {"items": []}
+        # A planilha pode ser fechada e aberta novamente no mesmo App. Cada
+        # abertura cria um novo Canvas, portanto os IDs de itens do cabeçalho
+        # anterior não podem ser reutilizados no Canvas atual.
+        if (
+            not isinstance(state, dict)
+            or state.get("canvas") is not canvas
+        ):
+            state = {"canvas": canvas, "items": []}
             self._virtual_grid_row_header_state = state
         items = state["items"]
         quantidade = max(0, fim - inicio)
