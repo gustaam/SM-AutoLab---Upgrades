@@ -1,4 +1,4 @@
-# Camada principal da interface: planilha, histórico, atualização e integração com o Windows.
+# Interface desktop e planilha.
 from __future__ import annotations
 
 import calendar as pycalendar
