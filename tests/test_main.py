@@ -234,13 +234,41 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('tree.bind("<Button-3>", _planilha_botao_direito)', source)
         self.assertIn("self._planilha_context_menu.tk_popup(event.x_root, event.y_root)", source)
 
-    def test_ajustes_do_feegow_e_maximizacao_padrao(self):
+    def test_ajustes_do_feegow_e_janela_normal_por_padrao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertNotIn("Mudar o Feegow", source)
         self.assertNotIn("mudar o feegow", source)
         self.assertGreaterEqual(source.count("Ajustes do Feegow"), 3)
-        self.assertIn('self.app.state("zoomed")', source)
+        self.assertNotIn('self.app.state("zoomed")', source)
 
+    def test_interface_importa_leitura_json_usada_pelos_historicos_e_planilha(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("from app import (")
+        end = source.index(")", start) + 1
+        imports = source[start:end]
+        self.assertIn("atomic_write_json,", imports)
+        self.assertIn("read_json_with_backup,", imports)
+        self.assertIn("read_json_with_backup(", source)
+
+    def test_planilha_botao_direito_esta_ligado_ao_canvas_interno(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('tree.bind("<Button-3>", _planilha_botao_direito)', source)
+        self.assertIn('tree._canvas.bind("<Button-3>", _planilha_botao_direito, add="+")', source)
+        self.assertIn("def _criar_menu_contexto_planilha", source)
+        for label in ("Editar", "Copiar", "Colar", "Excluir", "Selecionar tudo"):
+            self.assertIn(f'label="{label}"', source[source.index("def _criar_menu_contexto_planilha"):])
+
+    def test_icones_dos_cards_usam_container_circular_fixo(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _stat_card")
+        end = source.index("@staticmethod", start)
+        block = source[start:end]
+        self.assertIn("icon_holder = ctk.CTkFrame(", block)
+        self.assertIn("width=44,", block)
+        self.assertIn("height=44,", block)
+        self.assertIn("corner_radius=22,", block)
+        self.assertIn("icon_holder.pack_propagate(False)", block)
+        self.assertIn('fg_color="transparent"', block)
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
