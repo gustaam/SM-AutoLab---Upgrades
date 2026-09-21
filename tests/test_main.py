@@ -196,6 +196,23 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("altura = max(300, min(440, janela_h - 260))", source)
         self.assertIn('self.app.bind("<Configure>", self._ajustar_altura_acompanhamento, add="+")', source)
 
+    def test_cards_de_estatisticas_usam_cores_e_icones_por_categoria(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _stat_card")
+        end = source.index("@staticmethod", start)
+        block = source[start:end]
+        self.assertIn('"Executados": {', block)
+        self.assertIn('"Não executados": {', block)
+        self.assertIn('"Código atual": {', block)
+        self.assertIn('"card": ("#EEF9F1", "#1E3325")', block)
+        self.assertIn('"card": ("#FFF1F2", "#3A2528")', block)
+        self.assertIn('"card": ("#EEF6FF", "#1C2D3D")', block)
+        self.assertIn('"icon": ("#27AE60", "#2FAE63")', block)
+        self.assertIn('"icon": ("#E53935", "#F15B5B")', block)
+        self.assertIn('"icon": ("#1976D2", "#3F9BEF")', block)
+        self.assertIn('self.codigo_card = self._stat_card(stats, "▥", "Código atual"', source)
+        self.assertIn('icon_sizes = {"✓": 20, "!": 21, "▥": 25, "›": 29}', block)
+
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
