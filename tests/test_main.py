@@ -309,8 +309,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("@staticmethod", start)
         block = source[start:end]
         self.assertIn("icon_holder = ctk.CTkFrame(", block)
-        self.assertIn("width=44,", block)
-        self.assertIn("height=44,", block)
+        self.assertIn("width=icon_holder_size,", block)
+        self.assertIn("height=icon_holder_size,", block)
         self.assertIn("icon_holder_size = 44", block)
         self.assertIn("corner_radius=icon_holder_size // 2", block)
         self.assertIn("icon_holder.pack_propagate(False)", block)
