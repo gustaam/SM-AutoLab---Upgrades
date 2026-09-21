@@ -20,24 +20,24 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 
 | Arquivo | Função |
 |---|---|
-| `main.py` | Bootstrap enxuto da aplicação. Configura DPI, executa o splash e valida/inicializa o runtime canônico da interface. |
-| `interface.py` | Interface principal. Reúne a planilha virtualizada, histórico/calendário, edição, undo/redo, atualização integrada e integração visual com o Windows. |
-| `app.py` | Núcleo operacional. Controla Selenium/Feegow, leitura de planilhas, resultados, checkpoints e configuração persistente. |
-| `scripts/validate.py` | Validador central da arquitetura, versão, dependências, workflows e executável. |
-| `build_windows.bat` | Build manual para Windows, com validações, testes, metadados e geração do executável via PyInstaller. |
-| `requirements.txt` | Dependências de runtime com versões fixadas. |
-| `VERSION` | Versão oficial usada pelo build, CI e release. |
-| `SM AutoLab.ico` | Ícone usado no executável e na identidade do aplicativo. |
+| `main.py` | Ponto de entrada da aplicação: configura o ambiente do Windows, executa o splash e inicializa a interface principal. |
+| `interface.py` | Camada de interface desktop: janela principal, planilha, histórico, configurações, atualização integrada e integração visual com o Windows. |
+| `app.py` | Núcleo operacional: automação Selenium/Feegow, leitura de dados, resultados, checkpoints e persistência de configurações. |
+| `scripts/validate.py` | Validador do projeto: arquitetura, dependências, workflows, versão e integridade do executável. |
+| `build_windows.bat` | Script de build para Windows: valida o ambiente, executa testes e gera o executável com PyInstaller. |
+| `requirements.txt` | Define as dependências Python do projeto com suas versões utilizadas no ambiente de execução e build. |
+| `VERSION` | Armazena a versão oficial do aplicativo usada pelo build, CI e release. |
+| `SM AutoLab.ico` | Arquivo de identidade visual usado como ícone do aplicativo e do executável. |
 
 ### Testes
 
 | Arquivo | Escopo |
 |---|---|
-| `tests/test_app.py` | Automação, resultados, checkpoints e persistência. |
-| `tests/test_main.py` | Bootstrap, dashboard e integração da camada principal. |
-| `tests/test_planilha.py` | Planilha virtualizada, histórico, calendário e interações da grade. |
-| `tests/test_patch.py` | Regressões da consolidação do runtime canônico e das regras de compatibilidade. |
-| `tests/test_validation.py` | Regras do validador estrutural e de release. |
+| `tests/test_app.py` | Testes do núcleo operacional, resultados, checkpoints e persistência. |
+| `tests/test_main.py` | Testes do ponto de entrada, inicialização e integração da aplicação. |
+| `tests/test_planilha.py` | Testes da planilha, seleção, edição, navegação e comportamento da grade. |
+| `tests/test_patch.py` | Testes de regressão da arquitetura e das regras de compatibilidade do projeto. |
+| `tests/test_validation.py` | Testes das regras de validação estrutural, versão, qualidade e release. |
 
 ### Workflows e assets
 
