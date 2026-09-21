@@ -1,5 +1,7 @@
 # Testes do núcleo operacional.
 
+# Testes do núcleo operacional.
+
 import json
 import tempfile
 import unittest
