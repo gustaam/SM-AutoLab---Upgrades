@@ -1,3 +1,5 @@
+# Testes da planilha e grade.
+
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
