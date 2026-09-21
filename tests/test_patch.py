@@ -10,6 +10,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(__file__).resolve().parents[1]
 
+    def test_planilha_tem_apenas_abas_atividade_e_historico(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('for name in ("Atividade", "Histórico"):', source)
+        self.assertNotIn('for name in ("Atividade", "Não executados", "Histórico"):', source)
+        self.assertNotIn("self.aba_erros", source)
+        self.assertNotIn("self.erros_frame", source)
+        self.assertNotIn("self.erros_titulo", source)
+
     def test_main_bootstrap_uses_only_canonical_ui(self):
         source = (self.root / "main.py").read_text(encoding="utf-8")
         self.assertIn("SM_AUTOLAB_CANONICAL_UI", source)
