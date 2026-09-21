@@ -153,7 +153,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_dashboard_nao_tem_card_separado_de_progresso(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertNotIn('self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso"', source)
-        self.assertIn('self.codigo_card = self._stat_card(stats, "›", "Código atual"', source)
+        self.assertIn('self.codigo_card = self._stat_card(stats, "▥", "Código atual"', source)
         self.assertIn('self.erro_card = self._stat_card(stats, "!", "Não executados"', source)
 
     def test_historico_execucao_migra_e_reconstroi_erros(self):
