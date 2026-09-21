@@ -9,11 +9,11 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 
 ## Principais recursos
 
-- **Automação do Feegow:** leitura de códigos do Excel, login, autorização sequencial, tratamento de falhas e recuperação da sessão.
+- **Automação do Feegow:** leitura de códigos do Excel, validação pré-execução, login, autorização sequencial, tratamento de falhas e recuperação da sessão.
 - **Planilha virtualizada:** grade de alta capacidade com seleção, edição, copiar/colar, limpar e desfazer/refazer sem criar um widget por linha.
 - **Histórico e recuperação:** rascunhos, checkpoints, histórico de planilhas, calendário e retomada segura de execuções.
 - **Interface:** dashboard, indicadores de execução, tema claro/escuro, tooltips, layout responsivo e recursos nativos do Windows 11.
-- **Atualização integrada:** procura releases compatíveis, valida o manifesto e o SHA-256 e substitui o executável de forma segura.
+- **Atualização integrada:** procura releases compatíveis, valida manifesto e SHA-256, substitui o executável com backup temporário e faz rollback automático se a nova versão não confirmar a inicialização.
 - **Segurança operacional:** credenciais ficam fora do código, arquivos de configuração são persistidos localmente e o pipeline verifica dependências e Windows Defender.
 
 ## Estrutura do projeto
