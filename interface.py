@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import tkinter as tk
 import urllib.request
 from ctypes import wintypes
@@ -1724,6 +1725,16 @@ class App:
         self._status_blink_visible = True
         self._status_blink_fast = False
         self._status_finalizado_job = None
+        self._execucao_inicio_monotonic = None
+        self._execucao_timer_job = None
+        self._execucao_inicio_indice = 0
+        self._execucao_total = 0
+        self._tempo_decorrido_label = None
+        self._tempo_estimado_label = None
+        self._execucao_titulo_label = None
+        self._execucao_subtitulo_label = None
+        self._execucao_indicador_label = None
+        self._execucao_progresso_card = None
         self._carregar_estado_persistente()
         ctk.set_appearance_mode(self._tema)
         ctk.set_default_color_theme("blue")
@@ -1871,6 +1882,70 @@ class App:
         )
         main.pack(fill="both", expand=True, padx=16, pady=8)
 
+        execution_header = self._card(main)
+        execution_header.pack(fill="x", pady=(0, 10))
+        header_left = ctk.CTkFrame(execution_header, fg_color="transparent")
+        header_left.pack(side="left", fill="both", expand=True, padx=18, pady=13)
+
+        self._execucao_indicador_label = ctk.CTkLabel(
+            header_left,
+            text="●  Pronto para iniciar",
+            text_color=self.SUCCESS,
+            font=("Segoe UI", 13, "bold"),
+        )
+        self._execucao_indicador_label.pack(anchor="w")
+
+        self._execucao_titulo_label = ctk.CTkLabel(
+            header_left,
+            text="Execução pronta",
+            text_color=self.TEXT,
+            font=("Segoe UI", 22, "bold"),
+        )
+        self._execucao_titulo_label.pack(anchor="w", pady=(2, 0))
+
+        self._execucao_subtitulo_label = ctk.CTkLabel(
+            header_left,
+            text="Aguardando uma nova execução.",
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 11),
+        )
+        self._execucao_subtitulo_label.pack(anchor="w", pady=(1, 0))
+
+        time_row = ctk.CTkFrame(execution_header, fg_color="transparent")
+        time_row.pack(side="right", padx=14, pady=12)
+
+        elapsed_box = ctk.CTkFrame(
+            time_row, fg_color=(("#F3F7FA"), ("#24343D")),
+            corner_radius=10, width=150, height=58
+        )
+        elapsed_box.pack(side="left", padx=4)
+        elapsed_box.pack_propagate(False)
+        ctk.CTkLabel(
+            elapsed_box, text="Tempo decorrido", text_color=self.SUBTEXT,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", padx=12, pady=(8, 0))
+        self._tempo_decorrido_label = ctk.CTkLabel(
+            elapsed_box, text="00:00:00", text_color=self.TEXT,
+            font=("Segoe UI", 15, "bold")
+        )
+        self._tempo_decorrido_label.pack(anchor="w", padx=12)
+
+        eta_box = ctk.CTkFrame(
+            time_row, fg_color=(("#F3F7FA"), ("#24343D")),
+            corner_radius=10, width=165, height=58
+        )
+        eta_box.pack(side="left", padx=4)
+        eta_box.pack_propagate(False)
+        ctk.CTkLabel(
+            eta_box, text="Tempo estimado restante", text_color=self.SUBTEXT,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", padx=12, pady=(8, 0))
+        self._tempo_estimado_label = ctk.CTkLabel(
+            eta_box, text="—", text_color=self.TEXT,
+            font=("Segoe UI", 15, "bold")
+        )
+        self._tempo_estimado_label.pack(anchor="w", padx=12)
+
         top = ctk.CTkFrame(main, fg_color="transparent")
         top.pack(fill="x", pady=(0, 8))
         top.grid_columnconfigure(0, weight=4)
@@ -1940,13 +2015,15 @@ class App:
 
         stats = ctk.CTkFrame(main, fg_color="transparent")
         stats.pack(fill="x", pady=(0, 8))
-        stats.grid_columnconfigure((0, 1, 2), weight=1)
+        stats.grid_columnconfigure((0, 1, 2, 3), weight=1)
         self.sucesso_card = self._stat_card(stats, "✓", "Executados", "0", self.SUCCESS)
         self.sucesso_card.grid(row=0, column=0, sticky="ew", padx=(0, 5))
         self.erro_card = self._stat_card(stats, "!", "Não executados", "0", self.ERROR)
         self.erro_card.grid(row=0, column=1, sticky="ew", padx=5)
         self.codigo_card = self._stat_card(stats, "›", "Código atual", "—", self.INFO)
-        self.codigo_card.grid(row=0, column=2, sticky="ew", padx=(5, 0))
+        self.codigo_card.grid(row=0, column=2, sticky="ew", padx=5)
+        self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso", "0%", self.INFO)
+        self._execucao_progresso_card.grid(row=0, column=3, sticky="ew", padx=(5, 0))
 
         activity_card = self._card(main)
         activity_card.pack(fill="x", pady=(0, 6))
@@ -2797,6 +2874,62 @@ class App:
             except Exception:
                 card._sm_autolab_tooltip = None
         return card
+
+    @staticmethod
+    def _formatar_duracao(segundos):
+        total = max(0, int(round(float(segundos or 0))))
+        horas, resto = divmod(total, 3600)
+        minutos, segundos = divmod(resto, 60)
+        return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
+
+    def _iniciar_metricas_execucao(self, start, total):
+        self._execucao_inicio_monotonic = time.monotonic()
+        self._execucao_inicio_indice = int(start)
+        self._execucao_total = int(total)
+        self._atualizar_metricas_execucao()
+
+    def _parar_metricas_execucao(self):
+        job = getattr(self, "_execucao_timer_job", None)
+        if job is not None:
+            try:
+                self.app.after_cancel(job)
+            except Exception:
+                pass
+        self._execucao_timer_job = None
+        self._execucao_inicio_monotonic = None
+
+    def _atualizar_metricas_execucao(self):
+        if self._closing:
+            self._execucao_timer_job = None
+            return
+        inicio = getattr(self, "_execucao_inicio_monotonic", None)
+        if inicio is None:
+            return
+        try:
+            decorrido = max(0.0, time.monotonic() - inicio)
+        except Exception:
+            decorrido = 0.0
+
+        if self._tempo_decorrido_label is not None:
+            self._tempo_decorrido_label.configure(text=self._formatar_duracao(decorrido))
+
+        if self._tempo_estimado_label is not None:
+            processados = int(getattr(self, "_checkpoint_indice_seguro", 0))
+            concluidos = max(0, processados - int(self._execucao_inicio_indice))
+            restantes = max(0, int(self._execucao_total) - processados)
+            if concluidos > 0 and decorrido > 0 and restantes > 0:
+                por_item = decorrido / concluidos
+                estimado = por_item * restantes
+                self._tempo_estimado_label.configure(text=self._formatar_duracao(estimado))
+            elif restantes == 0 and int(self._execucao_total) > 0:
+                self._tempo_estimado_label.configure(text="00:00:00")
+            else:
+                self._tempo_estimado_label.configure(text="—")
+
+        try:
+            self._execucao_timer_job = self.app.after(500, self._atualizar_metricas_execucao)
+        except Exception:
+            self._execucao_timer_job = None
 
     def _set_stat(self, card, value):
         card.value_label.configure(text=str(value))
@@ -4935,6 +5068,9 @@ class App:
         self._set_stat(self.sucesso_card,0)
         self._set_stat(self.erro_card,0)
         self._set_stat(self.codigo_card,"—")
+        if self._execucao_progresso_card is not None:
+            self._set_stat(self._execucao_progresso_card, f"{(start / len(codigos)):.0%}" if codigos else "0%")
+        self._iniciar_metricas_execucao(start, len(codigos))
         self._erros_codigos = []
         self._add_activity(
             f"Iniciando automação com {len(codigos)} código(s) da coluna 'Senha'.",
@@ -4971,6 +5107,13 @@ class App:
         self._iniciar_automacao_interna(codigos)
 
     def _falha_geral(self, msg):
+        self._parar_metricas_execucao()
+        if self._execucao_titulo_label is not None:
+            self._execucao_titulo_label.configure(text="Execução interrompida")
+        if self._execucao_subtitulo_label is not None:
+            self._execucao_subtitulo_label.configure(text="Ocorreu um erro durante o processamento.")
+        if self._execucao_indicador_label is not None:
+            self._execucao_indicador_label.configure(text="●  Atenção", text_color=self.ERROR)
         self.botao_iniciar.configure(state="normal")
         self.botao_planilha.configure(state="normal")
         self.botao_parar.configure(state="disabled")
@@ -4980,6 +5123,20 @@ class App:
         messagebox.showerror("Erro no processo", msg)
 
     def _finalizar(self, resultado):
+        self._parar_metricas_execucao()
+        if self._execucao_titulo_label is not None:
+            self._execucao_titulo_label.configure(
+                text="Execução pausada" if self._parar else "Execução concluída"
+            )
+        if self._execucao_subtitulo_label is not None:
+            self._execucao_subtitulo_label.configure(
+                text="O ponto de retomada foi salvo." if self._parar else "Processamento finalizado."
+            )
+        if self._execucao_indicador_label is not None:
+            self._execucao_indicador_label.configure(
+                text="●  Pausada" if self._parar else "●  Concluída",
+                text_color=self.WARNING if self._parar else self.SUCCESS
+            )
         self.botao_iniciar.configure(state="normal")
         self.botao_planilha.configure(state="normal")
         self.botao_parar.configure(state="disabled")
@@ -5007,7 +5164,7 @@ class App:
         for item in resultado.itens:
             if item.status == "Erro":
                 self._add_erro_codigo(item.codigo)
-        self._selecionar_aba("Não executados" if resultado.erros else "Atividade")
+        self._selecionar_aba("Atividade")
 
         if resultado.erros == 0 and not self._parar:
             messagebox.showinfo(
@@ -5246,6 +5403,10 @@ class App:
         self._set_stat(self.sucesso_card, sucessos)
         self._set_stat(self.erro_card, erros)
         self._set_stat(self.codigo_card, codigo)
+        pct_text = f"{pct:.0%}"
+        if self._execucao_progresso_card is not None:
+            self._set_stat(self._execucao_progresso_card, pct_text)
+        self._atualizar_metricas_execucao()
         self.status_label.configure(
             text=f"Processando código {processados} de {total}",
             text_color=self.INFO,
@@ -5253,6 +5414,16 @@ class App:
         self._status_text_base = "Processando"
         self.status_pill.configure(fg_color=("#E5F1FB", "#183B54"))
         self.status_text.configure(text="Processando", text_color=self.INFO)
+        if self._execucao_titulo_label is not None:
+            self._execucao_titulo_label.configure(text="Execução em andamento")
+        if self._execucao_subtitulo_label is not None:
+            self._execucao_subtitulo_label.configure(
+                text="Automatizando autorizações. Aguarde..."
+            )
+        if self._execucao_indicador_label is not None:
+            self._execucao_indicador_label.configure(
+                text="●  Em andamento", text_color=self.INFO
+            )
         self._status_blink_fast = True
         # O estado já atualiza a animação; reiniciar o temporizador a cada código
         # tornaria o efeito irregular.
@@ -5327,6 +5498,7 @@ class App:
             "_fluent_accent_job",
             "_progress_anim_job",
             "_micro_dashboard_complete_job",
+            "_execucao_timer_job",
         ):
             job = getattr(self, job_attr, None)
             if job is not None:
