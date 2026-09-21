@@ -39,6 +39,367 @@ try:
 except Exception:
     pass
 
+_UI_TOOLTIP_MESSAGES = {
+    "iniciar": "Inicia a automação com os códigos selecionados.",
+    "parar": "Interrompe a automação com parada segura após o código atual.",
+    "configurações": "Abre as configurações do aplicativo.",
+    "aparência ›": "Abre as opções de tema claro, escuro e automático.",
+    "mudar o feegow": "Altera o endereço e os dados de acesso do Feegow.",
+    "verificar atualizações": "Procura uma versão mais recente do SM AutoLab.",
+    "abrir": "Abre a planilha interna.",
+    "arquivos": "Abre o histórico de planilhas salvas.",
+    "limpar histórico": "Remove o histórico de execuções exibido.",
+    "atividade": "Mostra a atividade e os eventos da execução.",
+    "histórico": "Mostra o histórico das execuções anteriores.",
+    "restaurar": "Restaura as configurações padrão.",
+    "cancelar": "Fecha esta janela sem aplicar as alterações.",
+    "salvar": "Salva as alterações atuais.",
+    "salvar e sair": "Salva a planilha e fecha a janela.",
+    "salvar e iniciar": "Salva a planilha e inicia a automação.",
+    "limpar": "Limpa os dados preenchidos na planilha.",
+    "voltar": "Volta para a visualização anterior.",
+    "desfazer": "Desfaz a última alteração.",
+    "refazer": "Refaz a alteração desfeita.",
+    "claro": "Usa o tema claro.",
+    "escuro": "Usa o tema escuro.",
+    "padrão do windows": "Segue automaticamente o tema do Windows.",
+}
+
+class _SMAutoLabTooltip:
+    """Tooltip leve para controles da interface, sem bindings globais."""
+    DELAY_MS = 450
+    HIDE_GRACE_MS = 80
+    MAX_WIDTH = 340
+
+    def __init__(self, widget, message, bind_children=True):
+        self.widget = widget
+        self.message = str(message or "").strip()
+        self.bind_children = bool(bind_children)
+        self._after_id = None
+        self._hide_id = None
+        self._window = None
+        self._closed = False
+        self._bindings = []
+
+        self._bind_widget_tree()
+
+    def _iter_widget_tree(self, widget=None):
+        widget = widget or self.widget
+        yield widget
+        try:
+            children = widget.winfo_children()
+        except Exception:
+            children = ()
+        for child in children:
+            yield from self._iter_widget_tree(child)
+
+    def _bind_widget_tree(self):
+        widgets = self._iter_widget_tree() if self.bind_children else (self.widget,)
+        for child in widgets:
+            if any(bound is child for bound, _ in self._bindings):
+                continue
+            try:
+                enter_id = child.bind("<Enter>", self._on_enter, add="+")
+                leave_id = child.bind("<Leave>", self._on_leave, add="+")
+                motion_id = child.bind("<Motion>", self._on_motion, add="+")
+                destroy_id = child.bind("<Destroy>", self._on_destroy, add="+")
+                self._bindings.extend([
+                    (child, ("<Enter>", enter_id)),
+                    (child, ("<Leave>", leave_id)),
+                    (child, ("<Motion>", motion_id)),
+                    (child, ("<Destroy>", destroy_id)),
+                ])
+            except Exception:
+                pass
+
+    def _cancel_after(self, attr):
+        job = getattr(self, attr, None)
+        if job is None:
+            return
+        try:
+            self.widget.after_cancel(job)
+        except Exception:
+            pass
+        setattr(self, attr, None)
+
+    def _inside(self):
+        try:
+            x = self.widget.winfo_pointerx()
+            y = self.widget.winfo_pointery()
+            left = self.widget.winfo_rootx()
+            top = self.widget.winfo_rooty()
+            return left <= x < left + self.widget.winfo_width() and top <= y < top + self.widget.winfo_height()
+        except Exception:
+            return False
+
+    def update_message(self, message):
+        self.message = str(message or "").strip()
+        if not self.message:
+            self.hide()
+            return
+        self._bind_widget_tree()
+
+    def _on_enter(self, _event=None):
+        if self._closed or not self.message:
+            return
+        self._cancel_after("_hide_id")
+        self._cancel_after("_after_id")
+        try:
+            self._after_id = self.widget.after(self.DELAY_MS, self.show)
+        except Exception:
+            self._after_id = None
+
+    def _on_leave(self, _event=None):
+        self._cancel_after("_after_id")
+        self._cancel_after("_hide_id")
+        try:
+            self._hide_id = self.widget.after(self.HIDE_GRACE_MS, self._hide_if_outside)
+        except Exception:
+            self.hide()
+
+    def _hide_if_outside(self):
+        self._hide_id = None
+        if not self._inside():
+            self.hide()
+
+    def _on_motion(self, _event=None):
+        self._cancel_after("_hide_id")
+        self._bind_widget_tree()
+        if self._window is not None:
+            self._position()
+
+    def _on_destroy(self, _event=None):
+        self._closed = True
+        self._cancel_after("_after_id")
+        self._cancel_after("_hide_id")
+
+    def _render(self):
+        if self._window is None:
+            return
+        dark = str(ctk.get_appearance_mode()).lower() == "dark"
+        bg, fg, border = (
+            ("#1A1A1A", "#F8F8F8", "#C8C8C8")
+            if dark else
+            ("#2B2B2B", "#FFFFFF", "#454545")
+        )
+        try:
+            for child in self._window.winfo_children():
+                child.destroy()
+            frame = tk.Frame(self._window, bg=bg, highlightbackground=border, highlightthickness=1, bd=0)
+            frame.pack()
+            label = tk.Label(
+                frame,
+                text=self.message,
+                bg=bg,
+                fg=fg,
+                font=("Segoe UI", 9),
+                justify="left",
+                wraplength=self.MAX_WIDTH,
+                padx=8,
+                pady=5,
+                bd=0,
+            )
+            label.pack()
+            self._window.update_idletasks()
+        except Exception:
+            self.hide()
+
+    def show(self):
+        self._after_id = None
+        self._cancel_after("_hide_id")
+        if self._closed or not self.message or not self._inside():
+            return
+        try:
+            if not self.widget.winfo_exists():
+                return
+            if self._window is None or not self._window.winfo_exists():
+                self._window = tk.Toplevel(self.widget)
+                self._window._sm_autolab_tooltip_window = True
+                self._window.overrideredirect(True)
+                try:
+                    self._window.attributes("-topmost", True)
+                except Exception:
+                    pass
+            self._render()
+            self._position()
+            self._window.deiconify()
+            self._window.lift()
+        except Exception:
+            self.hide()
+
+    def _position(self):
+        if self._window is None:
+            return
+        try:
+            pointer_x = self.widget.winfo_pointerx()
+            pointer_y = self.widget.winfo_pointery()
+            self._window.update_idletasks()
+            width = self._window.winfo_reqwidth()
+            height = self._window.winfo_reqheight()
+            sw = self.widget.winfo_screenwidth()
+            sh = self.widget.winfo_screenheight()
+            x = pointer_x + 14
+            y = pointer_y - height - 14
+            if x + width > sw - 4:
+                x = max(4, pointer_x - width - 14)
+            if y < 4:
+                y = pointer_y + 18
+            if y + height > sh - 4:
+                y = max(4, sh - height - 4)
+            self._window.geometry(f"{width}x{height}+{int(x)}+{int(y)}")
+        except Exception:
+            pass
+
+    def hide(self):
+        self._cancel_after("_after_id")
+        self._cancel_after("_hide_id")
+        if self._window is None:
+            return
+        try:
+            self._window.withdraw()
+        except Exception:
+            try:
+                self._window.destroy()
+            except Exception:
+                pass
+        self._window = None
+
+    def destroy(self):
+        self._closed = True
+        self._cancel_after("_after_id")
+        self._cancel_after("_hide_id")
+        for widget, binding in tuple(self._bindings):
+            sequence, funcid = binding
+            try:
+                widget.unbind(sequence, funcid)
+            except Exception:
+                pass
+        self._bindings.clear()
+        if self._window is not None:
+            try:
+                self._window.destroy()
+            except Exception:
+                pass
+        self._window = None
+
+def _ui_tooltip_text(widget):
+    try:
+        raw = widget.cget("text")
+    except Exception:
+        return None
+    text = " ".join(str(raw or "").replace("✓", "").split()).strip()
+    if not text:
+        return None
+    key = text.casefold()
+    if key in _UI_TOOLTIP_MESSAGES:
+        return _UI_TOOLTIP_MESSAGES[key]
+    while key and key[0] in "▶■←→‹›":
+        key = key[1:].strip()
+    if key in _UI_TOOLTIP_MESSAGES:
+        return _UI_TOOLTIP_MESSAGES[key]
+    if key.replace(" ", "").isalnum() and len(key) >= 4 and any(ch.isdigit() for ch in key):
+        return "Clique para copiar este código."
+    return None
+
+def _ui_attach_tooltip(widget):
+    message = _ui_tooltip_text(widget)
+    tooltip = getattr(widget, "_sm_autolab_tooltip", None)
+    if tooltip is not None:
+        tooltip.update_message(message)
+        return
+    if not message:
+        return
+    try:
+        widget._sm_autolab_tooltip = _SMAutoLabTooltip(
+            widget,
+            message,
+            bind_children=isinstance(widget, ctk.CTkButton),
+        )
+    except Exception:
+        widget._sm_autolab_tooltip = None
+
+def _ui_install_button_tooltips():
+    cls = ctk.CTkButton
+    if getattr(cls, "_sm_autolab_tooltip_installed", False):
+        return
+    original_init = cls.__init__
+    original_configure = cls.configure
+
+    def init_with_tooltip(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        _ui_attach_tooltip(self)
+
+    def configure_with_tooltip(self, *args, **kwargs):
+        result = original_configure(self, *args, **kwargs)
+        _ui_attach_tooltip(self)
+        return result
+
+    cls.__init__ = init_with_tooltip
+    cls.configure = configure_with_tooltip
+    cls._sm_autolab_tooltip_installed = True
+
+def _ui_bind_card_hover(card, accent):
+    if card is None or getattr(card, "_sm_card_hover_installed", False):
+        return
+    try:
+        card._sm_card_hover_installed = True
+        card._sm_card_base_border = card.cget("border_color")
+        card._sm_card_base_width = int(card.cget("border_width") or 0)
+
+        def inside():
+            try:
+                current = card.winfo_containing(card.winfo_pointerx(), card.winfo_pointery())
+                return current is not None and (
+                    str(current) == str(card) or str(current).startswith(str(card) + ".")
+                )
+            except Exception:
+                return False
+
+        def enter(_event=None):
+            try:
+                if card.winfo_exists():
+                    card.configure(
+                        border_width=max(1, card._sm_card_base_width),
+                        border_color=accent,
+                    )
+            except Exception:
+                pass
+
+        def leave(_event=None):
+            def restore():
+                try:
+                    if card.winfo_exists() and not inside():
+                        card.configure(
+                            border_width=card._sm_card_base_width,
+                            border_color=card._sm_card_base_border,
+                        )
+                except Exception:
+                    pass
+            try:
+                card.after_idle(restore)
+            except Exception:
+                restore()
+
+        for child in _walk_widgets(card):
+            try:
+                child.bind("<Enter>", enter, add="+")
+                child.bind("<Leave>", leave, add="+")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+def _walk_widgets(widget):
+    yield widget
+    try:
+        children = widget.winfo_children()
+    except Exception:
+        children = ()
+    for child in children:
+        yield from _walk_widgets(child)
+
+_ui_install_button_tooltips()
+
 REPO = "gustaam/SM-AutoLab---Upgrades"
 API_RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
 USER_AGENT = "SM AutoLab"
@@ -2406,6 +2767,24 @@ class App:
                                    font=("Segoe UI", 16, "bold"), anchor="w")
         value_label.pack(anchor="w")
         card.value_label = value_label
+
+        card_tooltips = {
+            "Executados": "Mostra a quantidade de códigos executados com sucesso.",
+            "Não executados": "Mostra a quantidade de códigos que apresentaram erro durante a execução.",
+            "Código atual": "Mostra o código que está sendo processado no momento.",
+        }
+        _ui_bind_card_hover(card, accent)
+        _ui_attach_tooltip(card)
+        card._sm_autolab_tooltip_message = card_tooltips.get(title)
+        if card._sm_autolab_tooltip_message:
+            try:
+                card._sm_autolab_tooltip = _SMAutoLabTooltip(
+                    card,
+                    card._sm_autolab_tooltip_message,
+                    bind_children=True,
+                )
+            except Exception:
+                card._sm_autolab_tooltip = None
         return card
 
     def _set_stat(self, card, value):
