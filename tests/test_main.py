@@ -67,6 +67,28 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertEqual(source.count('text="Iniciar"'), 1)
         self.assertIn('text_color="#FFFFFF"', source)
 
+    def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("class _SMAutoLabTooltip:", source)
+        self.assertIn("def _ui_install_button_tooltips", source)
+        self.assertIn("_ui_install_button_tooltips()", source)
+        self.assertIn("def _ui_bind_card_hover", source)
+        self.assertIn('"Executados": "Mostra a quantidade de códigos executados com sucesso."', source)
+        self.assertIn('"Não executados": "Mostra a quantidade de códigos que apresentaram erro durante a execução."', source)
+        self.assertIn('"Código atual": "Mostra o código que está sendo processado no momento."', source)
+        self.assertIn("_ui_bind_card_hover(card, accent)", source)
+        self.assertNotIn("install_ui_micro_29918", source)
+        self.assertNotIn("bind_all", source)
+
+    def test_stat_cards_mantem_feedback_visual_e_tooltip(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _stat_card")
+        end = source.index("def _set_stat", start)
+        block = source[start:end]
+        self.assertIn("_ui_bind_card_hover(card, accent)", block)
+        self.assertIn("_SMAutoLabTooltip(", block)
+        self.assertIn("card_tooltips =", block)
+
     def test_legacy_patch_module_is_absent(self):
         self.assertFalse((self.root / "patch.py").exists())
 
