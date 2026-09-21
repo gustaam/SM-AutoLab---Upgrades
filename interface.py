@@ -1,28 +1,37 @@
 # Camada principal da interface: planilha, histórico, atualização e integração com o Windows.
-from pathlib import Path
-import json
+from __future__ import annotations
+
 import calendar as pycalendar
-import tkinter as tk
-import threading
-import sys
-from datetime import datetime, timedelta
-from tkinter import messagebox, Canvas, Frame, ttk, Entry
-import customtkinter as ctk
-
-from app import (
-    ler_checkpoint, salvar_checkpoint, principal, principal_interno,
-    ler_checkpoint_interno, salvar_checkpoint_interno, excluir_checkpoint_interno,
-    carregar_configuracoes, salvar_configuracoes, restaurar_configuracoes,
-)
-
+import ctypes
 import hashlib
 import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
+import threading
+import tkinter as tk
 import urllib.request
+from ctypes import wintypes
+from datetime import datetime, timedelta
 from pathlib import Path
+from tkinter import Canvas, Entry, Frame, messagebox, ttk
+
+import customtkinter as ctk
+
+from app import (
+    carregar_configuracoes,
+    excluir_checkpoint_interno,
+    ler_checkpoint,
+    ler_checkpoint_interno,
+    principal,
+    principal_interno,
+    restaurar_configuracoes,
+    salvar_checkpoint,
+    salvar_checkpoint_interno,
+    salvar_configuracoes,
+)
 
 try:
     import truststore
@@ -1177,16 +1186,7 @@ __all__ = [
     "visible_row_range",
 ]
 
-import ctypes
-import os
-import sys
-from ctypes import wintypes
-
-import customtkinter as ctk
-
 # Windows/DWM helpers used directly by the canonical UI.
-import ctypes
-from ctypes import wintypes
 
 DWMWA_SYSTEMBACKDROP_TYPE = 38
 DWMWCP_ROUND = 2
