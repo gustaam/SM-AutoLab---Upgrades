@@ -1746,13 +1746,33 @@ class App:
                 self.app.update_idletasks()
                 app_x = self.app.winfo_rootx()
                 app_y = self.app.winfo_rooty()
+                sub_width = max(225, self._menu_aparencia.winfo_reqwidth(), self._menu_aparencia.winfo_width())
+                app_width = max(1, self.app.winfo_width())
+
                 if self._menu_config is not None and self._menu_config.winfo_exists():
-                    x = self._menu_config.winfo_rootx() - app_x + self._menu_config.winfo_width() - 2
-                    y = self._menu_config.winfo_rooty() - app_y
+                    config_root_x = self._menu_config.winfo_rootx() - app_x
+                    config_root_y = self._menu_config.winfo_rooty() - app_y
+                    config_width = self._menu_config.winfo_width()
+                    button_y = self._menu_aparencia_btn.winfo_rooty() - app_y if self._menu_aparencia_btn is not None else config_root_y
+                    button_height = self._menu_aparencia_btn.winfo_height() if self._menu_aparencia_btn is not None else self._menu_config.winfo_height()
+                    left_x = config_root_x - sub_width + 2
+                    right_x = config_root_x + config_width - 2
+                    if left_x >= 6:
+                        x = left_x
+                    else:
+                        x = min(right_x, max(6, app_width - sub_width - 6))
+                    y = max(6, button_y + max(0, (button_height - self._menu_aparencia.winfo_reqheight()) // 2))
                 else:
-                    x = self.botao_configuracoes.winfo_rootx() - app_x + self.botao_configuracoes.winfo_width()
-                    y = self.botao_configuracoes.winfo_rooty() - app_y
-                self._menu_aparencia.place(x=max(0, x), y=max(0, y))
+                    button_x = self.botao_configuracoes.winfo_rootx() - app_x
+                    button_y = self.botao_configuracoes.winfo_rooty() - app_y
+                    button_width = self.botao_configuracoes.winfo_width()
+                    x = button_x - sub_width + 2
+                    if x < 6:
+                        x = button_x + button_width - 2
+                    x = min(x, max(6, app_width - sub_width - 6))
+                    y = max(6, button_y)
+
+                self._menu_aparencia.place_configure(x=int(x), y=int(y))
                 self._menu_aparencia.lift()
         except Exception:
             pass
