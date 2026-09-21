@@ -1,5 +1,7 @@
 # Testes de regressão arquitetural.
 
+# Testes de regressão arquitetural.
+
 import unittest
 from pathlib import Path
 
