@@ -1768,7 +1768,8 @@ class App:
         self._historico_execucoes = []
         self._execucao_atual = None
         self._erros_codigos = []
-        self._historico_arquivo = Path.home() / ".sm_autolab_historico.json"
+        self._historico_arquivo = Path.home() / "SM AutoLab" / "historico_execucoes.json"
+        self._historico_arquivo_legado = Path.home() / ".sm_autolab_historico.json"
         self._planilha_arquivo = Path.home() / "SM AutoLab" / "planilha_interna.json"
         self._planilha_rascunho_arquivo = Path.home() / "SM AutoLab" / "planilha_rascunho.json"
         self._planilha_historico_arquivo = Path.home() / "SM AutoLab" / "planilha_historico.json"
@@ -1810,6 +1811,9 @@ class App:
         self._execucao_subtitulo_label = None
         self._execucao_indicador_label = None
         self._execucao_progresso_card = None
+        self._historico_reflow_job = None
+        self._historico_layout_width = 0
+        self._activity_card = None
         self._carregar_estado_persistente()
         ctk.set_appearance_mode(self._tema)
         ctk.set_default_color_theme("blue")
@@ -2079,6 +2083,7 @@ class App:
         activity_card.pack_propagate(False)
         self._activity_card = activity_card
         self._section_title(activity_card, "Acompanhamento")
+        self.app.bind("<Configure>", self._ajustar_altura_acompanhamento, add="+")
 
         # Fluent-inspired tab row, like the reference image.
         tabs = ctk.CTkFrame(activity_card, fg_color=("#F3F3F3", "#343A40"), corner_radius=8,
@@ -3007,18 +3012,51 @@ class App:
 
     def _carregar_estado_persistente(self):
         try:
-            if not self._historico_arquivo.exists():
-                return
-            dados = read_json_with_backup(self._historico_arquivo, {})
-            execucoes = dados.get("historico_execucoes", [])
-            erros = dados.get("erros", [])
-            tema = dados.get("tema", "system")
+            candidatos = [self._historico_arquivo, self._historico_arquivo_legado]
+            dados_principais = {}
+            for caminho in candidatos:
+                if not caminho.exists():
+                    continue
+                dados = read_json_with_backup(caminho, {})
+                if isinstance(dados, dict):
+                    dados_principais = dados
+                    if dados.get("historico_execucoes") or dados.get("tema") or dados.get("erros"):
+                        break
+
+            execucoes = dados_principais.get("historico_execucoes", [])
+            erros = dados_principais.get("erros", [])
+            tema = dados_principais.get("tema", "system")
+
             if tema in ("light", "dark", "system"):
                 self._tema = tema
+
             if isinstance(execucoes, list):
                 self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(execucoes)
+
+            # Reconstrói o índice de erros a partir das próprias execuções salvas.
+            # Assim, uma eventual ausência/corrupção da lista auxiliar não apaga
+            # os códigos que já estão registrados nos detalhes do histórico.
+            erros_reconstruidos = []
+            for execucao in self._historico_execucoes:
+                for codigo in execucao.get("codigos_erros", []) or []:
+                    texto = str(codigo).strip()
+                    if texto and texto not in erros_reconstruidos:
+                        erros_reconstruidos.append(texto)
+
             if isinstance(erros, list):
-                self._erros_codigos = [str(x) for x in erros][-200:]
+                for codigo in erros:
+                    texto = str(codigo).strip()
+                    if texto and texto not in erros_reconstruidos:
+                        erros_reconstruidos.append(texto)
+
+            self._erros_codigos = erros_reconstruidos[-200:]
+
+            # Migração transparente: a próxima gravação já vai consolidar o
+            # histórico no diretório "SM AutoLab".
+            if self._historico_arquivo.exists() is False and (
+                self._historico_execucoes or self._erros_codigos
+            ):
+                self._salvar_estado_persistente()
         except Exception:
             self._historico_execucoes = []
             self._erros_codigos = []
@@ -3027,11 +3065,13 @@ class App:
         try:
             self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(self._historico_execucoes)
             dados = {
+                "version": 2,
                 "historico_execucoes": self._historico_execucoes,
                 "erros": self._erros_codigos[-200:],
                 "tema": self._tema,
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
+            self._historico_arquivo.parent.mkdir(parents=True, exist_ok=True)
             atomic_write_json(self._historico_arquivo, dados)
         except Exception:
             pass
@@ -3233,26 +3273,68 @@ class App:
             self._criar_pasta_historico(execucao)
 
     def _criar_pasta_historico(self, execucao, atual=False):
-        container = ctk.CTkFrame(self.historico_lista, fg_color=("#FFFFFF", "#2D3338"), corner_radius=8, border_width=1, border_color=self.BORDER, width=92, height=78)
-        container.pack_propagate(False)
-        # grid of compact folders, centered in the history panel
-        # use a dedicated parent row grid when possible
-        parent=self.historico_lista
+        parent = self.historico_lista
         if not hasattr(self, "_hist_grid") or self._hist_grid is None:
-            self._hist_grid=ctk.CTkFrame(parent,fg_color="transparent")
-            self._hist_grid.pack(fill="x",padx=6,pady=4)
-        # distribute in 6 compact columns
-        count=len(self._hist_grid.winfo_children())
-        row=count//6; col=count%6
-        self._hist_grid.grid_columnconfigure(tuple(range(6)),weight=1)
-        tile=ctk.CTkFrame(self._hist_grid,fg_color=("#FFFFFF", "#2D3338"),corner_radius=8,border_width=1,border_color=self.BORDER,width=92,height=78)
-        tile.grid(row=row,column=col,padx=3,pady=3,sticky="nsew")
+            self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
+            self._hist_grid.pack(fill="x", padx=8, pady=5)
+
+        largura = max(parent.winfo_width(), 560)
+        colunas = max(3, min(6, int((largura - 24) // 142)))
+        for col in range(colunas):
+            self._hist_grid.grid_columnconfigure(col, weight=1, uniform="historico")
+
+        count = len(self._hist_grid.winfo_children())
+        row, col = divmod(count, colunas)
+        tile = ctk.CTkFrame(
+            self._hist_grid,
+            fg_color=("#FFFFFF", "#2D3338"),
+            corner_radius=8,
+            border_width=1,
+            border_color=self.BORDER,
+            width=132,
+            height=102,
+        )
+        tile.grid(row=row, column=col, padx=4, pady=4, sticky="nsew")
         tile.grid_propagate(False)
-        inicio=execucao.get("inicio",""); status=execucao.get("status",""); erros=int(execucao.get("erros",0) or 0)
-        icon=ctk.CTkLabel(tile,text="📁",font=("Segoe UI Emoji",18),text_color=self.ACCENT); icon.pack(pady=(5,0))
-        ctk.CTkLabel(tile,text=inicio.split(" ")[0] if inicio else "",text_color=self.TEXT,font=("Segoe UI",8,"bold")).pack()
-        ctk.CTkLabel(tile,text=inicio.split(" ")[1] if " " in inicio else "",text_color=self.SUBTEXT,font=("Segoe UI",7)).pack()
-        ctk.CTkLabel(tile,text=f"{status} • {erros} não exec.",text_color=self.SUBTEXT,font=("Segoe UI",7),wraplength=82).pack(pady=(3,0))
+
+        inicio = execucao.get("inicio", "")
+        status = str(execucao.get("status", "")).strip()
+        erros = int(execucao.get("erros", 0) or 0)
+        titulo = "Em andamento" if atual else status
+        icone = "📁"
+
+        ctk.CTkLabel(
+            tile, text=icone, font=("Segoe UI Emoji", 20),
+            text_color=self.ACCENT
+        ).pack(pady=(7, 1))
+        ctk.CTkLabel(
+            tile,
+            text=inicio.split(" ")[0] if inicio else "",
+            text_color=self.TEXT,
+            font=("Segoe UI", 9, "bold")
+        ).pack()
+        ctk.CTkLabel(
+            tile,
+            text=inicio.split(" ")[1] if " " in inicio else "",
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 8)
+        ).pack()
+        ctk.CTkLabel(
+            tile,
+            text=titulo[:24],
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 8, "bold"),
+            anchor="center",
+            justify="center",
+            wraplength=116,
+        ).pack(padx=6, pady=(4, 0))
+        ctk.CTkLabel(
+            tile,
+            text=f"{erros} não executado(s)",
+            text_color=self.ERROR if erros else self.SUBTEXT,
+            font=("Segoe UI", 8),
+            anchor="center",
+        ).pack(pady=(2, 0))
         detalhe=ctk.CTkToplevel(self.app) if False else None
         def selecionar(_e=None):
             for sibling in self._hist_grid.winfo_children():
@@ -3275,13 +3357,20 @@ class App:
         tile.bind("<Double-1>", abrir)
 
     def _abrir_detalhe_historico(self, execucao):
-        win=ctk.CTkToplevel(self.app); win.title("Histórico — SM AutoLab"); win.geometry("650x470"); win.resizable(False,False); win.transient(self.app)
+        win = ctk.CTkToplevel(self.app)
+        win.title("Execução — SM AutoLab")
+        win.geometry("680x500")
+        win.minsize(560, 400)
+        win.resizable(True, True)
+        win.transient(self.app)
         try:
-            aplicar_backdrop_sistema(win, "acrylic", dark=ctk.get_appearance_mode().lower() == "dark")
+            aplicar_backdrop_sistema(
+                win, "acrylic",
+                dark=ctk.get_appearance_mode().lower() == "dark"
+            )
         except Exception:
             pass
-        ctk.CTkLabel(win,text=execucao.get("inicio",""),text_color=self.TEXT,font=("Segoe UI",18,"bold")).pack(anchor="w",padx=18,pady=(16,2))
-        self._preencher_detalhe_pasta(win,execucao)
+        self._preencher_detalhe_pasta(win, execucao)
 
     def _preencher_detalhe_pasta(self, parent, execucao):
         for w in parent.winfo_children():
@@ -3307,16 +3396,37 @@ class App:
 
         if erros and codigos:
             ctk.CTkLabel(
-                parent, text="Códigos não executados (clique para copiar):",
-                text_color=self.ERROR, font=("Segoe UI", 11, "bold"), anchor="w"
-            ).pack(fill="x", padx=8, pady=(0, 3))
+                parent,
+                text="Códigos não executados (clique para copiar):",
+                text_color=self.ERROR,
+                font=("Segoe UI", 11, "bold"),
+                anchor="w",
+            ).pack(fill="x", padx=12, pady=(4, 5))
+
+            erros_area = ctk.CTkScrollableFrame(
+                parent,
+                fg_color=("transparent", "transparent"),
+                corner_radius=0,
+            )
+            erros_area.pack(fill="both", expand=True, padx=6, pady=(0, 8))
             for codigo in codigos:
-                self._criar_botao_erro(codigo, parent=parent)
+                self._criar_botao_erro(codigo, parent=erros_area)
+        elif erros:
+            ctk.CTkLabel(
+                parent,
+                text=f"{erros} código(s) não executado(s), sem código detalhado disponível.",
+                text_color=self.ERROR,
+                font=("Segoe UI", 10),
+                wraplength=560,
+                justify="left",
+            ).pack(anchor="w", padx=12, pady=(5, 10))
         else:
             ctk.CTkLabel(
-                parent, text="Nenhum código apresentou erro nessa execução.",
-                text_color=self.SUCCESS, font=("Segoe UI", 10)
-            ).pack(anchor="w", padx=8, pady=(3, 8))
+                parent,
+                text="Nenhum código apresentou erro nessa execução.",
+                text_color=self.SUCCESS,
+                font=("Segoe UI", 10),
+            ).pack(anchor="w", padx=12, pady=(5, 10))
 
     def _limpar_historico(self):
         if not self._historico_execucoes and not self._execucao_atual:
@@ -4528,9 +4638,14 @@ class App:
         }
         if itens:
             ultimo = itens[-1]
-            if ultimo.get("cells") == cells:
+            ultimo_saved = str(ultimo.get("saved_at", ""))
+            try:
+                ultimo_data = datetime.fromisoformat(ultimo_saved).date()
+            except Exception:
+                ultimo_data = None
+
+            if ultimo.get("cells") == cells and ultimo_data == agora.date():
                 entrada["id"] = ultimo.get("id", entrada["id"])
-                entrada["saved_at"] = ultimo.get("saved_at", entrada["saved_at"])
                 entrada["filled"] = ultimo.get("filled", len(linhas))
                 itens[-1] = entrada
             else:
@@ -5531,9 +5646,6 @@ class App:
         self._set_stat(self.sucesso_card, sucessos)
         self._set_stat(self.erro_card, erros)
         self._set_stat(self.codigo_card, codigo)
-        pct_text = f"{pct:.0%}"
-        if self._execucao_progresso_card is not None:
-            self._set_stat(self._execucao_progresso_card, pct_text)
         self._atualizar_metricas_execucao()
         self.status_label.configure(
             text=f"Processando código {processados} de {total}",
