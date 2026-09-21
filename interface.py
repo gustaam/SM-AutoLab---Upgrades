@@ -3588,11 +3588,34 @@ class App:
 
     def _salvar_planilha_interna_data(self, cells=None):
         self._garantir_pasta_planilha()
-        if cells is None:
-            cells=self._planilha_data
-        payload={"version":1,"updated_at":datetime.now().isoformat(timespec="seconds"),"cells":cells}
+        source = self._planilha_data if cells is None else cells
+        snapshot = {}
+        for key, value in (source or {}).items():
+            texto = str(value)
+            if texto != "":
+                snapshot[str(key)] = texto
+        payload = {
+            "version": 1,
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+            "cells": snapshot,
+        }
         atomic_write_json(self._planilha_arquivo, payload)
 
+        # Confirma a persistência real antes de registrar a operação como salva.
+        confirm = read_json_with_backup(self._planilha_arquivo, {})
+        saved = confirm.get("cells", {}) if isinstance(confirm, dict) else {}
+        if not isinstance(saved, dict):
+            saved = {}
+        normalized = {}
+        for key, value in saved.items():
+            texto = str(value)
+            if texto != "":
+                normalized[str(key)] = texto
+        if normalized != snapshot:
+            raise IOError(
+                "A planilha foi gravada, mas a conferência do arquivo "
+                "não corresponde aos dados atuais.",
+            )
     def _planilha_tem_alteracoes(self):
         return self._planilha_data != self._planilha_salva_data
 
