@@ -185,6 +185,17 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("height=102", block)
         self.assertIn("colunas = max(3, min(6", block)
         self.assertIn("wraplength=116", block)
+    def test_interface_remove_titulo_historico_de_execucoes(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("Histórico de execuções", source)
+        self.assertNotIn("histórico de execuções", source)
+
+    def test_area_de_historico_tem_altura_adaptavel(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _ajustar_altura_acompanhamento", source)
+        self.assertIn("altura = max(300, min(440, janela_h - 260))", source)
+        self.assertIn('self.app.bind("<Configure>", self._ajustar_altura_acompanhamento, add="+")', source)
+
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
