@@ -1589,10 +1589,10 @@ class App:
         tabs.pack(pady=(5, 5), padx=14)
 
         self.tab_buttons = {}
-        for name in ("Atividade", "Não executados", "Histórico"):
+        for name in ("Atividade", "Histórico"):
             btn = ctk.CTkButton(
                 tabs, text=name, command=lambda n=name: self._selecionar_aba(n),
-                width={"Atividade": 92, "Não executados": 122, "Histórico": 92}[name],
+                width={"Atividade": 92, "Histórico": 92}[name],
                 height=30, corner_radius=8,
                 fg_color=("#E5F1FB", "#183B54") if name == "Atividade" else "transparent",
                 hover_color=("#E8F2FC", "#204965"),
@@ -1607,7 +1607,6 @@ class App:
         self.tab_area.pack(fill="both", expand=True, padx=14, pady=(0, 5))
 
         self.aba_atividade = ctk.CTkFrame(self.tab_area, fg_color="transparent")
-        self.aba_erros = ctk.CTkFrame(self.tab_area, fg_color="transparent")
         self.aba_historico = ctk.CTkFrame(self.tab_area, fg_color="transparent")
 
         # Activity tab
@@ -1618,29 +1617,6 @@ class App:
         )
         self.atividade.pack(fill="both", expand=True)
         self.atividade.configure(state="disabled")
-
-        # Errors tab: each code is directly copyable.
-        erro_info = ctk.CTkFrame(self.aba_erros, fg_color="transparent")
-        erro_info.pack(fill="x", pady=(0, 6))
-        self.erros_titulo = ctk.CTkLabel(
-            erro_info, text="Nenhum código não executado", text_color=self.TEXT,
-            font=("Segoe UI", 12, "bold")
-        )
-        self.erros_titulo.pack(side="left", padx=(1, 0))
-        ctk.CTkLabel(
-            erro_info, text="Clique no código para copiar", text_color=self.SUBTEXT,
-            font=("Segoe UI", 10)
-        ).pack(side="right")
-
-        self.erros_frame = ctk.CTkScrollableFrame(
-            self.aba_erros, height=80, fg_color=("#FAFAFA", "#252A2F"),
-            corner_radius=8, border_width=1, border_color=self.BORDER
-        )
-        self.erros_frame.pack(fill="both", expand=True)
-        self._limpar_erros_visuais(salvar=False)
-
-        # Restore persisted errors after the UI is ready.
-        self._renderizar_erros_persistentes()
 
         # History tab: executions shown as expandable folders.
         history_header = ctk.CTkFrame(self.aba_historico, fg_color="transparent")
@@ -2376,11 +2352,10 @@ class App:
         atualizar_estado_salvar()
 
     def _selecionar_aba(self, nome):
-        for frame in (self.aba_atividade, self.aba_erros, self.aba_historico):
+        for frame in (self.aba_atividade, self.aba_historico):
             frame.pack_forget()
         mapa = {
             "Atividade": self.aba_atividade,
-            "Não executados": self.aba_erros,
             "Histórico": self.aba_historico,
         }
         mapa[nome].pack(fill="both", expand=True)
@@ -2494,18 +2469,6 @@ class App:
         except Exception:
             pass
 
-    def _renderizar_erros_persistentes(self):
-        if not hasattr(self, "erros_frame"):
-            return
-        for w in self.erros_frame.winfo_children():
-            w.destroy()
-        for codigo in self._erros_codigos:
-            self._criar_botao_erro(codigo)
-        self.erros_titulo.configure(
-            text=f"{len(self._erros_codigos)} código(s) não executado(s)" if self._erros_codigos
-            else "Nenhum código não executado"
-        )
-
     def _criar_botao_erro(self, codigo, parent=None):
         codigo = str(codigo)
         parent = parent or self.erros_frame
@@ -2519,21 +2482,11 @@ class App:
         btn.pack(fill="x", padx=6, pady=3)
         return btn
 
-    def _limpar_erros_visuais(self, salvar=True):
-        for w in self.erros_frame.winfo_children():
-            w.destroy()
-        self._erros_codigos = []
-        self.erros_titulo.configure(text="Nenhum código não executado")
-        if salvar:
-            self._salvar_estado_persistente()
-
     def _add_erro_codigo(self, codigo):
         codigo = str(codigo)
         if codigo in self._erros_codigos:
             return
         self._erros_codigos.append(codigo)
-        self.erros_titulo.configure(text=f"{len(self._erros_codigos)} código(s) não executado(s)")
-        self._criar_botao_erro(codigo)
         self._salvar_estado_persistente()
 
     def _copiar_codigo(self, codigo):
@@ -2806,7 +2759,7 @@ class App:
         confirmar = messagebox.askyesno(
             "Limpar histórico",
             "Tem certeza que deseja apagar todas as execuções salvas no histórico?\n\n"
-            "Essa ação não apaga a aba 'Não executados' da execução atual."
+            "Os códigos com erro continuam registrados nos detalhes do histórico."
         )
         if not confirmar:
             return
@@ -4587,7 +4540,7 @@ class App:
         self._set_stat(self.sucesso_card,0)
         self._set_stat(self.erro_card,0)
         self._set_stat(self.codigo_card,"—")
-        self._limpar_erros_visuais()
+        self._erros_codigos = []
         self._add_activity(
             f"Iniciando automação com {len(codigos)} código(s) da coluna 'Senha'.",
             self.INFO
@@ -4672,7 +4625,7 @@ class App:
                 f"Processados: {resultado.processados}\n"
                 f"Executados: {resultado.sucessos}\n"
                 f"Não executados: {resultado.erros}\n\n"
-                "Os códigos não executados estão na aba 'Não executados'."
+                "Os códigos com erro estão disponíveis nos detalhes do histórico."
             )
 
     def parar(self):
