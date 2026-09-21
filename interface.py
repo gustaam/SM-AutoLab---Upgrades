@@ -691,8 +691,7 @@ rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
 exit /b 1
 """
     try:
-        script.write_text(script_text, encoding="utf-8", newline="
-")
+        script.write_text(script_text, encoding="utf-8", newline="\r\n")
         flags = 0
         if os.name == "nt":
             flags = (
