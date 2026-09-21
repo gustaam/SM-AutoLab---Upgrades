@@ -6,7 +6,6 @@ from pathlib import Path
 from app import (
     ResultadoCodigo,
     Resultados,
-    SM_AUTOLAB_EXECUCAO_29923,
     atomic_write_json,
     atomic_write_text,
     backup_path,
@@ -16,11 +15,12 @@ from app import (
 # tests/test_stage10.py
 
 class ExecucaoPerformanceStage10Tests(unittest.TestCase):
-    def test_stage10_marker(self):
-        self.assertEqual(
-            SM_AUTOLAB_EXECUCAO_29923,
-            "SM-AUTOLAB-EXECUCAO-PERFORMANCE-29923",
-        )
+    def test_resultados_inicia_com_contadores_zerados(self):
+        resultados = Resultados(total=4)
+        self.assertEqual(resultados.total_planejado, 4)
+        self.assertEqual(resultados.processados, 0)
+        self.assertEqual(resultados.sucessos, 0)
+        self.assertEqual(resultados.erros, 0)
 
     def test_metricas_de_resultados_sao_incrementais(self):
         resultados = Resultados(total=4)
