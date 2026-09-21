@@ -213,6 +213,34 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('self.codigo_card = self._stat_card(stats, "▥", "Código atual"', source)
         self.assertIn('icon_sizes = {"✓": 20, "!": 21, "▥": 25, "›": 29}', block)
 
+    def test_planilha_sincroniza_edicao_antes_de_salvar(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _planilha_commit_edit")
+        end = source.index("def _planilha_fechar_edicao", start)
+        block = source[start:end]
+        self.assertIn("entry.get() if save else old", block)
+        self.assertIn("tree.item(iid, values=vals)", block)
+        self.assertIn('self._planilha_data[key] = new', block)
+        self.assertIn("self._planilha_marcar_alteracao()", block)
+        self.assertIn("self._planilha_edit_context = None", block)
+
+    def test_menu_contexto_da_planilha_abre_e_oferece_acoes_de_edicao(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_menu_contexto_planilha")
+        end = source.index("def _atualizar_menu_contexto_planilha", start)
+        block = source[start:end]
+        for label in ("Editar", "Desfazer", "Refazer", "Cortar", "Copiar", "Colar", "Excluir", "Selecionar tudo"):
+            self.assertIn(f'label="{label}"', block)
+        self.assertIn('tree.bind("<Button-3>", _planilha_botao_direito)', source)
+        self.assertIn("self._planilha_context_menu.tk_popup(event.x_root, event.y_root)", source)
+
+    def test_ajustes_do_feegow_e_maximizacao_padrao(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("Mudar o Feegow", source)
+        self.assertNotIn("mudar o feegow", source)
+        self.assertGreaterEqual(source.count("Ajustes do Feegow"), 3)
+        self.assertIn('self.app.state("zoomed")', source)
+
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
