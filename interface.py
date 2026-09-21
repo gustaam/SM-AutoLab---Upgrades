@@ -3048,30 +3048,50 @@ class App:
 
     def _carregar_estado_persistente(self):
         try:
-            candidatos = [self._historico_arquivo, self._historico_arquivo_legado]
-            dados_principais = {}
-            for caminho in candidatos:
+            registros = []
+            erros = []
+            tema = "system"
+
+            # Lê a localização atual e a antiga durante a migração. Os registros
+            # são mesclados por ID para que nenhuma execução existente seja perdida.
+            for caminho in (self._historico_arquivo, self._historico_arquivo_legado):
                 if not caminho.exists():
                     continue
                 dados = read_json_with_backup(caminho, {})
-                if isinstance(dados, dict):
-                    dados_principais = dados
-                    if dados.get("historico_execucoes") or dados.get("tema") or dados.get("erros"):
-                        break
+                if not isinstance(dados, dict):
+                    continue
 
-            execucoes = dados_principais.get("historico_execucoes", [])
-            erros = dados_principais.get("erros", [])
-            tema = dados_principais.get("tema", "system")
+                execucoes = dados.get("historico_execucoes", [])
+                if isinstance(execucoes, list):
+                    registros.extend(item for item in execucoes if isinstance(item, dict))
 
-            if tema in ("light", "dark", "system"):
-                self._tema = tema
+                lista_erros = dados.get("erros", [])
+                if isinstance(lista_erros, list):
+                    erros.extend(str(item).strip() for item in lista_erros if str(item).strip())
 
-            if isinstance(execucoes, list):
-                self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(execucoes)
+                valor_tema = dados.get("tema")
+                if valor_tema in ("light", "dark", "system"):
+                    tema = valor_tema
+
+            unicos = {}
+            for item in registros:
+                chave = str(item.get("id", "")).strip()
+                if not chave:
+                    chave = (
+                        str(item.get("inicio", "")),
+                        str(item.get("planilha", "")),
+                        str(item.get("pagina", "")),
+                    )
+                unicos[chave] = item
+
+            self._tema = tema
+            self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(
+                list(unicos.values())
+            )
 
             # Reconstrói o índice de erros a partir das próprias execuções salvas.
-            # Assim, uma eventual ausência/corrupção da lista auxiliar não apaga
-            # os códigos que já estão registrados nos detalhes do histórico.
+            # Assim, mesmo que a lista auxiliar esteja vazia ou antiga, os códigos
+            # continuam disponíveis nos detalhes das execuções.
             erros_reconstruidos = []
             for execucao in self._historico_execucoes:
                 for codigo in execucao.get("codigos_erros", []) or []:
@@ -3079,18 +3099,16 @@ class App:
                     if texto and texto not in erros_reconstruidos:
                         erros_reconstruidos.append(texto)
 
-            if isinstance(erros, list):
-                for codigo in erros:
-                    texto = str(codigo).strip()
-                    if texto and texto not in erros_reconstruidos:
-                        erros_reconstruidos.append(texto)
+            for codigo in erros:
+                texto = str(codigo).strip()
+                if texto and texto not in erros_reconstruidos:
+                    erros_reconstruidos.append(texto)
 
             self._erros_codigos = erros_reconstruidos[-200:]
 
-            # Migração transparente: a próxima gravação já vai consolidar o
-            # histórico no diretório "SM AutoLab".
-            if self._historico_arquivo.exists() is False and (
-                self._historico_execucoes or self._erros_codigos
+            if (
+                not self._historico_arquivo.exists()
+                and (self._historico_execucoes or self._erros_codigos)
             ):
                 self._salvar_estado_persistente()
         except Exception:
