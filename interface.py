@@ -1957,70 +1957,6 @@ class App:
         )
         main.pack(fill="both", expand=True, padx=16, pady=8)
 
-        execution_header = self._card(main)
-        execution_header.pack(fill="x", pady=(0, 10))
-        header_left = ctk.CTkFrame(execution_header, fg_color="transparent")
-        header_left.pack(side="left", fill="both", expand=True, padx=18, pady=13)
-
-        self._execucao_indicador_label = ctk.CTkLabel(
-            header_left,
-            text="●  Pronto para iniciar",
-            text_color=self.SUCCESS,
-            font=("Segoe UI", 13, "bold"),
-        )
-        self._execucao_indicador_label.pack(anchor="w")
-
-        self._execucao_titulo_label = ctk.CTkLabel(
-            header_left,
-            text="Execução pronta",
-            text_color=self.TEXT,
-            font=("Segoe UI", 22, "bold"),
-        )
-        self._execucao_titulo_label.pack(anchor="w", pady=(2, 0))
-
-        self._execucao_subtitulo_label = ctk.CTkLabel(
-            header_left,
-            text="Aguardando uma nova execução.",
-            text_color=self.SUBTEXT,
-            font=("Segoe UI", 11),
-        )
-        self._execucao_subtitulo_label.pack(anchor="w", pady=(1, 0))
-
-        time_row = ctk.CTkFrame(execution_header, fg_color="transparent")
-        time_row.pack(side="right", padx=14, pady=12)
-
-        elapsed_box = ctk.CTkFrame(
-            time_row, fg_color=(("#F3F7FA"), ("#24343D")),
-            corner_radius=10, width=150, height=58
-        )
-        elapsed_box.pack(side="left", padx=4)
-        elapsed_box.pack_propagate(False)
-        ctk.CTkLabel(
-            elapsed_box, text="Tempo decorrido", text_color=self.SUBTEXT,
-            font=("Segoe UI", 9, "bold")
-        ).pack(anchor="w", padx=12, pady=(8, 0))
-        self._tempo_decorrido_label = ctk.CTkLabel(
-            elapsed_box, text="00:00:00", text_color=self.TEXT,
-            font=("Segoe UI", 15, "bold")
-        )
-        self._tempo_decorrido_label.pack(anchor="w", padx=12)
-
-        eta_box = ctk.CTkFrame(
-            time_row, fg_color=(("#F3F7FA"), ("#24343D")),
-            corner_radius=10, width=165, height=58
-        )
-        eta_box.pack(side="left", padx=4)
-        eta_box.pack_propagate(False)
-        ctk.CTkLabel(
-            eta_box, text="Tempo estimado restante", text_color=self.SUBTEXT,
-            font=("Segoe UI", 9, "bold")
-        ).pack(anchor="w", padx=12, pady=(8, 0))
-        self._tempo_estimado_label = ctk.CTkLabel(
-            eta_box, text="—", text_color=self.TEXT,
-            font=("Segoe UI", 15, "bold")
-        )
-        self._tempo_estimado_label.pack(anchor="w", padx=12)
-
         top = ctk.CTkFrame(main, fg_color="transparent")
         top.pack(fill="x", pady=(0, 8))
         top.grid_columnconfigure(0, weight=4)
@@ -2086,25 +2022,62 @@ class App:
             progress, text="0 / 0", text_color=self.SUBTEXT,
             font=("Segoe UI", 12)
         )
-        self.progresso_label.pack(anchor="w", padx=14, pady=(0, 9))
+        self.progresso_label.pack(anchor="w", padx=14, pady=(0, 7))
+
+        time_row = ctk.CTkFrame(progress, fg_color="transparent")
+        time_row.pack(fill="x", padx=10, pady=(0, 10))
+        time_row.grid_columnconfigure((0, 1), weight=1)
+
+        elapsed_box = ctk.CTkFrame(
+            time_row, fg_color=("#F3F7FA", "#24343D"),
+            corner_radius=8, height=42
+        )
+        elapsed_box.grid(row=0, column=0, sticky="ew", padx=(4, 3))
+        elapsed_box.grid_propagate(False)
+        ctk.CTkLabel(
+            elapsed_box, text="Tempo decorrido", text_color=self.SUBTEXT,
+            font=("Segoe UI", 8, "bold")
+        ).pack(side="left", padx=(9, 6))
+        self._tempo_decorrido_label = ctk.CTkLabel(
+            elapsed_box, text="00:00:00", text_color=self.TEXT,
+            font=("Segoe UI", 12, "bold")
+        )
+        self._tempo_decorrido_label.pack(side="right", padx=(2, 9))
+
+        eta_box = ctk.CTkFrame(
+            time_row, fg_color=("#F3F7FA", "#24343D"),
+            corner_radius=8, height=42
+        )
+        eta_box.grid(row=0, column=1, sticky="ew", padx=(3, 4))
+        eta_box.grid_propagate(False)
+        ctk.CTkLabel(
+            eta_box, text="Tempo estimado", text_color=self.SUBTEXT,
+            font=("Segoe UI", 8, "bold")
+        ).pack(side="left", padx=(9, 6))
+        self._tempo_estimado_label = ctk.CTkLabel(
+            eta_box, text="—", text_color=self.TEXT,
+            font=("Segoe UI", 12, "bold")
+        )
+        self._tempo_estimado_label.pack(side="right", padx=(2, 9))
 
         stats = ctk.CTkFrame(main, fg_color="transparent")
         stats.pack(fill="x", pady=(0, 8))
-        stats.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        stats.grid_columnconfigure((0, 1, 2), weight=1)
         self.sucesso_card = self._stat_card(stats, "✓", "Executados", "0", self.SUCCESS)
         self.sucesso_card.grid(row=0, column=0, sticky="ew", padx=(0, 5))
         self.erro_card = self._stat_card(stats, "!", "Não executados", "0", self.ERROR)
         self.erro_card.grid(row=0, column=1, sticky="ew", padx=5)
         self.codigo_card = self._stat_card(stats, "›", "Código atual", "—", self.INFO)
-        self.codigo_card.grid(row=0, column=2, sticky="ew", padx=5)
-        self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso", "0%", self.INFO)
-        self._execucao_progresso_card.grid(row=0, column=3, sticky="ew", padx=(5, 0))
+        self.codigo_card.grid(row=0, column=2, sticky="ew", padx=(5, 0))
+        self._execucao_progresso_card = None
 
         activity_card = self._card(main)
         activity_card.pack(fill="x", pady=(0, 6))
-        # Área de acompanhamento mais alta para manter as pastas do histórico visíveis.
-        activity_card.configure(height=285)
+        # Altura adaptável: preserva espaço para o histórico sem esconder
+        # conteúdo quando a janela principal fica maior ou menor.
+        activity_card.configure(height=340)
         activity_card.pack_propagate(False)
+        self._activity_card = activity_card
         self._section_title(activity_card, "Acompanhamento")
 
         # Fluent-inspired tab row, like the reference image.
@@ -2145,10 +2118,6 @@ class App:
         # History tab: executions shown as expandable folders.
         history_header = ctk.CTkFrame(self.aba_historico, fg_color="transparent")
         history_header.pack(fill="x", pady=(0, 5))
-        ctk.CTkLabel(
-            history_header, text="Histórico de execuções",
-            text_color=self.TEXT, font=("Segoe UI", 12, "bold")
-        ).pack(side="left")
         self.botao_limpar_historico = ctk.CTkButton(
             history_header, text="Limpar histórico", command=self._limpar_historico,
             width=108, height=28, corner_radius=8,
