@@ -2055,9 +2055,9 @@ class App:
         eta_box.grid(row=0, column=1, sticky="ew", padx=(3, 4))
         eta_box.grid_propagate(False)
         ctk.CTkLabel(
-            eta_box, text="Tempo estimado", text_color=self.SUBTEXT,
-            font=("Segoe UI", 8, "bold")
-        ).pack(side="left", padx=(9, 6))
+            eta_box, text="Tempo estimado restante", text_color=self.SUBTEXT,
+            font=("Segoe UI", 7, "bold")
+        ).pack(side="left", padx=(8, 4))
         self._tempo_estimado_label = ctk.CTkLabel(
             eta_box, text="—", text_color=self.TEXT,
             font=("Segoe UI", 12, "bold")
@@ -2980,6 +2980,42 @@ class App:
         except Exception:
             self._execucao_timer_job = None
 
+    def _ajustar_altura_acompanhamento(self, _event=None):
+        """Adapta a área de histórico à altura da janela principal."""
+        card = getattr(self, "_activity_card", None)
+        if card is None:
+            return
+        try:
+            janela_h = max(590, int(self.app.winfo_height()))
+            altura = max(300, min(440, janela_h - 260))
+            atual = int(card.cget("height") or 0)
+            if abs(atual - altura) > 3:
+                card.configure(height=altura)
+        except Exception:
+            pass
+
+        lista = getattr(self, "historico_lista", None)
+        if lista is None:
+            return
+        try:
+            largura = int(lista.winfo_width())
+        except Exception:
+            return
+        if largura < 200:
+            return
+        anterior = int(getattr(self, "_historico_layout_width", 0) or 0)
+        if abs(largura - anterior) < 40:
+            return
+        self._historico_layout_width = largura
+        if getattr(self, "_historico_reflow_job", None) is not None:
+            try:
+                self.app.after_cancel(self._historico_reflow_job)
+            except Exception:
+                pass
+        self._historico_reflow_job = self.app.after(
+            100, self._restaurar_historico_na_tela
+        )
+
     def _set_stat(self, card, value):
         card.value_label.configure(text=str(value))
 
@@ -3256,6 +3292,11 @@ class App:
         for w in self.historico_lista.winfo_children():
             w.destroy()
         self._hist_grid=None
+        self._historico_reflow_job = None
+        try:
+            self._historico_layout_width = int(self.historico_lista.winfo_width())
+        except Exception:
+            self._historico_layout_width = 0
 
         if self._execucao_atual:
             self._criar_pasta_historico(self._execucao_atual, atual=True)
@@ -3435,7 +3476,7 @@ class App:
         confirmar = messagebox.askyesno(
             "Limpar histórico",
             "Tem certeza que deseja apagar todas as execuções salvas no histórico?\n\n"
-            "Os códigos com erro continuam registrados nos detalhes do histórico."
+            "Os códigos associados a essas execuções também serão removidos do histórico."
         )
         if not confirmar:
             return
