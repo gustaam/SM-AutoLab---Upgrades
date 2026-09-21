@@ -1,4 +1,5 @@
 @echo off
+REM Build do executável Windows.
 setlocal EnableExtensions EnableDelayedExpansion
 
 echo ==========================================
