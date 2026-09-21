@@ -19,6 +19,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _configurar_hover_menu", source)
         self.assertIn('aparencia.bind("<Enter>", self._mostrar_menu_aparencia', source)
         self.assertIn('aparencia.bind("<Leave>", self._agendar_fechar_menus', source)
+        self.assertIn("for widget in self._iterar_descendentes_ui(aparencia):", source)
+        self.assertIn('widget.bind("<Enter>", self._mostrar_menu_aparencia', source)
 
     def test_planilha_mouse_events_use_one_hit_test(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
