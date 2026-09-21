@@ -2879,11 +2879,48 @@ class App:
         ).pack(anchor="w", padx=14, pady=(10, 0))
 
     def _stat_card(self, parent, icon, title, value, accent):
-        card = ctk.CTkFrame(parent, fg_color=self.CARD, corner_radius=10,
-                            border_width=1, border_color=self.BORDER, height=80)
+        palettes = {
+            "Executados": {
+                "card": ("#EEF9F1", "#1E3325"),
+                "icon": ("#27AE60", "#2FAE63"),
+                "title": ("#167A43", "#70D995"),
+                "value": ("#123B27", "#ECFFF1"),
+            },
+            "Não executados": {
+                "card": ("#FFF1F2", "#3A2528"),
+                "icon": ("#E53935", "#F15B5B"),
+                "title": ("#C62828", "#FF8A8A"),
+                "value": ("#541A1D", "#FFF0F0"),
+            },
+            "Código atual": {
+                "card": ("#EEF6FF", "#1C2D3D"),
+                "icon": ("#1976D2", "#3F9BEF"),
+                "title": ("#125AA3", "#73B8FF"),
+                "value": ("#102E4A", "#EDF7FF"),
+            },
+        }
+        palette = palettes.get(
+            str(title),
+            {
+                "card": self.CARD,
+                "icon": self.CARD,
+                "title": self.SUBTEXT,
+                "value": self.TEXT,
+            },
+        )
+
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=palette["card"],
+            corner_radius=10,
+            border_width=1,
+            border_color=palette["card"][0] if isinstance(palette["card"], tuple) else self.BORDER,
+            height=80,
+        )
         row = ctk.CTkFrame(card, fg_color="transparent")
-        row.pack(fill="both", expand=True, padx=14, pady=8)
-        icon_sizes = {"✓": 18, "!": 22, "›": 30}
+        row.pack(fill="both", expand=True, padx=12, pady=8)
+
+        icon_sizes = {"✓": 20, "!": 21, "›": 29}
         icon_font = icon_sizes.get(str(icon), 22)
         ctk.CTkLabel(
             row,
@@ -2891,17 +2928,26 @@ class App:
             width=44,
             height=44,
             corner_radius=22,
-            fg_color=("#F3F8FC", "#243D4B"),
-            text_color=accent,
-            font=("Segoe UI", icon_font, "bold")
-        ).pack(side="left", padx=(0, 12))
+            fg_color=palette["icon"],
+            text_color="#FFFFFF",
+            font=("Segoe UI", icon_font, "bold"),
+        ).pack(side="left", padx=(0, 11))
 
         text_box = ctk.CTkFrame(row, fg_color="transparent")
         text_box.pack(side="left", fill="both", expand=True)
-        ctk.CTkLabel(text_box, text=title, text_color=self.SUBTEXT,
-                     font=("Segoe UI", 10)).pack(anchor="w")
-        value_label = ctk.CTkLabel(text_box, text=value, text_color=self.TEXT,
-                                   font=("Segoe UI", 16, "bold"), anchor="w")
+        ctk.CTkLabel(
+            text_box,
+            text=title,
+            text_color=palette["title"],
+            font=("Segoe UI", 10, "bold"),
+        ).pack(anchor="w")
+        value_label = ctk.CTkLabel(
+            text_box,
+            text=value,
+            text_color=palette["value"],
+            font=("Segoe UI", 19, "bold"),
+            anchor="w",
+        )
         value_label.pack(anchor="w")
         card.value_label = value_label
 
