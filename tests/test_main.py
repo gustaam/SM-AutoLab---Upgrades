@@ -67,6 +67,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertEqual(source.count('text="Iniciar"'), 1)
         self.assertIn('text_color="#FFFFFF"', source)
 
+    def test_interface_importa_escrita_atomica_usada_pelo_salvamento(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("from app import (")
+        end = source.index(")", start) + 1
+        imports = source[start:end]
+        self.assertIn("atomic_write_json,", imports)
+        self.assertIn("atomic_write_json(", source)
+
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
