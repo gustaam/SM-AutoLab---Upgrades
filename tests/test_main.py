@@ -89,6 +89,26 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("_SMAutoLabTooltip(", block)
         self.assertIn("card_tooltips =", block)
 
+    def test_tooltip_fecha_no_clique_foco_ou_destruicao(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("class _SMAutoLabTooltip:")
+        end = source.index("def _ui_tooltip_text", start)
+        block = source[start:end]
+        self.assertIn('child.bind("<ButtonPress>", self._on_press, add="+")', block)
+        self.assertIn('child.bind("<FocusOut>", self._on_focus_out, add="+")', block)
+        self.assertIn("self._destroy_window()", block)
+        self.assertIn("def _destroy_window(self):", block)
+        self.assertNotIn('self._window.withdraw()', block)
+
+    def test_botao_abrir_continua_com_tooltip_canonico(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("self.botao_planilha = ctk.CTkButton(")
+        end = source.index("self.botao_planilha.pack", start)
+        block = source[start:end]
+        self.assertIn('text="Abrir"', block)
+        self.assertIn("command=self.abrir_planilha", block)
+        self.assertIn('"abrir": "Abre a planilha interna."', source)
+
     def test_legacy_patch_module_is_absent(self):
         self.assertFalse((self.root / "patch.py").exists())
 
