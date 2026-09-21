@@ -4306,6 +4306,86 @@ class App:
         """Retorna todos os códigos preenchidos na segunda coluna (Senha)."""
         return extract_column(self._planilha_data, column=1)
 
+    def _validar_planilha_antes_execucao(self, cells=None):
+        """Valida a estrutura da planilha antes de iniciar a automação."""
+        cells = self._planilha_data if cells is None else cells
+        rows = {}
+
+        for key, value in (cells or {}).items():
+            try:
+                row, col = (int(part.strip()) for part in str(key).split(","))
+            except (TypeError, ValueError):
+                continue
+            if row < 0 or col < 0 or col >= 3:
+                continue
+            texto = str(value or "").strip()
+            if texto:
+                rows.setdefault(row, {})[col] = texto
+
+        avisos = []
+        codigos_por_chave = {}
+
+        for row in sorted(rows):
+            data = rows[row]
+            quantidade = data.get(0, "")
+            codigo = data.get(1, "")
+            item = data.get(2, "")
+            numero_linha = row + 1
+
+            if not codigo:
+                if quantidade or item:
+                    avisos.append(
+                        f"Linha {numero_linha}: não possui código na coluna Senha e será ignorada."
+                    )
+                continue
+
+            chave_codigo = codigo.casefold()
+            anteriores = codigos_por_chave.setdefault(chave_codigo, [])
+            anteriores.append(numero_linha)
+
+            if not quantidade:
+                avisos.append(
+                    f"Linha {numero_linha}: código {codigo} está sem quantidade."
+                )
+            else:
+                quantidade_normalizada = quantidade.replace(" ", "").replace(",", ".")
+                try:
+                    valor = float(quantidade_normalizada)
+                    quantidade_valida = valor > 0 and valor.is_integer()
+                except (TypeError, ValueError):
+                    quantidade_valida = False
+                if not quantidade_valida:
+                    avisos.append(
+                        f"Linha {numero_linha}: quantidade \"{quantidade}\" não é um número inteiro positivo."
+                    )
+
+        for codigo, linhas in codigos_por_chave.items():
+            if len(linhas) > 1:
+                avisos.append(
+                    f"Código {codigo.upper()} aparece nas linhas {', '.join(map(str, linhas))} "
+                    "e será executado uma vez por ocorrência."
+                )
+
+        if not avisos:
+            return True
+
+        limite = 12
+        exibidos = avisos[:limite]
+        detalhes = "\n".join(f"• {texto}" for texto in exibidos)
+        if len(avisos) > limite:
+            detalhes += f"\n• ... e mais {len(avisos) - limite} ponto(s) de atenção."
+
+        mensagem = (
+            f"Foram encontrados {len(avisos)} ponto(s) de atenção na planilha.\n\n"
+            f"{detalhes}\n\n"
+            "Deseja continuar mesmo assim?"
+        )
+        return messagebox.askyesno(
+            "Validação da planilha",
+            mensagem,
+            parent=self._planilha_window or self.app,
+        )
+
     def _filtrar_arquivos_60_dias(self, itens):
         agora = datetime.now()
         limite = agora - timedelta(days=ARQUIVOS_DIAS)
@@ -4961,6 +5041,8 @@ class App:
 
     def _planilha_salvar_e_iniciar(self):
         self._planilha_fechar_edicao()
+        if not self._validar_planilha_antes_execucao():
+            return
         codigos=self._extrair_codigos_planilha()
         if not codigos:
             messagebox.showwarning(
@@ -5095,6 +5177,8 @@ class App:
 
     def iniciar_thread(self):
         """Inicia diretamente a partir dos códigos salvos na coluna Senha."""
+        if not self._validar_planilha_antes_execucao():
+            return
         codigos=self._extrair_codigos_planilha()
         if not codigos:
             self.abrir_planilha()
