@@ -605,28 +605,104 @@ def _prepare_independent_restart_environment(environ: dict[str, str] | None = No
     return env
 
 def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, str]:
+    """Prepara a troca do executável e um rollback automático caso o novo não inicialize."""
     script_dir = downloaded.parent
     script = script_dir / "apply_update.cmd"
+    backup = script_dir / f"{target.name}.sm_autolab_backup"
+    failed = script_dir / f"{target.name}.sm_autolab_failed"
+    health = script_dir / "startup.ok"
+    pid_file = script_dir / "started.pid"
+
     target_cmd = _escape_cmd_path(str(target))
     downloaded_cmd = _escape_cmd_path(str(downloaded))
+    backup_cmd = _escape_cmd_path(str(backup))
+    failed_cmd = _escape_cmd_path(str(failed))
+    health_cmd = _escape_cmd_path(str(health))
+    pid_cmd = _escape_cmd_path(str(pid_file))
+
     script_text = f"""@echo off
-setlocal DisableDelayedExpansion
+setlocal EnableExtensions DisableDelayedExpansion
+set "SM_TARGET={target_cmd}"
+set "SM_DOWNLOADED={downloaded_cmd}"
+set "SM_BACKUP={backup_cmd}"
+set "SM_FAILED={failed_cmd}"
+set "SM_HEALTH={health_cmd}"
+set "SM_PIDFILE={pid_cmd}"
+set /a SM_REPLACE_WAIT=0
+
 :wait_replace
-move /Y "{downloaded_cmd}" "{target_cmd}" >nul 2>&1
-if exist "{downloaded_cmd}" (
+move /Y "%SM_TARGET%" "%SM_BACKUP%" >nul 2>&1
+if not exist "%SM_TARGET%" goto install_new
+set /a SM_REPLACE_WAIT+=1
+if %SM_REPLACE_WAIT% GEQ 45 goto abort_update
+timeout /t 1 /nobreak >nul
+goto wait_replace
+
+:install_new
+move /Y "%SM_DOWNLOADED%" "%SM_TARGET%" >nul 2>&1
+if not exist "%SM_TARGET%" goto rollback
+
+del /Q "%SM_HEALTH%" >nul 2>&1
+del /Q "%SM_PIDFILE%" >nul 2>&1
+set "SM_PID="
+for /f "delims=" %%P in ('powershell -NoProfile -Command "$p=Start-Process -FilePath $env:SM_TARGET -PassThru; $p.Id"') do set "SM_PID=%%P"
+
+set /a SM_HEALTH_WAIT=0
+:wait_health
+if exist "%SM_HEALTH%" goto success
+if not exist "%SM_TARGET%" goto rollback
+set /a SM_HEALTH_WAIT+=1
+if %SM_HEALTH_WAIT% GEQ 30 goto rollback
+timeout /t 1 /nobreak >nul
+goto wait_health
+
+:rollback
+if defined SM_PID taskkill /PID %SM_PID% /T /F >nul 2>&1
+timeout /t 1 /nobreak >nul
+move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
+if exist "%SM_TARGET%" (
     timeout /t 1 /nobreak >nul
-    goto wait_replace
+    move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
 )
-start "" "{target_cmd}"
+move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
+if exist "%SM_FAILED%" del /Q "%SM_FAILED%" >nul 2>&1
+del /Q "%SM_DOWNLOADED%" >nul 2>&1
+del /Q "%SM_HEALTH%" >nul 2>&1
+del /Q "%SM_PIDFILE%" >nul 2>&1
 cd /d "%TEMP%" >nul 2>&1
 rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
+exit /b 1
+
+:success
+del /Q "%SM_BACKUP%" >nul 2>&1
+del /Q "%SM_HEALTH%" >nul 2>&1
+del /Q "%SM_PIDFILE%" >nul 2>&1
+cd /d "%TEMP%" >nul 2>&1
+rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
+exit /b 0
+
+:abort_update
+del /Q "%SM_DOWNLOADED%" >nul 2>&1
+del /Q "%SM_HEALTH%" >nul 2>&1
+del /Q "%SM_PIDFILE%" >nul 2>&1
+if exist "%SM_BACKUP%" move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
+cd /d "%TEMP%" >nul 2>&1
+rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
+exit /b 1
 """
     try:
-        script.write_text(script_text, encoding="utf-8", newline="\r\n")
+        script.write_text(script_text, encoding="utf-8", newline="
+")
         flags = 0
         if os.name == "nt":
-            flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+            flags = (
+                subprocess.CREATE_NEW_PROCESS_GROUP
+                | subprocess.DETACHED_PROCESS
+                | subprocess.CREATE_NO_WINDOW
+            )
         restart_env = _prepare_independent_restart_environment()
+        restart_env["SM_AUTOLAB_UPDATE_HEALTH"] = str(health)
+        restart_env["SM_AUTOLAB_UPDATE_PIDFILE"] = str(pid_file)
         subprocess.Popen(
             ["cmd.exe", "/d", "/c", str(script)],
             cwd=str(script_dir),
