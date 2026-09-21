@@ -86,7 +86,7 @@ O executável recebe ícone, assets, versão e metadados do produto durante a ge
 
 ## Release e atualização
 
-A release atualmente publicada é **v2.99.35**.
+A release atualmente publicada é **v2.99.36**.
 
 A **v2.99.32** restaura os tooltips da interface e o efeito de hover dos cards **Executados**, **Não executados** e **Código atual**, mantendo a aba **Não executados** removida.
 
