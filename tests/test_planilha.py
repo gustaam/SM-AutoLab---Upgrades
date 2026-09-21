@@ -2,6 +2,8 @@
 
 # Testes da planilha e grade.
 
+import json
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -48,6 +50,82 @@ class FakeTree:
 
     def set_focus(self, iid):
         self._focus = str(iid)
+
+
+class PlanilhaPersistenceTests(unittest.TestCase):
+    def test_salvamento_da_planilha_persiste_e_reabre(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "SM AutoLab" / "planilha_interna.json"
+            app = App.__new__(App)
+            app._planilha_arquivo = path
+            app._planilha_data = {
+                "0,0": "1",
+                "0,1": "ABC",
+                "0,2": "Item",
+                "3,1": "DEF",
+            }
+
+            App._salvar_planilha_interna_data(app)
+
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["cells"], app._planilha_data)
+
+            reopened = App.__new__(App)
+            reopened._planilha_arquivo = path
+            self.assertEqual(
+                App._carregar_planilha_interna(reopened),
+                app._planilha_data,
+            )
+
+    def test_historico_de_planilhas_antigo_nao_e_apagado_ao_carregar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "SM AutoLab" / "planilha_historico.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            item = {
+                "id": "antigo",
+                "saved_at": "2020-01-01T10:00:00",
+                "cells": {"0,1": "ABC"},
+                "filled": 1,
+            }
+            path.write_text(
+                json.dumps({"version": 3, "items": [item]}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            app = App.__new__(App)
+            app._planilha_arquivo = path.parent / "planilha_interna.json"
+            app._planilha_historico_arquivo = path
+            app._planilha_historico_cache = None
+            app._planilha_historico_cache_signature = None
+
+            loaded = App._carregar_historico_planilhas(app)
+
+            self.assertEqual(loaded, [item])
+            persisted = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["items"], [item])
+
+    def test_preparacao_de_novo_dia_nao_apaga_planilha_salva(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "SM AutoLab" / "planilha_interna.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            cells = {"0,1": "ABC", "1,2": "Item"}
+            payload = {
+                "version": 1,
+                "updated_at": "2020-01-01T10:00:00",
+                "cells": cells,
+            }
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            app = App.__new__(App)
+            app._planilha_arquivo = path
+            app._planilha_historico_arquivo = path.parent / "planilha_historico.json"
+            app._planilha_historico_cache = None
+            app._planilha_historico_cache_signature = None
+
+            App._preparar_planilha_do_dia(app)
+
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["cells"], cells)
 
 
 class PlanilhaBehaviorTests(unittest.TestCase):
