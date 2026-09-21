@@ -51,7 +51,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_iniciar_footer_does_not_create_a_white_strip(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        actions_start = source.index("actions = ctk.CTkFrame(self.app")
+        actions_start = source.index("actions = ctk.CTkFrame(")
         actions_end = source.index("self.status_label =", actions_start)
         actions_block = source[actions_start:actions_end]
         self.assertIn('fg_color="transparent"', actions_block)
