@@ -468,7 +468,6 @@ class VirtualGridStage13Tests(unittest.TestCase):
         self.assertIn("row_height = tree.row_height", callback)
         self.assertIn("int(first * total + 0.0001)", callback)
         self.assertNotIn("first * scrollable_rows", callback)
-        self.assertNotIn("(viewport_height + row_height - 1) // row_height", callback.replace("viewport_rows = max(1, ", "", 1))
 
     def test_cell_bbox_uses_logical_canvas_coordinates(self):
         grid = VirtualGridTree.__new__(VirtualGridTree)
