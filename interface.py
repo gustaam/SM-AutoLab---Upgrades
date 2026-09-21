@@ -2469,9 +2469,8 @@ class App:
         except Exception:
             pass
 
-    def _criar_botao_erro(self, codigo, parent=None):
+    def _criar_botao_erro(self, codigo, parent):
         codigo = str(codigo)
-        parent = parent or self.erros_frame
         btn = ctk.CTkButton(
             parent, text=codigo, command=lambda c=codigo: self._copiar_codigo(c),
             height=30, corner_radius=8, fg_color=("#FDE7E9", "#4B2529"),
