@@ -4,7 +4,7 @@
 
 Automação de autorizações no Feegow em um aplicativo desktop para Windows, com planilha virtualizada, histórico, recuperação de execução, atualização integrada e interface moderna.
 
-**Versão em preparação:** `2.99.33`  
+**Versão em preparação:** `2.99.34`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -86,9 +86,13 @@ O executável recebe ícone, assets, versão e metadados do produto durante a ge
 
 ## Release e atualização
 
-A release atualmente publicada é **v2.99.32**.
+A release atualmente publicada é **v2.99.33**.
 
 A **v2.99.32** restaura os tooltips da interface e o efeito de hover dos cards **Executados**, **Não executados** e **Código atual**, mantendo a aba **Não executados** removida.
+
+A **v2.99.33** restaura a numeração visível das linhas no cabeçalho lateral da planilha, inclusive após reabrir a planilha.
+
+A **v2.99.34** corrige o ciclo de vida dos tooltips para que desapareçam ao clicar, perder o foco ou destruir o controle, evitando que o tooltip de **Abrir** fique preso sobre a planilha.
 
 A **v2.99.33** restaura a numeração visível das linhas no cabeçalho lateral da planilha, inclusive após reabrir a planilha.
 
