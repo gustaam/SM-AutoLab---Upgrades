@@ -1,3 +1,4 @@
+# Exclusões do versionamento.
 # Python
 __pycache__/
 *.py[cod]
