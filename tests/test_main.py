@@ -270,6 +270,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("validos = [item for item in itens if isinstance(item, dict)]", sheet_block)
         self.assertNotIn("_salvar_historico_planilhas(filtrados)", sheet_block)
 
+    def test_historico_usa_widget_de_icone_correto_ao_criar_pasta(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_pasta_historico")
+        end = source.index("def _abrir_detalhe_historico", start)
+        block = source[start:end]
+        self.assertIn("icone = \"📁\"", block)
+        self.assertIn("for w in (tile,icone):", block)
+        self.assertNotIn("for w in (tile,icon):", block)
+
     def test_tempo_estimado_usa_mesma_fonte_do_tempo_decorrido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("elapsed_box = ctk.CTkFrame(")
