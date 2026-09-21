@@ -102,11 +102,15 @@ class _SMAutoLabTooltip:
                 enter_id = child.bind("<Enter>", self._on_enter, add="+")
                 leave_id = child.bind("<Leave>", self._on_leave, add="+")
                 motion_id = child.bind("<Motion>", self._on_motion, add="+")
+                press_id = child.bind("<ButtonPress>", self._on_press, add="+")
+                focus_id = child.bind("<FocusOut>", self._on_focus_out, add="+")
                 destroy_id = child.bind("<Destroy>", self._on_destroy, add="+")
                 self._bindings.extend([
                     (child, ("<Enter>", enter_id)),
                     (child, ("<Leave>", leave_id)),
                     (child, ("<Motion>", motion_id)),
+                    (child, ("<ButtonPress>", press_id)),
+                    (child, ("<FocusOut>", focus_id)),
                     (child, ("<Destroy>", destroy_id)),
                 ])
             except Exception:
@@ -168,10 +172,20 @@ class _SMAutoLabTooltip:
         if self._window is not None:
             self._position()
 
+    def _on_press(self, _event=None):
+        # Cliques no controle encerram imediatamente o tooltip. Isso evita
+        # que a janela auxiliar permaneça sobre uma nova janela aberta pelo
+        # comando do botão, como acontece no botão "Abrir".
+        self.hide()
+
+    def _on_focus_out(self, _event=None):
+        self.hide()
+
     def _on_destroy(self, _event=None):
         self._closed = True
         self._cancel_after("_after_id")
         self._cancel_after("_hide_id")
+        self._destroy_window()
 
     def _render(self):
         if self._window is None:
@@ -250,19 +264,20 @@ class _SMAutoLabTooltip:
         except Exception:
             pass
 
+    def _destroy_window(self):
+        window = self._window
+        self._window = None
+        if window is None:
+            return
+        try:
+            window.destroy()
+        except Exception:
+            pass
+
     def hide(self):
         self._cancel_after("_after_id")
         self._cancel_after("_hide_id")
-        if self._window is None:
-            return
-        try:
-            self._window.withdraw()
-        except Exception:
-            try:
-                self._window.destroy()
-            except Exception:
-                pass
-        self._window = None
+        self._destroy_window()
 
     def destroy(self):
         self._closed = True
@@ -275,12 +290,7 @@ class _SMAutoLabTooltip:
             except Exception:
                 pass
         self._bindings.clear()
-        if self._window is not None:
-            try:
-                self._window.destroy()
-            except Exception:
-                pass
-        self._window = None
+        self._destroy_window()
 
 def _ui_tooltip_text(widget):
     try:
