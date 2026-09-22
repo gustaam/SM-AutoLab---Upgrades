@@ -2666,6 +2666,7 @@ class App:
             return
         self._tema = tema
         ctk.set_appearance_mode(tema)
+        self._atualizar_icones_cards_estatistica()
         try:
             dark = ctk.get_appearance_mode().lower() == "dark"
             atualizar_backdrop_tema(self.app, dark)
@@ -3034,6 +3035,26 @@ class App:
             except Exception:
                 card._sm_autolab_tooltip = None
         return card
+
+    def _atualizar_icones_cards_estatistica(self):
+        for card in (
+            getattr(self, "sucesso_card", None),
+            getattr(self, "erro_card", None),
+            getattr(self, "codigo_card", None),
+        ):
+            canvas = getattr(card, "_sm_stat_icon_canvas", None)
+            colors = getattr(card, "_sm_stat_icon_colors", None)
+            if canvas is None or not colors:
+                continue
+            try:
+                canvas.configure(bg=self._cor_fluente(colors[0]))
+                canvas.itemconfigure(
+                    1,
+                    fill=self._cor_fluente(colors[1]),
+                    outline=self._cor_fluente(colors[1]),
+                )
+            except Exception:
+                pass
 
     @staticmethod
     def _formatar_duracao(segundos):
