@@ -295,9 +295,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
         self.assertIn('icone = "📁"', block)
-        self.assertIn("icone_widget = ctk.CTkLabel(", block)
-        self.assertIn("for widget in (tile, icone_widget):", block)
-        self.assertNotIn("for w in (tile,icone):", block)
+        self.assertIn("icon = ctk.CTkLabel(", block)
+        self.assertIn("widgets = (tile, icon, date_label, time_label, error_label)", block)
+        self.assertIn('widget.bind("<Button-1>", clicar)', block)
+        self.assertNotIn('widget.bind("<Double-1>"', block)
 
     def test_tempo_estimado_usa_mesma_fonte_do_tempo_decorrido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
