@@ -3329,16 +3329,31 @@ class App:
         for execucao in reversed(historico_visivel):
             self._criar_pasta_historico(execucao)
 
+    def _formatar_data_historico(self, valor):
+        texto = str(valor or "").strip()
+        if not texto:
+            return ""
+        data = texto.split(" ", 1)[0]
+        try:
+            return datetime.strptime(data, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except ValueError:
+            return data
+
     def _criar_pasta_historico(self, execucao, atual=False):
         parent = self.historico_lista
+        tile_width = 144
+        tile_height = 116
+
         if not hasattr(self, "_hist_grid") or self._hist_grid is None:
             self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
             self._hist_grid.pack(fill="x", padx=8, pady=5)
 
-        largura = max(parent.winfo_width(), 560)
-        colunas = max(3, min(6, int((largura - 24) // 142)))
+        largura = max(parent.winfo_width(), tile_width + 16)
+        colunas = max(1, min(8, int((largura - 16) // (tile_width + 8))))
         for col in range(colunas):
-            self._hist_grid.grid_columnconfigure(col, weight=1, uniform="historico")
+            self._hist_grid.grid_columnconfigure(
+                col, weight=0, minsize=tile_width + 8
+            )
 
         count = len(self._hist_grid.winfo_children())
         row, col = divmod(count, colunas)
@@ -3348,51 +3363,46 @@ class App:
             corner_radius=8,
             border_width=1,
             border_color=self.BORDER,
-            width=132,
-            height=102,
+            width=tile_width,
+            height=tile_height,
         )
-        tile.grid(row=row, column=col, padx=4, pady=4, sticky="nsew")
+        tile.grid(row=row, column=col, padx=4, pady=4)
         tile.grid_propagate(False)
 
-        inicio = execucao.get("inicio", "")
-        status = str(execucao.get("status", "")).strip()
+        inicio = str(execucao.get("inicio", "") or "")
+        horario = inicio.split(" ", 1)[1] if " " in inicio else ""
         erros = int(execucao.get("erros", 0) or 0)
-        titulo = "Em andamento" if atual else status
         icone = "📁"
 
         icone_widget = ctk.CTkLabel(
             tile, text=icone, font=("Segoe UI Emoji", 20),
             text_color=self.ACCENT
         )
-        icone_widget.pack(pady=(7, 1))
+        icone_widget.pack(pady=(8, 2))
         ctk.CTkLabel(
             tile,
-            text=inicio.split(" ")[0] if inicio else "",
+            text=self._formatar_data_historico(inicio),
             text_color=self.TEXT,
-            font=("Segoe UI", 9, "bold")
-        ).pack()
-        ctk.CTkLabel(
-            tile,
-            text=inicio.split(" ")[1] if " " in inicio else "",
-            text_color=self.SUBTEXT,
-            font=("Segoe UI", 8)
-        ).pack()
-        ctk.CTkLabel(
-            tile,
-            text=titulo[:24],
-            text_color=self.SUBTEXT,
-            font=("Segoe UI", 8, "bold"),
+            font=("Segoe UI", 9, "bold"),
             anchor="center",
             justify="center",
-            wraplength=116,
-        ).pack(padx=6, pady=(4, 0))
+        ).pack(fill="x", padx=6)
+        ctk.CTkLabel(
+            tile,
+            text=horario,
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 8),
+            anchor="center",
+        ).pack(fill="x", padx=6, pady=(1, 0))
         ctk.CTkLabel(
             tile,
             text=f"{erros} não executado(s)",
             text_color=self.ERROR if erros else self.SUBTEXT,
             font=("Segoe UI", 8),
             anchor="center",
-        ).pack(pady=(2, 0))
+            justify="center",
+            wraplength=tile_width - 20,
+        ).pack(fill="x", padx=8, pady=(8, 0))
         def selecionar(_e=None):
             for sibling in self._hist_grid.winfo_children():
                 sibling.configure(border_color=self.BORDER, fg_color=("#FFFFFF", "#2D3338"))
