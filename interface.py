@@ -2503,7 +2503,7 @@ class App:
         if not self._pointer_no_menu_aparencia() and not self._pointer_no_botao_aparencia():
             self._fechar_menu_aparencia()
 
-    def _mostrar_menu_configuracoes    def _mostrar_menu_configuracoes(self, _event=None):
+    def _mostrar_menu_configuracoes(self, _event=None):
         """Abre o menu principal de configurações sem bindings concorrentes."""
         self._cancelar_fechar_menus()
 
