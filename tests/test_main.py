@@ -191,7 +191,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("tile_width = 118", block)
         self.assertIn("tile_height = 96", block)
         self.assertIn("colunas = max(1, min(8", block)
-        self.assertIn("wraplength=tile_width - 20", block)
+        self.assertIn("wraplength=tile_width - 10", block)
         self.assertNotIn('text=titulo[:24]', block)
         self.assertNotIn("sticky=\"nsew\"", block)
         self.assertIn("def _formatar_data_historico", source)
@@ -356,7 +356,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn('sticky="nsew"', block)
         self.assertNotIn('text=titulo[:24]', block)
         self.assertNotIn('text="Concluída"', block)
-        self.assertIn("wraplength=tile_width - 20", block)
+        self.assertIn("wraplength=tile_width - 10", block)
 
     def test_data_do_historico_e_formatada_no_padrao_brasileiro(self):
         import interface
