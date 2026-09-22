@@ -424,6 +424,133 @@ def _walk_widgets(widget):
     for child in children:
         yield from _walk_widgets(child)
 
+
+def _ui_windows_scrollbar_colors():
+    """Paleta da barra clássica de rolagem usada em todo o aplicativo."""
+    dark = str(ctk.get_appearance_mode()).lower() == "dark"
+    if dark:
+        return {
+            "bg": "#5F5F5F",
+            "activebackground": "#7A7A7A",
+            "troughcolor": "#252525",
+        }
+    return {
+        "bg": "#858585",
+        "activebackground": "#6E6E6E",
+        "troughcolor": "#E4E4E4",
+    }
+
+
+def _ui_update_windows_scrollbar(scrollable):
+    """Atualiza a barra clássica conforme o tema atual."""
+    bar = getattr(scrollable, "_sm_windows_scrollbar", None)
+    if bar is None:
+        return
+    try:
+        if not bar.winfo_exists():
+            return
+        bar.configure(**_ui_windows_scrollbar_colors())
+    except Exception:
+        pass
+
+
+def _ui_install_windows_scrollbar(scrollable):
+    """
+    Substitui a barra vertical do CTkScrollableFrame por tk.Scrollbar.
+    O tk.Scrollbar usa as setas clássicas superior/inferior do Windows.
+    """
+    try:
+        if getattr(scrollable, "_sm_windows_scrollbar", None) is not None:
+            _ui_update_windows_scrollbar(scrollable)
+            return
+
+        parent = getattr(scrollable, "_parent_frame", None)
+        canvas = getattr(scrollable, "_parent_canvas", None)
+        old_scrollbar = getattr(scrollable, "_scrollbar", None)
+        if parent is None or canvas is None:
+            return
+
+        if old_scrollbar is not None:
+            try:
+                old_scrollbar.grid_remove()
+            except Exception:
+                try:
+                    old_scrollbar.grid_forget()
+                except Exception:
+                    pass
+
+        bar = tk.Scrollbar(
+            parent,
+            orient="vertical",
+            command=canvas.yview,
+            width=16,
+            borderwidth=0,
+            relief="flat",
+            highlightthickness=0,
+            takefocus=False,
+            **_ui_windows_scrollbar_colors(),
+        )
+        bar.grid(row=1, column=1, sticky="ns", padx=0, pady=0)
+        canvas.configure(yscrollcommand=bar.set)
+        scrollable._sm_windows_scrollbar = bar
+    except Exception:
+        LOGGER.debug("Não foi possível instalar a barra clássica.", exc_info=True)
+
+
+def _ui_install_scrollbar_autopatch():
+    """Faz com que toda nova CTkScrollableFrame receba a barra de referência."""
+    cls = ctk.CTkScrollableFrame
+    if getattr(cls, "_sm_windows_scrollbar_installed", False):
+        return
+
+    original_init = cls.__init__
+
+    def init_with_windows_scrollbar(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        _ui_install_windows_scrollbar(self)
+
+    cls.__init__ = init_with_windows_scrollbar
+    cls._sm_windows_scrollbar_installed = True
+
+
+def _ui_make_windows_scrollbar(parent, orient, command):
+    """Cria a mesma barra clássica para widgets Tk/ttk."""
+    return tk.Scrollbar(
+        parent,
+        orient=orient,
+        command=command,
+        width=16,
+        borderwidth=0,
+        relief="flat",
+        highlightthickness=0,
+        takefocus=False,
+        **_ui_windows_scrollbar_colors(),
+    )
+
+
+def _ui_refresh_all_windows_scrollbars(root):
+    """Reaplica a paleta da referência em todas as barras instaladas."""
+    if root is None:
+        return
+    stack = [root]
+    while stack:
+        widget = stack.pop()
+        bar = getattr(widget, "_sm_windows_scrollbar", None)
+        if bar is not None:
+            _ui_update_windows_scrollbar(widget)
+        if isinstance(widget, tk.Scrollbar):
+            try:
+                widget.configure(**_ui_windows_scrollbar_colors())
+            except Exception:
+                pass
+        try:
+            stack.extend(widget.winfo_children())
+        except Exception:
+            pass
+
+
+_ui_install_scrollbar_autopatch()
+
 _ui_install_button_tooltips()
 
 REPO = "gustaam/SM-AutoLab---Upgrades"
@@ -661,7 +788,7 @@ def _prepare_independent_restart_environment(environ: dict[str, str] | None = No
     return env
 
 def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, str]:
-    """Prepara a troca do executável e um rollback automático caso o novo não inicialize."""
+    """Prepara a troca do executável com CMD oculto e rollback por health-check."""
     script_dir = downloaded.parent
     script = script_dir / "apply_update.cmd"
     backup = script_dir / f"{target.name}.sm_autolab_backup"
@@ -675,6 +802,7 @@ def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, 
     failed_cmd = _escape_cmd_path(str(failed))
     health_cmd = _escape_cmd_path(str(health))
     pid_cmd = _escape_cmd_path(str(pid_file))
+    exe_name = _escape_cmd_path(target.name)
 
     script_text = f"""@echo off
 setlocal EnableExtensions DisableDelayedExpansion
@@ -684,6 +812,7 @@ set "SM_BACKUP={backup_cmd}"
 set "SM_FAILED={failed_cmd}"
 set "SM_HEALTH={health_cmd}"
 set "SM_PIDFILE={pid_cmd}"
+set "SM_EXE={exe_name}"
 set /a SM_REPLACE_WAIT=0
 
 :wait_replace
@@ -691,7 +820,7 @@ move /Y "%SM_TARGET%" "%SM_BACKUP%" >nul 2>&1
 if not exist "%SM_TARGET%" goto install_new
 set /a SM_REPLACE_WAIT+=1
 if %SM_REPLACE_WAIT% GEQ 45 goto abort_update
-powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
+>nul choice /n /t 1 /d y
 goto wait_replace
 
 :install_new
@@ -700,24 +829,34 @@ if not exist "%SM_TARGET%" goto rollback
 
 del /Q "%SM_HEALTH%" >nul 2>&1
 del /Q "%SM_PIDFILE%" >nul 2>&1
-set "SM_PID="
-for /f "delims=" %%P in ('powershell -NoProfile -Command "$p=Start-Process -FilePath $env:SM_TARGET -PassThru; $p.Id"') do set "SM_PID=%%P"
+start "" /b "%SM_TARGET%"
 
+set /a SM_PID_WAIT=0
 set /a SM_HEALTH_WAIT=0
+:find_pid
+for /f "tokens=2 delims=," %%P in ('tasklist /FI "IMAGENAME eq %SM_EXE%" /FO CSV /NH 2^>nul') do (
+    if not defined SM_PID set "SM_PID=%%~P"
+)
+if defined SM_PID goto wait_health
+set /a SM_PID_WAIT+=1
+if %SM_PID_WAIT% GEQ 10 goto rollback
+>nul choice /n /t 1 /d y
+goto find_pid
+
 :wait_health
+>nul choice /n /t 1 /d y
 if exist "%SM_HEALTH%" goto success
 if not exist "%SM_TARGET%" goto rollback
 set /a SM_HEALTH_WAIT+=1
 if %SM_HEALTH_WAIT% GEQ 30 goto rollback
-powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
 goto wait_health
 
 :rollback
 if defined SM_PID taskkill /PID %SM_PID% /T /F >nul 2>&1
-powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
+>nul choice /n /t 1 /d y
 move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
 if exist "%SM_TARGET%" (
-    powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
+    >nul choice /n /t 1 /d y
     move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
 )
 move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
@@ -2072,6 +2211,7 @@ class App:
             scrollbar_button_hover_color=("#AFAFAF", "#777777")
         )
         main.pack(fill="both", expand=True, padx=16, pady=8)
+        self._main_scrollable = main
 
         top = ctk.CTkFrame(main, fg_color="transparent")
         top.pack(fill="x", pady=(0, 8))
@@ -2451,10 +2591,14 @@ class App:
 
         janela = ctk.CTkToplevel(self.app)
         janela.title("Atualização")
-        janela.geometry("430x150")
+        janela.geometry("430x165")
         janela.resizable(False, False)
         janela.transient(self.app)
         janela.grab_set()
+        try:
+            janela.attributes("-topmost", True)
+        except Exception:
+            pass
         janela.protocol("WM_DELETE_WINDOW", lambda: None)
         janela.configure(fg_color=self.BG)
 
@@ -2476,7 +2620,7 @@ class App:
         barra = ctk.CTkProgressBar(
             janela,
             width=386,
-            height=9,
+            height=12,
             corner_radius=5,
             mode="determinate",
             progress_color=self.ACCENT,
@@ -2487,6 +2631,18 @@ class App:
         self._atualizacao_janela = janela
         self._atualizacao_barra = barra
         self._atualizacao_label = label
+
+        # Garante que a janela e a barra sejam compostas antes de iniciar o
+        # download em outra thread. O topmost é removido logo depois.
+        try:
+            janela.update_idletasks()
+            janela.deiconify()
+            janela.lift()
+            janela.focus_force()
+            janela.update()
+            janela.after(250, lambda: janela.attributes("-topmost", False))
+        except Exception:
+            pass
 
     def _atualizacao_atualizar_progresso(self, baixado, total):
         janela = getattr(self, "_atualizacao_janela", None)
@@ -2968,6 +3124,7 @@ class App:
             return
         self._tema = tema
         ctk.set_appearance_mode(tema)
+        _ui_refresh_all_windows_scrollbars(self.app)
         self._atualizar_icones_cards_estatistica()
         try:
             dark = ctk.get_appearance_mode().lower() == "dark"
@@ -4484,14 +4641,15 @@ class App:
             except Exception:
                 pass
 
-        y=ttk.Scrollbar(body,orient="vertical",command=tree.yview)
-        x=ttk.Scrollbar(body,orient="horizontal",command=tree.xview)
+        y=_ui_make_windows_scrollbar(body,"vertical",tree.yview)
+        x=_ui_make_windows_scrollbar(body,"horizontal",tree.xview)
         tree.configure(yscrollcommand=_sync_row_header,xscrollcommand=x.set)
 
         row_header_frame.grid(row=0,column=0,sticky="ns")
         tree.grid(row=0,column=1,sticky="nsew")
         y.grid(row=0,column=2,sticky="ns")
         x.grid(row=1,column=1,sticky="ew")
+        self._planilha_scrollbars = (y, x)
         body.grid_rowconfigure(0,weight=1)
         body.grid_columnconfigure(1,weight=1)
 
@@ -6380,22 +6538,6 @@ class App:
         v = tuple(round(a[i] + (b[i] - a[i]) * fator) for i in range(3))
         return "#" + "".join(f"{x:02X}" for x in v)
 
-    def _parar_pisca_status(self, manter_estado=True):
-        try:
-            job = getattr(self, "_status_blink_job", None)
-            if job is not None:
-                self.app.after_cancel(job)
-            self._status_blink_job = None
-
-            if manter_estado and getattr(self, "status_indicator", None) is not None:
-                modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
-                self.status_indicator.configure(bg=canvas_bg)
-                self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
-                self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
-        except Exception:
-            self._status_blink_job = None
-
     def _executar_pisca_status(self):
         try:
             import math
@@ -6440,6 +6582,22 @@ class App:
                 self._status_anim_interval,
                 self._executar_pisca_status
             )
+        except Exception:
+            self._status_blink_job = None
+
+    def _parar_pisca_status(self, manter_estado=True):
+        try:
+            job = getattr(self, "_status_blink_job", None)
+            if job is not None:
+                self.app.after_cancel(job)
+            self._status_blink_job = None
+
+            if manter_estado and getattr(self, "status_indicator", None) is not None:
+                modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
+                self.status_indicator.configure(bg=canvas_bg)
+                self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
+                self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
         except Exception:
             self._status_blink_job = None
 
