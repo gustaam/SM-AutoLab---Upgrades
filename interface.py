@@ -16,10 +16,10 @@ import time
 import tkinter as tk
 import urllib.request
 from ctypes import wintypes
-
-LOGGER = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 from pathlib import Path
+
+LOGGER = logging.getLogger(__name__)
 from tkinter import Canvas, Entry, Menu, messagebox, ttk
 
 import customtkinter as ctk
