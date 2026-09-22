@@ -43,6 +43,8 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("github.event_name == 'push'", workflow)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("if: steps.release.outputs.published != 'true'", workflow)
+        self.assertIn('gh workflow run release.yml --repo "${GITHUB_REPOSITORY}" --ref "${RELEASE_TAG}"', workflow)
+        self.assertNotIn('gh workflow run release.yml --repo "\\${GITHUB_REPOSITORY}"', workflow)
 
     def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):
         self.assertTrue(callable(validate_dependencies))
