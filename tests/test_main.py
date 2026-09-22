@@ -440,6 +440,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_planilha_processada_persiste_e_impede_reabertura_da_mesma_revisao(self):
         import interface
+        import tempfile
 
         with tempfile.TemporaryDirectory() as temp_dir:
             obj = object.__new__(interface.App)
@@ -459,6 +460,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_planilha_nova_revisao_limpa_marcador_de_processamento(self):
         import interface
+        import tempfile
 
         with tempfile.TemporaryDirectory() as temp_dir:
             obj = object.__new__(interface.App)
