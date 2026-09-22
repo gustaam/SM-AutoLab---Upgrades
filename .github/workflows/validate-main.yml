@@ -1,4 +1,4 @@
-# Validação contínua da main.
+# Validação contínua da aplicação.
 name: Validate main for release
 
 on:
