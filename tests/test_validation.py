@@ -36,6 +36,13 @@ class ConsolidatedValidationTests(unittest.TestCase):
             security.assert_called_once_with(root)
             quality.assert_called_once_with(root)
 
+    def test_workflow_de_main_nao_dispara_release_manual(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
+        self.assertNotIn("gh workflow run release.yml", workflow)
+        self.assertIn("github.event_name == 'push'", workflow)
+        self.assertIn("github.ref == 'refs/heads/main'", workflow)
+
     def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):
         self.assertTrue(callable(validate_dependencies))
         self.assertTrue(callable(validate_workflow_pins))
