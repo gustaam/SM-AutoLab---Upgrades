@@ -446,6 +446,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("tile_height = 96", block)
         self.assertIn("icon.pack(pady=(3, 0))", block)
         self.assertIn("error_label.pack(fill=\"x\", padx=3, pady=(3, 0))", block)
+        self.assertIn("minsize=0", block)
+        self.assertIn("tile.grid(row=row, column=col, padx=1, pady=1)", block)
 
     def test_menus_configuracoes_trocam_ordem_aparencia_atualizacoes(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
