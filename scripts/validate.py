@@ -472,6 +472,9 @@ def validate_pe(path: Path, min_size: int = MIN_EXECUTABLE_SIZE) -> dict[str, ob
 def _cli_all(root: Path) -> int:
     validate_architecture(root)
     validate_version(root / "VERSION")
+    validate_dependencies(root)
+    validate_workflow_pins(root)
+    validate_workflow_security(root)
     validate_quality(root)
     print("Validação consolidada: OK")
     return 0
