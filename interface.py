@@ -3682,7 +3682,7 @@ class App:
             widget.bind("<Button-1>", clicar)
         return tile
 
-    def _abrir_detalhe_historico    def _abrir_detalhe_historico(self, execucao):
+    def _abrir_detalhe_historico(self, execucao):
         win = ctk.CTkToplevel(self.app)
         win.title("Execução — SM AutoLab")
         win.geometry("680x500")
