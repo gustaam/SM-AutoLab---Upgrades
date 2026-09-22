@@ -87,6 +87,7 @@ class _SMAutoLabTooltip:
         self._after_id = None
         self._hide_id = None
         self._window = None
+        self._rendered_message = None
         self._closed = False
         self._bindings = []
 
