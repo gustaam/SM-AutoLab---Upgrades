@@ -788,7 +788,7 @@ def _prepare_independent_restart_environment(environ: dict[str, str] | None = No
     return env
 
 def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, str]:
-    """Prepara a troca do executável e um rollback automático caso o novo não inicialize."""
+    """Prepara a troca do executável com CMD oculto e rollback por health-check."""
     script_dir = downloaded.parent
     script = script_dir / "apply_update.cmd"
     backup = script_dir / f"{target.name}.sm_autolab_backup"
@@ -802,6 +802,7 @@ def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, 
     failed_cmd = _escape_cmd_path(str(failed))
     health_cmd = _escape_cmd_path(str(health))
     pid_cmd = _escape_cmd_path(str(pid_file))
+    exe_name = _escape_cmd_path(target.name)
 
     script_text = f"""@echo off
 setlocal EnableExtensions DisableDelayedExpansion
@@ -811,6 +812,7 @@ set "SM_BACKUP={backup_cmd}"
 set "SM_FAILED={failed_cmd}"
 set "SM_HEALTH={health_cmd}"
 set "SM_PIDFILE={pid_cmd}"
+set "SM_EXE={exe_name}"
 set /a SM_REPLACE_WAIT=0
 
 :wait_replace
@@ -818,7 +820,7 @@ move /Y "%SM_TARGET%" "%SM_BACKUP%" >nul 2>&1
 if not exist "%SM_TARGET%" goto install_new
 set /a SM_REPLACE_WAIT+=1
 if %SM_REPLACE_WAIT% GEQ 45 goto abort_update
-powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
+>nul choice /n /t 1 /d y
 goto wait_replace
 
 :install_new
@@ -827,24 +829,34 @@ if not exist "%SM_TARGET%" goto rollback
 
 del /Q "%SM_HEALTH%" >nul 2>&1
 del /Q "%SM_PIDFILE%" >nul 2>&1
-set "SM_PID="
-for /f "delims=" %%P in ('powershell -NoProfile -Command "$p=Start-Process -FilePath $env:SM_TARGET -PassThru; $p.Id"') do set "SM_PID=%%P"
+start "" /b "%SM_TARGET%"
 
+set /a SM_PID_WAIT=0
 set /a SM_HEALTH_WAIT=0
+:find_pid
+for /f "tokens=2 delims=," %%P in ('tasklist /FI "IMAGENAME eq %SM_EXE%" /FO CSV /NH 2^>nul') do (
+    if not defined SM_PID set "SM_PID=%%~P"
+)
+if defined SM_PID goto wait_health
+set /a SM_PID_WAIT+=1
+if %SM_PID_WAIT% GEQ 10 goto rollback
+>nul choice /n /t 1 /d y
+goto find_pid
+
 :wait_health
+>nul choice /n /t 1 /d y
 if exist "%SM_HEALTH%" goto success
 if not exist "%SM_TARGET%" goto rollback
 set /a SM_HEALTH_WAIT+=1
 if %SM_HEALTH_WAIT% GEQ 30 goto rollback
-powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
 goto wait_health
 
 :rollback
 if defined SM_PID taskkill /PID %SM_PID% /T /F >nul 2>&1
-powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
+>nul choice /n /t 1 /d y
 move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
 if exist "%SM_TARGET%" (
-    powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
+    >nul choice /n /t 1 /d y
     move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
 )
 move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
@@ -2579,10 +2591,14 @@ class App:
 
         janela = ctk.CTkToplevel(self.app)
         janela.title("Atualização")
-        janela.geometry("430x150")
+        janela.geometry("430x165")
         janela.resizable(False, False)
         janela.transient(self.app)
         janela.grab_set()
+        try:
+            janela.attributes("-topmost", True)
+        except Exception:
+            pass
         janela.protocol("WM_DELETE_WINDOW", lambda: None)
         janela.configure(fg_color=self.BG)
 
@@ -2604,7 +2620,7 @@ class App:
         barra = ctk.CTkProgressBar(
             janela,
             width=386,
-            height=9,
+            height=12,
             corner_radius=5,
             mode="determinate",
             progress_color=self.ACCENT,
@@ -2615,6 +2631,18 @@ class App:
         self._atualizacao_janela = janela
         self._atualizacao_barra = barra
         self._atualizacao_label = label
+
+        # Garante que a janela e a barra sejam compostas antes de iniciar o
+        # download em outra thread. O topmost é removido logo depois.
+        try:
+            janela.update_idletasks()
+            janela.deiconify()
+            janela.lift()
+            janela.focus_force()
+            janela.update()
+            janela.after(250, lambda: janela.attributes("-topmost", False))
+        except Exception:
+            pass
 
     def _atualizacao_atualizar_progresso(self, baixado, total):
         janela = getattr(self, "_atualizacao_janela", None)
