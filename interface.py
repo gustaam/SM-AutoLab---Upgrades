@@ -6362,12 +6362,11 @@ class App:
                 pass
             self._status_blink_job = None
 
-        # Pisca binário visível: ciclo curto e apenas dois itemconfigure por tick.
-        # Isso é mais perceptível que a variação contínua de cor e custa menos.
+        # Muitos frames + intervalo curto = pulso visual contínuo, em vez de
+        # aparência de GIF. A geometria permanece idêntica.
         self._status_anim_frame = 0
-        self._status_anim_frames = 2
-        self._status_anim_interval = 250
-        self._status_blink_visible = False
+        self._status_anim_frames = 28 if self._status_blink_fast else 36
+        self._status_anim_interval = 28 if self._status_blink_fast else 32
         self._executar_pisca_status()
 
     @staticmethod
@@ -6399,22 +6398,44 @@ class App:
 
     def _executar_pisca_status(self):
         try:
-            self._status_blink_visible = not bool(self._status_blink_visible)
+            import math
+
+            frames = max(2, int(self._status_anim_frames))
+            idx = self._status_anim_frame % frames
+
+            # Seno suavizado: sobe e desce sem saltos perceptíveis.
+            fase = (2.0 * math.pi * idx) / frames
+            fator = (math.sin(fase - math.pi / 2.0) + 1.0) / 2.0
+            # Curva suave para manter o ponto visível mesmo no vale.
+            fator = fator * fator * (3.0 - 2.0 * fator)
 
             if self._status_blink_fast:
-                halo_off, halo_on = "#3B7285", "#8FD4EC"
-                dot_off, dot_on = "#2F6F87", "#65B8DB"
+                # Azul/ciano mais discreto durante execução.
+                halo_base, halo_brilho = "#3B7285", "#8FD4EC"
+                dot_base, dot_brilho = "#2F6F87", "#65B8DB"
             else:
-                halo_off, halo_on = "#4E8054", "#C9F0CC"
-                dot_off, dot_on = "#2F7437", "#6ECB72"
+                halo_base, halo_brilho = "#4E8054", "#C9F0CC"
+                dot_base, dot_brilho = "#2F7437", "#6ECB72"
 
-            halo = halo_on if self._status_blink_visible else halo_off
-            dot = dot_on if self._status_blink_visible else dot_off
+            halo = self._interpolar_cor(halo_base, halo_brilho, fator)
+            dot = self._interpolar_cor(dot_base, dot_brilho, fator)
 
-            # O fundo permanece fixo; cada ciclo altera somente os dois objetos.
-            self.status_indicator.itemconfigure(self._status_halo, fill=halo)
-            self.status_indicator.itemconfigure(self._status_dot, fill=dot)
+            modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+            if self._status_blink_fast:
+                canvas_bg = "#183B54" if modo_escuro else "#E5F1FB"
+            else:
+                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
+            self.status_indicator.configure(bg=canvas_bg)
+            self.status_indicator.itemconfigure(
+                self._status_halo,
+                fill=halo
+            )
+            self.status_indicator.itemconfigure(
+                self._status_dot,
+                fill=dot
+            )
 
+            self._status_anim_frame = idx + 1
             self._status_blink_job = self.app.after(
                 self._status_anim_interval,
                 self._executar_pisca_status
