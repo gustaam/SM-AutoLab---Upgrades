@@ -2,52 +2,63 @@
 
 # SM AutoLab
 
-Automação de autorizações no Feegow em um aplicativo desktop para Windows, com planilha virtualizada, histórico, recuperação de execução, atualização integrada e interface moderna.
+Aplicativo Windows para automação de autorizações no Feegow, com execução de códigos a partir de planilhas, recuperação segura de execuções, histórico, atualização integrada e interface moderna.
 
-**Versão em preparação:** `2.99.44`  
+**Versão atual no código:** `3.0.0`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
 
-- **Automação do Feegow:** leitura de códigos do Excel, validação pré-execução, login, autorização sequencial, tratamento de falhas e recuperação da sessão.
-- **Planilha virtualizada:** grade de alta capacidade com seleção, edição, copiar/colar, limpar e desfazer/refazer sem criar um widget por linha.
-- **Histórico e recuperação:** rascunhos, checkpoints, histórico de planilhas, calendário e retomada segura de execuções.
-- **Interface:** dashboard, indicadores de execução, tema claro/escuro, tooltips, layout responsivo e recursos nativos do Windows 11.
-- **Atualização integrada:** procura releases compatíveis, valida manifesto e SHA-256, substitui o executável com backup temporário e faz rollback automático se a nova versão não confirmar a inicialização.
-- **Segurança operacional:** credenciais ficam fora do código, arquivos de configuração são persistidos localmente e o pipeline verifica dependências e Windows Defender.
+- **Automação do Feegow:** leitura de códigos do Excel, login, autorização sequencial, tratamento de falhas, recuperação da página e recuperação do navegador.
+- **Planilha virtualizada:** grade de alta capacidade com seleção, edição, copiar/colar, recortar, limpar, desfazer/refazer e renderização apenas do conteúdo visível.
+- **Persistência e recuperação:** checkpoints, histórico de planilhas, rascunhos, estado processado e retomada segura sem reabrir ou reaproveitar indevidamente uma planilha já processada.
+- **Histórico de execução:** detalhes de uma execução ficam agrupados; a área de histórico de erros é apresentada somente quando existem erros.
+- **Interface:** dashboard, métricas de execução, progresso, tooltips, layout responsivo, tema claro/escuro e integração nativa com Windows 11.
+- **Rolagem:** barras personalizadas com polegar arredondado, setas de navegação, arraste, paginação no trilho, repetição e estados de hover.
+- **Atualização integrada:** descoberta de releases, validação do manifesto e SHA-256, substituição segura do executável, backup e rollback automático.
+- **Segurança operacional:** credenciais ficam fora do código, gravações críticas usam escrita atômica com backup e o pipeline verifica dependências, estrutura e Windows Defender.
 
 ## Estrutura do projeto
 
-### Arquivos principais
+### Produção
 
 | Arquivo | Função |
 |---|---|
-| `main.py` | Inicialização e splash |
-| `interface.py` | Interface desktop e planilha |
-| `app.py` | Automação e persistência |
-| `scripts/validate.py` | Validação estrutural e de release |
-| `build_windows.bat` | Build do executável Windows |
+| `main.py` | Ponto de entrada, inicialização e splash |
+| `interface.py` | Interface desktop, planilha virtualizada, histórico, atualização e integração Windows 11 |
+| `app.py` | Automação Selenium, resultados, checkpoints, configuração e persistência |
+| `patch.py` | Camada histórica de compatibilidade ainda usada pelo runtime |
+
+A produção foi consolidada nesses quatro módulos. `patch.py` permanece separado deliberadamente para preservar compatibilidade; novos recursos devem ser implementados nos módulos canônicos.
+
+### Validação, build e dependências
+
+| Caminho | Função |
+|---|---|
+| `scripts/validate.py` | Validação de arquitetura, versão, dependências, workflows, qualidade e executável |
+| `scripts/smoke_ui.py` | Smoke test da interface |
+| `build_windows.bat` | Build local do executável Windows |
 | `requirements.txt` | Dependências do projeto |
 | `VERSION` | Versão oficial do aplicativo |
-| `SM AutoLab.ico` | Ícone do aplicativo e executável |
+| `SM AutoLab.ico` | Ícone do aplicativo |
 
 ### Testes
 
 | Arquivo | Escopo |
 |---|---|
-| `tests/test_app.py` | Testes do núcleo operacional |
-| `tests/test_main.py` | Testes de inicialização |
-| `tests/test_planilha.py` | Testes da planilha e grade |
-| `tests/test_patch.py` | Testes de regressão arquitetural |
-| `tests/test_validation.py` | Testes de validação e release |
-| `tests/test_history.py` | Regressões de histórico e retomada |
+| `tests/test_app.py` | Persistência, armazenamento seguro e resultados |
+| `tests/test_main.py` | Inicialização e integração |
+| `tests/test_planilha.py` | Planilha, seleção, edição, virtualização e persistência |
+| `tests/test_patch.py` | Regressões de compatibilidade |
+| `tests/test_validation.py` | Validadores, workflows, versão e executável |
+| `tests/test_history.py` | Histórico, recuperação e retomada |
 
 ### Workflows e assets
 
 | Caminho | Função |
 |---|---|
-| `.github/workflows/validate-main.yml` | Validação contínua da main |
-| `.github/workflows/release.yml` | Build e publicação da release |
+| `.github/workflows/validate-main.yml` | CI da `main`: validação, dependências, testes, integração, smoke test e Defender |
+| `.github/workflows/release.yml` | Build, validação e publicação da release |
 | `assets/feegow_powered.png` | Identidade visual |
 | `assets/laboratorio_principal.png` | Imagem principal da interface |
 | `.gitignore` | Exclusões do versionamento |
@@ -55,54 +66,113 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 
 ## Arquitetura
 
-A produção foi compactada em três módulos:
+A separação atual é:
 
 `main.py` → inicialização e splash  
-`interface.py` → interface, planilha, histórico e atualização integrada  
-`app.py` → automação e persistência
+`interface.py` → interface, planilha, histórico, atualização e Windows 11  
+`app.py` → automação, resultados, checkpoints e persistência  
+`patch.py` → compatibilidade histórica mantida por segurança
 
-As correções históricas agora estão consolidadas diretamente nesses módulos. A regra de manutenção é evitar implementações paralelas: novos ajustes devem entrar na implementação canônica correspondente.
+A regra de manutenção é evitar implementações paralelas e consolidar novos ajustes na implementação canônica correspondente.
+
+## Planilha virtualizada
+
+A grade usa `VirtualGridTree`, baseada em Canvas, com virtualização de linhas e pool visual limitado.
+
+Principais características:
+
+- até 10.000 linhas lógicas;
+- renderização somente da região visível com overscan;
+- seleção de células e retângulos;
+- edição direta;
+- copiar, colar, recortar e excluir;
+- desfazer/refazer;
+- identificação unificada de célula por hit-test;
+- sincronização de rolagem horizontal e vertical;
+- cabeçalho lateral com numeração das linhas.
+
+A implementação evita criar um widget individual para cada linha da planilha.
+
+## Recuperação e estado processado
+
+Execuções interrompidas usam checkpoints associados à planilha/página e, na planilha interna, um fingerprint do conjunto de códigos.
+
+O aplicativo diferencia uma execução interrompida de uma planilha que já foi processada. Quando não existe trabalho pendente, a planilha processada não é reapresentada como se pudesse ser retomada; o fluxo pode iniciar uma nova planilha em branco.
+
+Essa proteção possui testes de regressão para alterações de conteúdo, persistência e estado processado.
+
+## Histórico de erros
+
+O histórico detalhado da execução é mantido de forma agrupada. A apresentação específica dos erros é condicional: quando não há erros, não é criada uma pasta de erros apenas para preencher a interface; quando há erros, os detalhes ficam organizados nessa área.
+
+## Barra de rolagem
+
+A interface utiliza uma barra personalizada inspirada no comportamento visual do Windows, com:
+
+- polegar arredondado;
+- setas de incremento e decremento;
+- arraste do polegar;
+- clique no trilho para paginação;
+- repetição ao manter a seta pressionada;
+- estados de hover;
+- suporte vertical e horizontal.
+
+## Atualização
+
+A atualização é integrada à própria aplicação.
+
+O fluxo:
+
+1. consulta releases compatíveis;
+2. valida versão e manifesto;
+3. confere o SHA-256 do executável;
+4. prepara o ambiente para substituição;
+5. mantém backup durante a troca;
+6. reinicia a aplicação de forma independente;
+7. executa rollback quando a nova versão não confirma a inicialização.
+
+Não existe updater separado publicado pelo projeto.
 
 ## Validação e qualidade
 
-O projeto valida continuamente:
+O CI verifica continuamente:
 
-- arquitetura e ausência de arquivos legados;
-- versões fixadas de Python, pip e dependências;
-- referências das GitHub Actions;
-- sintaxe e suíte de testes;
+- arquitetura consolidada e ausência de módulos legados removidos;
+- versão e progressão de versão;
+- dependências;
+- referências fixadas das GitHub Actions;
+- qualidade estrutural;
+- sintaxe;
+- suíte de testes;
 - integração da aplicação;
-- metadados e estrutura do executável;
-- Windows Defender.
+- smoke test da interface;
+- estrutura e metadados do executável;
+- Microsoft Defender.
 
-O CI utiliza **Python 3.14.7** e **pip 26.2.1**. O build oficial usa **PyInstaller 6.22.3**.
+O CI utiliza **Python 3.14.7** e **pip 26.2.1**. O build oficial utiliza **PyInstaller 6.22.3**.
 
-## Build do Windows
+## Release
 
-O build produz um único executável:
+A versão oficial do código neste `main` é **3.0.0**.
 
-`dist/SM AutoLab.exe`
+O fluxo de release possui dois caminhos:
 
-O executável recebe ícone, assets, versão e metadados do produto durante a geração. Os arquivos de metadados temporários não fazem parte da árvore versionada.
+- **Automático:** após o workflow `Validate main for release` concluir com sucesso para um push na `main`, o workflow de release é acionado por `workflow_run`. Isso evita depender de um disparo encadeado pelo mesmo `GITHUB_TOKEN` e reduz o risco de duplicidade.
+- **Manual:** o workflow `release.yml` continua disponível por `workflow_dispatch`, exigindo a tag explícita da release.
 
-## Release e atualização
+Antes da publicação, o pipeline confirma que a tag corresponde ao commit atualmente validado da `main`, executa novamente os testes, gera o executável, valida metadados e Defender, cria o manifesto e verifica remotamente os assets publicados.
 
-A release atualmente publicada é **v2.99.44**.
+## Histórico recente da versão 3.0.0
 
-A próxima versão preparada no `main` é a **v2.99.45**.
+A série `3.0.0` consolidou, entre outras mudanças:
 
-A **v2.99.32** restaura os tooltips da interface e o efeito de hover dos cards **Executados**, **Não executados** e **Código atual**, mantendo a aba **Não executados** removida.
-
-A **v2.99.33** restaura a numeração visível das linhas no cabeçalho lateral da planilha, inclusive após reabrir a planilha.
-
-A **v2.99.34** corrige o ciclo de vida dos tooltips para que desapareçam ao clicar, perder o foco ou destruir o controle, evitando que o tooltip de **Abrir** fique preso sobre a planilha.
-
-A **v2.99.35** corrige o salvamento da planilha interna, disponibilizando a função de escrita atômica usada pela interface e cobrindo esse caminho com teste de regressão.
-
-A **v2.99.36** adiciona validação pré-execução da planilha, dashboard de execução com métricas de tempo/progresso e atualização segura com backup e rollback automático.
-
-O fluxo valida a base, executa um smoke test real da interface, cria o executável, verifica PE/metadados e Defender, gera um manifesto com SHA-256 e publica o asset. O aplicativo usa esse manifesto para localizar versões compatíveis e validar a integridade antes da atualização.
+- barras de rolagem arredondadas com setas;
+- recuperação segura de planilhas interrompidas;
+- distinção entre planilhas processadas e trabalho ainda pendente;
+- histórico de erros exibido somente quando necessário;
+- ajustes no fluxo automático de release;
+- consolidação dos testes de regressão correspondentes.
 
 ---
 
-**SM AutoLab** — automação, planilha de alta capacidade e interface desktop em uma base enxuta e verificável.
+**SM AutoLab** — automação de autorizações no Feegow, planilha virtualizada e interface desktop em uma base compacta e verificável.
