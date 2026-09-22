@@ -163,6 +163,57 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('self.codigo_card = self._stat_card(stats, "▥", "Código atual"', source)
         self.assertIn('self.erro_card = self._stat_card(stats, "!", "Não executados"', source)
 
+    def test_historico_de_erros_tem_arquivo_separado(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('historico_erros.json', source)
+        start = source.index("def _salvar_estado_persistente")
+        end = source.index("def _criar_botao_erro", start)
+        block = source[start:end]
+        self.assertNotIn('self._erros_codigos[-200:]', block)
+        self.assertIn("def _salvar_erros_persistentes", source)
+        self.assertIn("self._salvar_erros_persistentes()", source)
+
+    def test_pastas_do_historico_usam_largura_da_janela_no_primeiro_layout(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_pasta_historico")
+        end = source.index("def _atualizar_visual_selecao_historico", start)
+        block = source[start:end]
+        self.assertIn("largura_parent = int(parent.winfo_width())", block)
+        self.assertIn("largura_app = int(self.app.winfo_width())", block)
+        self.assertIn("largura_app - 80", block)
+        self.assertIn("tile.grid(row=row, column=col, padx=1, pady=1)", block)
+
+    def test_icones_de_estatistica_problematicos_sao_vetoriais(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_imagem_icone_estatistica")
+        end = source.index("def _render_stat_icon", start)
+        block = source[start:end]
+        self.assertIn('if str(icon) == "✓":', block)
+        self.assertIn('elif str(icon) == "▥":', block)
+        self.assertIn("draw.line(", block)
+        self.assertIn("draw.rounded_rectangle(", block)
+
+    def test_janela_principal_nao_usa_backdrop_mica(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def config_app")
+        end = source.index("def _reposicionar_menus", start)
+        block = source[start:end]
+        self.assertNotIn('aplicar_backdrop_sistema(self.app, "mica"', block)
+
+    def test_restore_da_janela_tem_handler_leve(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada', source)
+        self.assertIn("def _estabilizar_apos_retomada", source)
+        self.assertIn("self.app.after_idle(self._estabilizar_apos_retomada)", source)
+
+    def test_pronto_reinicia_pulso_verde(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _aplicar_status")
+        end = source.index("def atualizar_progresso", start)
+        block = source[start:end]
+        self.assertIn("self._iniciar_pisca_status()", block)
+        self.assertIn('self._status_blink_fast = False', block)
+
     def test_historico_execucao_migra_e_reconstroi_erros(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _carregar_estado_persistente")
@@ -188,10 +239,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
-        self.assertIn("tile_width = 118", block)
-        self.assertIn("tile_height = 96", block)
+        self.assertIn("tile_width = 112", block)
+        self.assertIn("tile_height = 84", block)
         self.assertIn("colunas = max(1, min(8", block)
-        self.assertIn("wraplength=tile_width - 10", block)
+        self.assertIn("wraplength=tile_width - 6", block)
         self.assertNotIn('text=titulo[:24]', block)
         self.assertNotIn("sticky=\"nsew\"", block)
         self.assertIn("def _formatar_data_historico", source)
@@ -444,8 +495,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("tile_width = 118", block)
         self.assertIn("tile_height = 96", block)
-        self.assertIn("icon.pack(pady=(3, 0))", block)
-        self.assertIn("error_label.pack(fill=\"x\", padx=3, pady=(3, 0))", block)
+        self.assertIn("icon.pack(pady=(2, 0))", block)
+        self.assertIn("error_label.pack(fill=\"x\", padx=2, pady=(2, 0))", block)
         self.assertIn("minsize=0", block)
         self.assertIn("tile.grid(row=row, column=col, padx=1, pady=1)", block)
 
