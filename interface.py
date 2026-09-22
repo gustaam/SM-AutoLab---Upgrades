@@ -575,23 +575,63 @@ def find_update(timeout: int = 8) -> dict | None:
         "release_url": release.get("html_url") or "",
     }
 
-def download_file(url: str, destination: Path, expected_sha256: str = "") -> None:
+def download_file(
+    url: str,
+    destination: Path,
+    expected_sha256: str = "",
+    progress_callback=None,
+) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     hasher = hashlib.sha256()
     with urllib.request.urlopen(request, timeout=30) as response, destination.open("wb") as output:
+        try:
+            total_bytes = int(response.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            total_bytes = 0
+        downloaded_bytes = 0
+        last_percent = -1
+
+        if progress_callback is not None:
+            try:
+                progress_callback(0, total_bytes)
+            except Exception:
+                pass
+
         while True:
             chunk = response.read(1024 * 1024)
             if not chunk:
                 break
             output.write(chunk)
             hasher.update(chunk)
+            downloaded_bytes += len(chunk)
+
+            if progress_callback is not None:
+                if total_bytes > 0:
+                    percent = int(downloaded_bytes * 100 / total_bytes)
+                    if percent != last_percent:
+                        last_percent = percent
+                        try:
+                            progress_callback(downloaded_bytes, total_bytes)
+                        except Exception:
+                            pass
+                elif downloaded_bytes == len(chunk):
+                    try:
+                        progress_callback(downloaded_bytes, total_bytes)
+                    except Exception:
+                        pass
+
+        if progress_callback is not None:
+            try:
+                progress_callback(downloaded_bytes, total_bytes)
+            except Exception:
+                pass
+
     if expected_sha256 and hasher.hexdigest().lower() != expected_sha256.lower():
         try:
             destination.unlink()
         except OSError:
             pass
         raise RuntimeError("A verificação SHA-256 da atualização falhou.")
-
 def _escape_cmd_path(value: str) -> str:
     """Escapa caracteres especiais para uso em arquivo .cmd sem expansão de variáveis."""
     return (
@@ -729,7 +769,7 @@ exit /b 1
     except OSError as exc:
         return False, str(exc)
 
-def launch_updater(update: dict) -> tuple[bool, str]:
+def launch_updater(update: dict, progress_callback=None) -> tuple[bool, str]:
     if os.name != "nt":
         return False, "A atualização automática integrada só está disponível no Windows."
     if not update.get("download_url"):
@@ -742,7 +782,12 @@ def launch_updater(update: dict) -> tuple[bool, str]:
     temp_dir = Path(tempfile.mkdtemp(prefix="sm_autolab_update_"))
     downloaded = temp_dir / target.name
     try:
-        download_file(str(update["download_url"]), downloaded, str(update.get("sha256") or ""))
+        download_file(
+            str(update["download_url"]),
+            downloaded,
+            str(update.get("sha256") or ""),
+            progress_callback=progress_callback,
+        )
         ok, error = _schedule_replace_after_exit(target, downloaded)
         if not ok:
             raise RuntimeError(error or "Não foi possível preparar a substituição da atualização.")
@@ -1730,6 +1775,47 @@ def atualizar_backdrop_tema(window, dark: bool):
         return False
     return _set_dwm_attribute(hwnd, 20, ctypes.c_int(1 if dark else 0))
 
+def _set_window_redraw(window, enabled: bool) -> bool:
+    """Bloqueia/libera o redesenho Tk durante minimizar/restaurar."""
+    if os.name != "nt" or window is None:
+        return False
+    try:
+        hwnd = int(window.winfo_id())
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        send = user32.SendMessageW
+        send.argtypes = [wintypes.HWND, wintypes.UINT, ctypes.c_size_t, ctypes.c_ssize_t]
+        send.restype = wintypes.LPARAM
+        WM_SETREDRAW = 0x000B
+        send(
+            wintypes.HWND(hwnd),
+            wintypes.UINT(WM_SETREDRAW),
+            ctypes.c_size_t(1 if enabled else 0),
+            ctypes.c_ssize_t(0),
+        )
+        return True
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+def _redraw_window_now(window) -> bool:
+    """Força um único repaint da janela e dos filhos após a restauração."""
+    if os.name != "nt" or window is None:
+        return False
+    try:
+        hwnd = int(window.winfo_id())
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        redraw = user32.RedrawWindow
+        redraw.argtypes = [wintypes.HWND, ctypes.c_void_p, wintypes.HRGN, wintypes.UINT]
+        redraw.restype = wintypes.BOOL
+        RDW_INVALIDATE = 0x0001
+        RDW_ALLCHILDREN = 0x0080
+        RDW_UPDATENOW = 0x0100
+        return bool(redraw(
+            wintypes.HWND(hwnd), None, None,
+            RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW,
+        ))
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
 def _ler_versao_aplicativo():
     """Lê a versão embutida no executável/projeto."""
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -1822,6 +1908,9 @@ class App:
         self._status_blink_job = None
         self._status_blink_visible = True
         self._status_blink_fast = False
+        self._status_anim_colors = []
+        self._status_blink_paused_on_minimize = False
+        self._janela_redesenho_bloqueado = False
         self._status_finalizado_job = None
         self._execucao_inicio_monotonic = None
         self._execucao_timer_job = None
@@ -1829,6 +1918,10 @@ class App:
         self._execucao_total = 0
         self._tempo_decorrido_label = None
         self._tempo_estimado_label = None
+        self._atualizacao_janela = None
+        self._atualizacao_barra = None
+        self._atualizacao_label = None
+        self._atualizacao_em_andamento = False
         self._execucao_titulo_label = None
         self._execucao_subtitulo_label = None
         self._execucao_indicador_label = None
@@ -1863,7 +1956,7 @@ class App:
             except Exception:
                 pass
         try:
-            self._app_restore_job = self.app.after_idle(self._estabilizar_apos_retomada)
+            self._app_restore_job = self.app.after(30, self._estabilizar_apos_retomada)
         except Exception:
             self._app_restore_job = None
 
@@ -1872,11 +1965,28 @@ class App:
         if self._closing:
             return
         try:
-            self.app.update_idletasks()
-            self._reposicionar_menus()
-            self._ajustar_altura_acompanhamento()
+            _set_window_redraw(self.app, True)
+            _redraw_window_now(self.app)
+            self._janela_redesenho_bloqueado = False
+            if self._status_blink_paused_on_minimize:
+                self._status_blink_paused_on_minimize = False
+                self._iniciar_pisca_status()
+        except Exception:
+            self._janela_redesenho_bloqueado = False
+
+    def _preparar_minimizacao(self, _event=None):
+        if self._closing:
+            return
+        try:
+            self._status_blink_paused_on_minimize = self._status_blink_job is not None
+            if self._status_blink_job is not None:
+                self.app.after_cancel(self._status_blink_job)
+            self._status_blink_job = None
+            self._janela_redesenho_bloqueado = True
+            _set_window_redraw(self.app, False)
         except Exception:
             pass
+        self._fechar_menus
 
     def config_app(self):
         self.app.title("SM AutoLab")
@@ -1885,7 +1995,7 @@ class App:
         self.app.resizable(True, True)
         self.app.configure(fg_color=self.BG)
         self.app.protocol("WM_DELETE_WINDOW", self._fechar_aplicativo)
-        self.app.bind("<Unmap>", self._fechar_menus, add="+")
+        self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")
         self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada, add="+")
 
         # Abre a janela em tamanho maior e centralizada na tela.
@@ -2360,6 +2470,109 @@ class App:
         import threading
         threading.Thread(target=worker,daemon=True).start()
 
+    @staticmethod
+    def _formatar_tamanho_atualizacao(valor):
+        try:
+            valor = float(valor)
+        except (TypeError, ValueError):
+            return "0 B"
+        unidades = ("B", "KB", "MB", "GB")
+        indice = 0
+        while valor >= 1024 and indice < len(unidades) - 1:
+            valor /= 1024
+            indice += 1
+        if indice == 0:
+            return f"{int(valor)} {unidades[indice]}"
+        return f"{valor:.1f} {unidades[indice]}"
+
+    def _mostrar_progresso_atualizacao(self, version):
+        self._atualizacao_em_andamento = True
+        janela = getattr(self, "_atualizacao_janela", None)
+        try:
+            if janela is not None and janela.winfo_exists():
+                janela.lift()
+                return
+        except Exception:
+            pass
+
+        janela = ctk.CTkToplevel(self.app)
+        janela.title("Atualização")
+        janela.geometry("430x150")
+        janela.resizable(False, False)
+        janela.transient(self.app)
+        janela.grab_set()
+        janela.protocol("WM_DELETE_WINDOW", lambda: None)
+        janela.configure(fg_color=self.BG)
+
+        ctk.CTkLabel(
+            janela,
+            text=f"Baixando atualização v{version}",
+            text_color=self.TEXT,
+            font=("Segoe UI", 14, "bold"),
+        ).pack(anchor="w", padx=22, pady=(18, 3))
+
+        label = ctk.CTkLabel(
+            janela,
+            text="Preparando download...",
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 10),
+        )
+        label.pack(anchor="w", padx=22, pady=(0, 8))
+
+        barra = ctk.CTkProgressBar(
+            janela,
+            width=386,
+            height=9,
+            corner_radius=5,
+            mode="determinate",
+            progress_color=self.ACCENT,
+        )
+        barra.set(0)
+        barra.pack(padx=22, pady=(0, 5))
+
+        self._atualizacao_janela = janela
+        self._atualizacao_barra = barra
+        self._atualizacao_label = label
+
+    def _atualizacao_atualizar_progresso(self, baixado, total):
+        janela = getattr(self, "_atualizacao_janela", None)
+        barra = getattr(self, "_atualizacao_barra", None)
+        label = getattr(self, "_atualizacao_label", None)
+        if janela is None or barra is None or label is None:
+            return
+        try:
+            if total and total > 0:
+                proporcao = max(0.0, min(1.0, float(baixado) / float(total)))
+                barra.set(proporcao)
+                label.configure(
+                    text=(
+                        f"{proporcao * 100:.0f}%  •  "
+                        f"{self._formatar_tamanho_atualizacao(baixado)} de "
+                        f"{self._formatar_tamanho_atualizacao(total)}"
+                    )
+                )
+            else:
+                label.configure(
+                    text=f"{self._formatar_tamanho_atualizacao(baixado)} baixados"
+                )
+        except Exception:
+            pass
+
+    def _fechar_progresso_atualizacao(self):
+        janela = getattr(self, "_atualizacao_janela", None)
+        self._atualizacao_janela = None
+        self._atualizacao_barra = None
+        self._atualizacao_label = None
+        if janela is not None:
+            try:
+                janela.grab_release()
+            except Exception:
+                pass
+            try:
+                janela.destroy()
+            except Exception:
+                pass
+
     def _mostrar_resultado_atualizacao(self, info):
         if info and info.get("error"):
             messagebox.showerror(
@@ -2405,20 +2618,41 @@ class App:
         if not resposta:
             return
 
-        ok,msg=launch_updater(info)
-        if not ok:
-            messagebox.showerror(
-                "Atualização",
-                f"Não foi possível iniciar o atualizador.\n\n{msg}",
-                parent=self.app
-            )
-            return
+        self._mostrar_progresso_atualizacao(version)
 
-        self._add_activity(
-            f"Atualização para v{version} iniciada.",
-            self.INFO
-        )
-        self._fechar_aplicativo()
+        def progresso(baixado, total):
+            try:
+                self.app.after(
+                    0,
+                    lambda d=baixado, t=total: self._atualizacao_atualizar_progresso(d, t),
+                )
+            except Exception:
+                pass
+
+        def finalizar_download(ok, msg):
+            self._atualizacao_em_andamento = False
+            self._fechar_progresso_atualizacao()
+            if not ok:
+                messagebox.showerror(
+                    "Atualização",
+                    f"Não foi possível baixar a atualização.\n\n{msg}",
+                    parent=self.app
+                )
+                return
+            self._add_activity(
+                f"Atualização para v{version} iniciada.",
+                self.INFO
+            )
+            self._fechar_aplicativo()
+
+        def worker():
+            ok, msg = launch_updater(info, progress_callback=progresso)
+            try:
+                self.app.after(0, lambda: finalizar_download(ok, msg))
+            except Exception:
+                pass
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _alternar_menu_configuracoes(self):
         if self._menu_config is not None:
@@ -2575,36 +2809,6 @@ class App:
         menu.pack_propagate(False)
         self._menu_config = menu
 
-        atualizar = ctk.CTkButton(
-            menu,
-            text="Verificar atualizações",
-            command=self._verificar_atualizacoes_interativo,
-            width=202,
-            height=40,
-            corner_radius=8,
-            fg_color=self.CARD,
-            hover_color=("#EAF4FC", "#263F50"),
-            text_color=self.TEXT,
-            font=("Segoe UI", 12),
-            anchor="w",
-        )
-        atualizar.pack(fill="x", padx=7, pady=(8, 3))
-
-        mudar = ctk.CTkButton(
-            menu,
-            text="Ajustes do Feegow",
-            command=self._abrir_popup_feegow,
-            width=202,
-            height=40,
-            corner_radius=8,
-            fg_color=self.CARD,
-            hover_color=("#EAF4FC", "#263F50"),
-            text_color=self.TEXT,
-            font=("Segoe UI", 12),
-            anchor="w",
-        )
-        mudar.pack(fill="x", padx=7, pady=(3, 3))
-
         aparencia = ctk.CTkButton(
             menu,
             text="Aparência  ›",
@@ -2638,6 +2842,36 @@ class App:
                 widget.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
             except Exception:
                 pass
+        mudar = ctk.CTkButton(
+            menu,
+            text="Ajustes do Feegow",
+            command=self._abrir_popup_feegow,
+            width=202,
+            height=40,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#EAF4FC", "#263F50"),
+            text_color=self.TEXT,
+            font=("Segoe UI", 12),
+            anchor="w",
+        )
+        mudar.pack(fill="x", padx=7, pady=(3, 3))
+
+        atualizar = ctk.CTkButton(
+            menu,
+            text="Verificar atualizações",
+            command=self._verificar_atualizacoes_interativo,
+            width=202,
+            height=40,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#EAF4FC", "#263F50"),
+            text_color=self.TEXT,
+            font=("Segoe UI", 12),
+            anchor="w",
+        )
+        atualizar.pack(fill="x", padx=7, pady=(8, 3))
+
         _ui_scan_tooltips(self._menu_config)
 
         self.app.update_idletasks()
@@ -3112,11 +3346,12 @@ class App:
             text_color=palette["title"],
             font=("Segoe UI", 10, "bold"),
         ).pack(anchor="w")
+        value_font = ("Segoe UI", 17) if str(title) == "Código atual" else ("Segoe UI", 19, "bold")
         value_label = ctk.CTkLabel(
             text_box,
             text=value,
             text_color=palette["value"],
-            font=("Segoe UI", 19, "bold"),
+            font=value_font,
             anchor="w",
         )
         value_label.pack(anchor="w")
@@ -3282,6 +3517,8 @@ class App:
 
     def _ajustar_altura_acompanhamento(self, _event=None):
         """Adapta a área de histórico à altura da janela principal."""
+        if getattr(self, "_janela_redesenho_bloqueado", False):
+            return
         card = getattr(self, "_activity_card", None)
         if card is None:
             return
@@ -6176,8 +6413,30 @@ class App:
         # Muitos frames + intervalo curto = pulso visual contínuo, em vez de
         # aparência de GIF. A geometria permanece idêntica.
         self._status_anim_frame = 0
-        self._status_anim_frames = 18 if self._status_blink_fast else 20
-        self._status_anim_interval = 80 if self._status_blink_fast else 110
+        self._status_anim_frames = 18 if self._status_blink_fast else 24
+        self._status_anim_interval = 80 if self._status_blink_fast else 60
+
+        if self._status_blink_fast:
+            halo_base, halo_brilho = "#3B7285", "#8FD4EC"
+            dot_base, dot_brilho = "#2F6F87", "#65B8DB"
+            canvas_bg = "#183B54" if ctk.get_appearance_mode().lower() == "dark" else "#E5F1FB"
+        else:
+            halo_base, halo_brilho = "#4E8054", "#C9F0CC"
+            dot_base, dot_brilho = "#2F7437", "#6ECB72"
+            canvas_bg = "#21482A" if ctk.get_appearance_mode().lower() == "dark" else "#E7F5E7"
+
+        import math
+        cores = []
+        for idx in range(self._status_anim_frames):
+            fase = (2.0 * math.pi * idx) / self._status_anim_frames
+            fator = (math.sin(fase - math.pi / 2.0) + 1.0) / 2.0
+            fator = fator * fator * (3.0 - 2.0 * fator)
+            cores.append((
+                self._interpolar_cor(halo_base, halo_brilho, fator),
+                self._interpolar_cor(dot_base, dot_brilho, fator),
+            ))
+        self._status_anim_colors = cores
+        self.status_indicator.configure(bg=canvas_bg)
         self._executar_pisca_status()
 
     @staticmethod
@@ -6209,42 +6468,15 @@ class App:
 
     def _executar_pisca_status(self):
         try:
-            import math
+            cores = getattr(self, "_status_anim_colors", None) or ()
+            if not cores or getattr(self, "status_indicator", None) is None:
+                self._status_blink_job = None
+                return
 
-            frames = max(2, int(self._status_anim_frames))
-            idx = self._status_anim_frame % frames
-
-            # Seno suavizado: sobe e desce sem saltos perceptíveis.
-            fase = (2.0 * math.pi * idx) / frames
-            fator = (math.sin(fase - math.pi / 2.0) + 1.0) / 2.0
-            # Curva suave para manter o ponto visível mesmo no vale.
-            fator = fator * fator * (3.0 - 2.0 * fator)
-
-            if self._status_blink_fast:
-                # Azul/ciano mais discreto durante execução.
-                halo_base, halo_brilho = "#3B7285", "#8FD4EC"
-                dot_base, dot_brilho = "#2F6F87", "#65B8DB"
-            else:
-                halo_base, halo_brilho = "#4E8054", "#C9F0CC"
-                dot_base, dot_brilho = "#2F7437", "#6ECB72"
-
-            halo = self._interpolar_cor(halo_base, halo_brilho, fator)
-            dot = self._interpolar_cor(dot_base, dot_brilho, fator)
-
-            modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-            if self._status_blink_fast:
-                canvas_bg = "#183B54" if modo_escuro else "#E5F1FB"
-            else:
-                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
-            self.status_indicator.configure(bg=canvas_bg)
-            self.status_indicator.itemconfigure(
-                self._status_halo,
-                fill=halo
-            )
-            self.status_indicator.itemconfigure(
-                self._status_dot,
-                fill=dot
-            )
+            idx = self._status_anim_frame % len(cores)
+            halo, dot = cores[idx]
+            self.status_indicator.itemconfigure(self._status_halo, fill=halo)
+            self.status_indicator.itemconfigure(self._status_dot, fill=dot)
 
             self._status_anim_frame = idx + 1
             self._status_blink_job = self.app.after(
