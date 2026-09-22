@@ -1,4 +1,4 @@
-# Regressões do histórico persistente e retomada.
+# Testes de histórico persistente e retomada.
 
 import json
 import tempfile
