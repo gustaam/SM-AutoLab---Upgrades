@@ -191,10 +191,13 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
-        self.assertIn("width=132", block)
-        self.assertIn("height=102", block)
-        self.assertIn("colunas = max(3, min(6", block)
-        self.assertIn("wraplength=116", block)
+        self.assertIn("tile_width = 144", block)
+        self.assertIn("tile_height = 116", block)
+        self.assertIn("colunas = max(1, min(8", block)
+        self.assertIn("wraplength=tile_width - 20", block)
+        self.assertIn('strftime("%d/%m/%Y")', block)
+        self.assertNotIn('text=titulo[:24]', block)
+        self.assertNotIn("sticky=\"nsew\"", block)
     def test_interface_remove_titulo_historico_de_execucoes(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertNotIn('text="Histórico de execuções"', source)
