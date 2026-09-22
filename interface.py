@@ -425,40 +425,346 @@ def _walk_widgets(widget):
         yield from _walk_widgets(child)
 
 
+class _SMWindowsRoundedScrollbar(tk.Canvas):
+    """Barra de rolagem arredondada com setas, inspirada no padrão do Windows."""
+
+    ARROW_SIZE = 16
+    MIN_THUMB = 28
+    REPEAT_DELAY = 420
+    REPEAT_INTERVAL = 55
+
+    def __init__(self, master, orient="vertical", command=None, **kwargs):
+        self.orient = str(orient or "vertical").lower()
+        self.command = command
+        self._first = 0.0
+        self._last = 1.0
+        self._drag_offset = None
+        self._repeat_job = None
+        self._hover_part = None
+        self._bg_color = "#F3F3F3"
+        self._thumb_color = "#C8C8C8"
+        self._thumb_hover_color = "#AFAFAF"
+        self._arrow_color = "#707070"
+        self._arrow_hover_color = "#595959"
+        kwargs.setdefault("width", self.ARROW_SIZE)
+        kwargs.setdefault("height", self.ARROW_SIZE)
+        kwargs.setdefault("highlightthickness", 0)
+        kwargs.setdefault("borderwidth", 0)
+        kwargs.setdefault("relief", "flat")
+        kwargs.setdefault("takefocus", False)
+        kwargs.setdefault("bg", self._bg_color)
+        super().__init__(master, **kwargs)
+
+        self.bind("<ButtonPress-1>", self._on_press, add="+")
+        self.bind("<ButtonRelease-1>", self._on_release, add="+")
+        self.bind("<B1-Motion>", self._on_motion, add="+")
+        self.bind("<Motion>", self._on_motion_hover, add="+")
+        self.bind("<Leave>", self._on_leave, add="+")
+        self.bind("<Configure>", lambda _event: self._redraw(), add="+")
+        self.after_idle(self._redraw)
+
+    def set_colors(
+        self,
+        bg_color,
+        thumb_color,
+        thumb_hover_color,
+        arrow_color,
+        arrow_hover_color,
+    ):
+        self._bg_color = bg_color
+        self._thumb_color = thumb_color
+        self._thumb_hover_color = thumb_hover_color
+        self._arrow_color = arrow_color
+        self._arrow_hover_color = arrow_hover_color
+        try:
+            self.configure(bg=self._bg_color)
+        except Exception:
+            pass
+        self._redraw()
+
+    def set(self, first, last):
+        try:
+            self._first = max(0.0, min(1.0, float(first)))
+            self._last = max(self._first, min(1.0, float(last)))
+        except (TypeError, ValueError):
+            self._first, self._last = 0.0, 1.0
+        self._redraw()
+
+    def get(self):
+        return self._first, self._last
+
+    def _dimensions(self):
+        width = max(1, int(self.winfo_width()))
+        height = max(1, int(self.winfo_height()))
+        return width, height
+
+    def _track_bounds(self):
+        width, height = self._dimensions()
+        if self.orient == "horizontal":
+            start = self.ARROW_SIZE
+            end = max(start + 1, width - self.ARROW_SIZE)
+        else:
+            start = self.ARROW_SIZE
+            end = max(start + 1, height - self.ARROW_SIZE)
+        return start, end
+
+    def _thumb_geometry(self):
+        start, end = self._track_bounds()
+        track_length = max(1.0, end - start)
+        visible = max(0.0, min(1.0, self._last - self._first))
+        thumb_length = max(self.MIN_THUMB, track_length * visible)
+        thumb_length = min(track_length, thumb_length)
+        movable = max(0.0, track_length - thumb_length)
+        thumb_start = start + movable * self._first
+        thumb_end = thumb_start + thumb_length
+        return start, end, thumb_start, thumb_end
+
+    @staticmethod
+    def _rounded_rect(canvas, x0, y0, x1, y1, radius, fill, tag):
+        radius = max(1, min(float(radius), (x1 - x0) / 2.0, (y1 - y0) / 2.0))
+        canvas.create_rectangle(
+            x0 + radius, y0, x1 - radius, y1,
+            fill=fill, outline="", tags=tag
+        )
+        canvas.create_rectangle(
+            x0, y0 + radius, x1, y1 - radius,
+            fill=fill, outline="", tags=tag
+        )
+        canvas.create_oval(
+            x0, y0, x0 + 2 * radius, y0 + 2 * radius,
+            fill=fill, outline="", tags=tag
+        )
+        canvas.create_oval(
+            x1 - 2 * radius, y0, x1, y0 + 2 * radius,
+            fill=fill, outline="", tags=tag
+        )
+        canvas.create_oval(
+            x0, y1 - 2 * radius, x0 + 2 * radius, y1,
+            fill=fill, outline="", tags=tag
+        )
+        canvas.create_oval(
+            x1 - 2 * radius, y1 - 2 * radius, x1, y1,
+            fill=fill, outline="", tags=tag
+        )
+
+    def _redraw(self):
+        try:
+            self.delete("all")
+            width, height = self._dimensions()
+            self.configure(bg=self._bg_color)
+
+            if self.orient == "horizontal":
+                start, end, thumb_start, thumb_end = self._thumb_geometry()
+                center = height / 2.0
+                thumb_half = max(2.0, min(height / 2.0 - 1.0, 6.0))
+                self._rounded_rect(
+                    self,
+                    thumb_start,
+                    center - thumb_half,
+                    thumb_end,
+                    center + thumb_half,
+                    thumb_half,
+                    self._thumb_color if self._hover_part != "thumb" else self._thumb_hover_color,
+                    "thumb",
+                )
+                arrow_fill_left = (
+                    self._arrow_hover_color if self._hover_part == "decrement"
+                    else self._arrow_color
+                )
+                arrow_fill_right = (
+                    self._arrow_hover_color if self._hover_part == "increment"
+                    else self._arrow_color
+                )
+                cy = center
+                self.create_polygon(
+                    11, cy, 5, cy - 4, 5, cy + 4,
+                    fill=arrow_fill_left, outline="", tags="decrement"
+                )
+                self.create_polygon(
+                    width - 5, cy, width - 11, cy - 4, width - 11, cy + 4,
+                    fill=arrow_fill_right, outline="", tags="increment"
+                )
+            else:
+                start, end, thumb_start, thumb_end = self._thumb_geometry()
+                center = width / 2.0
+                thumb_half = max(2.0, min(width / 2.0 - 1.0, 6.0))
+                self._rounded_rect(
+                    self,
+                    center - thumb_half,
+                    thumb_start,
+                    center + thumb_half,
+                    thumb_end,
+                    thumb_half,
+                    self._thumb_color if self._hover_part != "thumb" else self._thumb_hover_color,
+                    "thumb",
+                )
+                arrow_fill_up = (
+                    self._arrow_hover_color if self._hover_part == "decrement"
+                    else self._arrow_color
+                )
+                arrow_fill_down = (
+                    self._arrow_hover_color if self._hover_part == "increment"
+                    else self._arrow_color
+                )
+                cx = center
+                self.create_polygon(
+                    cx, 5, cx - 4, 11, cx + 4, 11,
+                    fill=arrow_fill_up, outline="", tags="decrement"
+                )
+                self.create_polygon(
+                    cx, height - 5, cx - 4, height - 11, cx + 4, height - 11,
+                    fill=arrow_fill_down, outline="", tags="increment"
+                )
+        except Exception:
+            pass
+
+    def _position_from_event(self, event):
+        return event.x if self.orient == "horizontal" else event.y
+
+    def _is_in_thumb(self, position):
+        _, _, thumb_start, thumb_end = self._thumb_geometry()
+        return thumb_start <= position <= thumb_end
+
+    def _region(self, position):
+        width, height = self._dimensions()
+        total = width if self.orient == "horizontal" else height
+        if position < self.ARROW_SIZE:
+            return "decrement"
+        if position >= total - self.ARROW_SIZE:
+            return "increment"
+        if self._is_in_thumb(position):
+            return "thumb"
+        return "track"
+
+    def _run_command(self, *args):
+        if callable(self.command):
+            try:
+                self.command(*args)
+            except Exception:
+                pass
+
+    def _scroll_one(self, direction):
+        self._run_command("scroll", direction, "units")
+
+    def _start_repeat(self, direction):
+        self._cancel_repeat()
+        self._scroll_one(direction)
+
+        def repeat():
+            self._repeat_job = None
+            if self._drag_offset is None:
+                self._scroll_one(direction)
+                self._repeat_job = self.after(self.REPEAT_INTERVAL, repeat)
+
+        self._repeat_job = self.after(self.REPEAT_DELAY, repeat)
+
+    def _cancel_repeat(self):
+        job = self._repeat_job
+        self._repeat_job = None
+        if job is not None:
+            try:
+                self.after_cancel(job)
+            except Exception:
+                pass
+
+    def _on_press(self, event):
+        position = self._position_from_event(event)
+        region = self._region(position)
+        if region == "decrement":
+            self._drag_offset = None
+            self._start_repeat(-1)
+        elif region == "increment":
+            self._drag_offset = None
+            self._start_repeat(1)
+        elif region == "thumb":
+            self._cancel_repeat()
+            _, _, thumb_start, _ = self._thumb_geometry()
+            self._drag_offset = position - thumb_start
+        else:
+            self._cancel_repeat()
+            _, _, thumb_start, thumb_end = self._thumb_geometry()
+            if position < thumb_start:
+                self._run_command("scroll", -1, "pages")
+            elif position > thumb_end:
+                self._run_command("scroll", 1, "pages")
+
+    def _on_motion(self, event):
+        if self._drag_offset is None:
+            return
+        start, end, thumb_start, thumb_end = self._thumb_geometry()
+        thumb_length = thumb_end - thumb_start
+        movable = max(1.0, (end - start) - thumb_length)
+        position = self._position_from_event(event)
+        target = position - self._drag_offset
+        fraction = max(0.0, min(1.0, (target - start) / movable))
+        self._run_command("moveto", fraction)
+        self._hover_part = "thumb"
+        self._redraw()
+
+    def _on_release(self, _event):
+        self._cancel_repeat()
+        self._drag_offset = None
+
+    def _on_motion_hover(self, event):
+        if self._drag_offset is not None:
+            return
+        region = self._region(self._position_from_event(event))
+        if region != self._hover_part:
+            self._hover_part = region
+            self._redraw()
+
+    def _on_leave(self, _event):
+        if self._drag_offset is None:
+            self._hover_part = None
+            self._redraw()
+
+    def destroy(self):
+        self._cancel_repeat()
+        return super().destroy()
+
+
 def _ui_windows_scrollbar_colors():
-    """Paleta da barra clássica de rolagem usada em todo o aplicativo."""
+    """Paleta visual da barra arredondada usada em todo o aplicativo."""
     dark = str(ctk.get_appearance_mode()).lower() == "dark"
     if dark:
         return {
-            "bg": "#5F5F5F",
-            "activebackground": "#7A7A7A",
-            "troughcolor": "#252525",
+            "bg": "#252525",
+            "thumb": "#626262",
+            "thumb_hover": "#777777",
+            "arrow": "#C2C2C2",
+            "arrow_hover": "#FFFFFF",
         }
     return {
-        "bg": "#858585",
-        "activebackground": "#6E6E6E",
-        "troughcolor": "#E4E4E4",
+        "bg": "#F3F3F3",
+        "thumb": "#C8C8C8",
+        "thumb_hover": "#AFAFAF",
+        "arrow": "#707070",
+        "arrow_hover": "#595959",
     }
 
 
 def _ui_update_windows_scrollbar(scrollable):
-    """Atualiza a barra clássica conforme o tema atual."""
+    """Atualiza a barra arredondada conforme o tema atual."""
     bar = getattr(scrollable, "_sm_windows_scrollbar", None)
     if bar is None:
         return
     try:
         if not bar.winfo_exists():
             return
-        bar.configure(**_ui_windows_scrollbar_colors())
+        colors = _ui_windows_scrollbar_colors()
+        bar.set_colors(
+            colors["bg"],
+            colors["thumb"],
+            colors["thumb_hover"],
+            colors["arrow"],
+            colors["arrow_hover"],
+        )
     except Exception:
         pass
 
 
 def _ui_install_windows_scrollbar(scrollable):
-    """
-    Substitui a barra vertical do CTkScrollableFrame por tk.Scrollbar.
-    O tk.Scrollbar usa as setas clássicas superior/inferior do Windows.
-    """
+    """Instala a barra arredondada com setas em um CTkScrollableFrame."""
     try:
         if getattr(scrollable, "_sm_windows_scrollbar", None) is not None:
             _ui_update_windows_scrollbar(scrollable)
@@ -479,26 +785,30 @@ def _ui_install_windows_scrollbar(scrollable):
                 except Exception:
                     pass
 
-        bar = tk.Scrollbar(
+        colors = _ui_windows_scrollbar_colors()
+        bar = _SMWindowsRoundedScrollbar(
             parent,
             orient="vertical",
             command=canvas.yview,
             width=16,
-            borderwidth=0,
-            relief="flat",
-            highlightthickness=0,
-            takefocus=False,
-            **_ui_windows_scrollbar_colors(),
+            bg=colors["bg"],
         )
         bar.grid(row=1, column=1, sticky="ns", padx=0, pady=0)
+        bar.set_colors(
+            colors["bg"],
+            colors["thumb"],
+            colors["thumb_hover"],
+            colors["arrow"],
+            colors["arrow_hover"],
+        )
         canvas.configure(yscrollcommand=bar.set)
         scrollable._sm_windows_scrollbar = bar
     except Exception:
-        LOGGER.debug("Não foi possível instalar a barra clássica.", exc_info=True)
+        LOGGER.debug("Não foi possível instalar a barra arredondada.", exc_info=True)
 
 
 def _ui_install_scrollbar_autopatch():
-    """Faz com que toda nova CTkScrollableFrame receba a barra de referência."""
+    """Faz com que todo CTkScrollableFrame use a barra arredondada com setas."""
     cls = ctk.CTkScrollableFrame
     if getattr(cls, "_sm_windows_scrollbar_installed", False):
         return
@@ -514,33 +824,53 @@ def _ui_install_scrollbar_autopatch():
 
 
 def _ui_make_windows_scrollbar(parent, orient, command):
-    """Cria a mesma barra clássica para widgets Tk/ttk."""
-    return tk.Scrollbar(
+    """Cria a mesma barra arredondada para widgets Tk."""
+    colors = _ui_windows_scrollbar_colors()
+    bar = _SMWindowsRoundedScrollbar(
         parent,
         orient=orient,
         command=command,
-        width=16,
-        borderwidth=0,
-        relief="flat",
-        highlightthickness=0,
-        takefocus=False,
-        **_ui_windows_scrollbar_colors(),
+        width=16 if orient == "vertical" else 120,
+        height=16 if orient == "horizontal" else 120,
+        bg=colors["bg"],
     )
+    bar.set_colors(
+        colors["bg"],
+        colors["thumb"],
+        colors["thumb_hover"],
+        colors["arrow"],
+        colors["arrow_hover"],
+    )
+    return bar
 
 
 def _ui_refresh_all_windows_scrollbars(root):
-    """Reaplica a paleta da referência em todas as barras instaladas."""
+    """Reaplica o tema a todas as barras arredondadas."""
     if root is None:
         return
     stack = [root]
     while stack:
         widget = stack.pop()
-        bar = getattr(widget, "_sm_windows_scrollbar", None)
-        if bar is not None:
-            _ui_update_windows_scrollbar(widget)
-        if isinstance(widget, tk.Scrollbar):
+        if isinstance(widget, _SMWindowsRoundedScrollbar):
             try:
-                widget.configure(**_ui_windows_scrollbar_colors())
+                colors = _ui_windows_scrollbar_colors()
+                widget.set_colors(
+                    colors["bg"],
+                    colors["thumb"],
+                    colors["thumb_hover"],
+                    colors["arrow"],
+                    colors["arrow_hover"],
+                )
+            except Exception:
+                pass
+        elif isinstance(widget, tk.Scrollbar):
+            try:
+                colors = _ui_windows_scrollbar_colors()
+                widget.configure(
+                    bg=colors["thumb"],
+                    activebackground=colors["thumb_hover"],
+                    troughcolor=colors["bg"],
+                )
             except Exception:
                 pass
         try:
@@ -3958,17 +4288,20 @@ class App:
         except Exception:
             self._historico_layout_width = 0
 
-        if self._execucao_atual:
+        if self._execucao_atual and self._historico_execucao_tem_erros(self._execucao_atual):
             self._criar_pasta_historico(self._execucao_atual, atual=True)
 
-        historico_visivel = list(self._historico_execucoes)
+        historico_visivel = [
+            item for item in self._historico_execucoes
+            if self._historico_execucao_tem_erros(item)
+        ]
 
-        if not historico_visivel and not self._execucao_atual:
+        if not historico_visivel:
             self._historico_selecionados.clear()
             self._atualizar_visual_selecao_historico()
             self._atualizar_botao_apagar_historico()
             ctk.CTkLabel(
-                self.historico_lista, text="Nenhuma execução registrada ainda.",
+                self.historico_lista, text="Nenhuma execução com erros registrada ainda.",
                 text_color=self.SUBTEXT, font=("Segoe UI", 10)
             ).pack(anchor="w", padx=8, pady=8)
             return
@@ -3983,6 +4316,17 @@ class App:
             self._criar_pasta_historico(execucao)
         self._atualizar_visual_selecao_historico()
         self._atualizar_botao_apagar_historico()
+
+    @staticmethod
+    def _historico_execucao_tem_erros(execucao):
+        if not isinstance(execucao, dict):
+            return False
+        try:
+            if int(execucao.get("erros", 0) or 0) > 0:
+                return True
+        except (TypeError, ValueError):
+            pass
+        return str(execucao.get("status", "")).strip().casefold() == "erro geral"
 
     def _id_historico_execucao(self, execucao):
         if not isinstance(execucao, dict):
@@ -4436,6 +4780,8 @@ class App:
         payload = {
             "version": 1,
             "updated_at": datetime.now().isoformat(timespec="seconds"),
+            "processed_fingerprint": "",
+            "processed_at": "",
             "cells": snapshot,
         }
         atomic_write_json(self._planilha_arquivo, payload)
@@ -4459,6 +4805,72 @@ class App:
                 "A planilha foi gravada, mas a conferência do arquivo "
                 "não corresponde aos dados atuais.",
             )
+    @staticmethod
+    @staticmethod
+    def _planilha_fingerprint(cells):
+        """Gera uma impressão estável do conteúdo relevante da planilha."""
+        normalizados = {
+            str(chave): str(valor)
+            for chave, valor in (cells or {}).items()
+            if str(valor) != ""
+        }
+        payload = json.dumps(
+            sorted(normalizados.items()),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+    def _planilha_foi_processada(self, cells):
+        """Retorna True quando a revisão salva já foi concluída pela automação."""
+        fingerprint = self._planilha_fingerprint(cells)
+
+        # O marcador persistido continua válido mesmo depois de o histórico
+        # visual ser apagado pelo usuário.
+        try:
+            data = read_json_with_backup(self._planilha_arquivo, {})
+            if (
+                isinstance(data, dict)
+                and str(data.get("processed_fingerprint", "")).strip() == fingerprint
+            ):
+                return True
+        except Exception:
+            pass
+
+        # Fallback para execuções registradas antes do marcador persistido.
+        for execucao in reversed(getattr(self, "_historico_execucoes", [])):
+            if not isinstance(execucao, dict):
+                continue
+            if str(execucao.get("origem", "")).strip() != "planilha_interna":
+                continue
+            status = str(execucao.get("status", "")).strip().casefold()
+            if status != "concluída":
+                continue
+            if str(execucao.get("planilha_fingerprint", "")).strip() == fingerprint:
+                return True
+        return False
+
+    def _marcar_planilha_interna_processada(self, cells):
+        """Persiste que a revisão salva foi processada com sucesso."""
+        try:
+            self._garantir_pasta_planilha()
+            data = read_json_with_backup(self._planilha_arquivo, {})
+            if not isinstance(data, dict):
+                data = {}
+            data["version"] = 1
+            data["cells"] = {
+                str(chave): str(valor)
+                for chave, valor in (cells or {}).items()
+                if str(valor) != ""
+            }
+            data["processed_fingerprint"] = self._planilha_fingerprint(cells)
+            data["processed_at"] = datetime.now().isoformat(timespec="seconds")
+            atomic_write_json(self._planilha_arquivo, data)
+        except Exception:
+            LOGGER.exception("Falha ao registrar a planilha interna como processada.")
+
+
     def _planilha_tem_alteracoes(self):
         return self._planilha_data != self._planilha_salva_data
 
@@ -4511,9 +4923,30 @@ class App:
             except Exception:
                 pass
 
+        recuperar_rascunho = False
         if dados_iniciais is None:
             self._preparar_planilha_do_dia()
-            self._planilha_data=self._carregar_planilha_interna()
+            ultima = self._carregar_planilha_interna()
+            if ultima:
+                if self._planilha_foi_processada(ultima):
+                    self._planilha_apagar_rascunho()
+                    self._planilha_data = {}
+                else:
+                    recuperar = messagebox.askyesno(
+                        "Recuperar última planilha",
+                        "A última planilha salva ainda não foi processada.\\n\\n"
+                        "Deseja recuperá-la?",
+                        parent=self.app,
+                    )
+                    if recuperar:
+                        self._planilha_data = dict(ultima)
+                        recuperar_rascunho = True
+                    else:
+                        self._planilha_apagar_rascunho()
+                        self._planilha_data = {}
+            else:
+                self._planilha_data = {}
+                recuperar_rascunho = True
         else:
             self._planilha_data={str(k):str(v) for k,v in dados_iniciais.items() if str(v)!=""}
         self._planilha_salva_data=dict(self._planilha_data)
@@ -4542,7 +4975,8 @@ class App:
         except Exception:
             pass
 
-        self._planilha_recuperar_rascunho_se_houver()
+        if recuperar_rascunho:
+            self._planilha_recuperar_rascunho_se_houver()
 
         toolbar=ctk.CTkFrame(win, fg_color=self.CARD, corner_radius=0, height=64)
         toolbar.pack(fill="x"); toolbar.pack_propagate(False)
@@ -6365,6 +6799,7 @@ class App:
 
         self._iniciar_historico_execucao("Planilha interna",0,start)
         self._execucao_atual["origem"] = "planilha_interna"
+        self._execucao_atual["planilha_fingerprint"] = self._planilha_fingerprint(self._planilha_data)
         self._execucao_atual["total"] = len(codigos)
         self._execucao_atual["checkpoint"] = int(start)
         self._execucao_atual["proximo_indice"] = int(start)
@@ -6474,6 +6909,10 @@ class App:
             self._aplicar_status("Parado pelo usuário")
         else:
             self._add_activity("Processo finalizado.", self.SUCCESS)
+            try:
+                self._marcar_planilha_interna_processada(self._planilha_data)
+            except Exception:
+                pass
             self._finalizar_historico_execucao(resultado, "Concluída")
             # Aplicar imediatamente: evita que a messagebox bloqueie a atualização
             # do cabeçalho deixando-o visualmente em "Processando".

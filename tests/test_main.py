@@ -408,6 +408,73 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Tempo estimado restante"', block)
         self.assertIn('font=("Segoe UI", 8, "bold")', block)
 
+    def test_planilha_recupera_ultima_apenas_quando_nao_processada(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _planilha_fingerprint", source)
+        self.assertIn("def _planilha_foi_processada", source)
+        self.assertIn('status != "concluída"', source)
+        self.assertIn('"A última planilha salva ainda não foi processada.', source)
+
+    def test_planilha_processada_abre_nova_vazia_e_apaga_rascunho(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def abrir_planilha(self, dados_iniciais=None):")
+        end = source.index("def _", start + 10)
+        block = source[start:end]
+        self.assertIn("if self._planilha_foi_processada(ultima):", block)
+        self.assertIn("self._planilha_apagar_rascunho()", block)
+        self.assertIn("self._planilha_data = {}", block)
+
+    def test_historico_de_erros_renderiza_pasta_apenas_com_erros(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _restaurar_historico_na_tela")
+        end = source.index("def _id_historico_execucao", start)
+        block = source[start:end]
+        self.assertIn("self._historico_execucao_tem_erros(item)", block)
+        self.assertIn('Nenhuma execução com erros registrada ainda.', block)
+
+    def test_historico_de_erros_considera_erro_geral(self):
+        import interface
+        self.assertTrue(interface.App._historico_execucao_tem_erros({"erros": 1}))
+        self.assertTrue(interface.App._historico_execucao_tem_erros({"status": "Erro geral", "erros": 0}))
+        self.assertFalse(interface.App._historico_execucao_tem_erros({"status": "Concluída", "erros": 0}))
+
+    def test_planilha_processada_persiste_e_impede_reabertura_da_mesma_revisao(self):
+        import interface
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            obj = object.__new__(interface.App)
+            obj._planilha_arquivo = Path(temp_dir) / "planilha_interna.json"
+            obj._planilha_data = {"0,0": "1", "0,1": "ABC", "0,2": "Item"}
+            obj._salvar_planilha_interna_data()
+
+            self.assertFalse(obj._planilha_foi_processada(obj._planilha_data))
+            obj._marcar_planilha_interna_processada(obj._planilha_data)
+            self.assertTrue(obj._planilha_foi_processada(obj._planilha_data))
+
+            data = interface.read_json_with_backup(obj._planilha_arquivo, {})
+            self.assertEqual(
+                data.get("processed_fingerprint"),
+                obj._planilha_fingerprint(obj._planilha_data),
+            )
+
+    def test_planilha_nova_revisao_limpa_marcador_de_processamento(self):
+        import interface
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            obj = object.__new__(interface.App)
+            obj._planilha_arquivo = Path(temp_dir) / "planilha_interna.json"
+            obj._planilha_data = {"0,0": "1", "0,1": "ABC"}
+            obj._salvar_planilha_interna_data()
+            obj._marcar_planilha_interna_processada(obj._planilha_data)
+            obj._planilha_data = {"0,0": "2", "0,1": "XYZ"}
+            obj._salvar_planilha_interna_data()
+
+            data = interface.read_json_with_backup(obj._planilha_arquivo, {})
+            self.assertEqual(data.get("processed_fingerprint"), "")
+            self.assertFalse(obj._planilha_foi_processada(obj._planilha_data))
+
     def test_planilha_salva_e_recarrega_dados_pelo_mesmo_caminho(self):
         import tempfile
         import interface
@@ -570,6 +637,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("math.sin", exec_block)
         self.assertIn("self.status_indicator.configure(bg=canvas_bg)", exec_block)
         self.assertIn("self.status_indicator.itemconfigure(", exec_block)
+
+    def test_scrollbars_usam_referencia_arredondada_com_setas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("class _SMWindowsRoundedScrollbar(tk.Canvas):", source)
+        self.assertIn("ARROW_SIZE = 16", source)
+        self.assertIn("def _rounded_rect", source)
+        self.assertIn("create_polygon", source)
+        self.assertIn("_ui_install_scrollbar_autopatch()", source)
+        self.assertNotIn("ttk.Scrollbar", source)
 
     def test_reposicionamento_de_menus_e_coalescido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")

@@ -69,21 +69,19 @@ jobs:
     needs: validate
     if: >-
       ${{ needs.validate.result == 'success' &&
-          ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-           (github.event_name == 'pull_request' && github.event.action == 'closed' &&
-            github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')) }}
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
-      actions: write
 
     steps:
       - name: Verificar que a main não mudou
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VALIDATED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+          VALIDATED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
@@ -97,7 +95,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VALIDATED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+          VALIDATED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           version_b64="$(gh api "repos/${GITHUB_REPOSITORY}/contents/VERSION?ref=${VALIDATED_SHA}" --jq '.content' | tr -d '\n')"
@@ -143,7 +141,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          VALIDATED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+          VALIDATED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           set +e
@@ -170,14 +168,3 @@ jobs:
             exit 1
           fi
           echo "Tag ${RELEASE_TAG} -> ${VALIDATED_SHA}"
-
-      - name: Disparar workflow da release
-        if: steps.release.outputs.published != 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          set -euo pipefail
-          gh workflow run release.yml --repo "${GITHUB_REPOSITORY}" --ref "${RELEASE_TAG}" -f "release_tag=${RELEASE_TAG}"
-          echo "Workflow de release disparado para ${RELEASE_TAG}."
