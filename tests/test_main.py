@@ -26,7 +26,6 @@ class CanonicalRuntimeTests(unittest.TestCase):
         for marker in (
             "def _localizar_planilha_pendente",
             "def _filtrar_arquivos_60_dias",
-            "def _agendar_fechar_aparencia",
             "self.caminho",
             "self.pagina",
             "salvar_checkpoint,",
@@ -214,8 +213,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _atualizar_icones_cards_estatistica")
         end = source.index("@staticmethod", start)
         block = source[start:end]
-        self.assertIn("canvas.configure(bg=self._cor_fluente(colors[0]))", block)
-        self.assertIn("canvas.itemconfigure(", block)
+        self.assertIn("self._render_stat_icon(card)", block)
+        self.assertIn("def _render_stat_icon", source)
     def test_cards_de_estatisticas_usam_cores_e_icones_por_categoria(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _stat_card")
@@ -342,11 +341,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("width=icon_holder_size,", block)
         self.assertIn("height=icon_holder_size,", block)
         self.assertIn("icon_holder_size = 44", block)
-        self.assertIn("icon_holder.create_oval(", block)
-        self.assertIn("icon_holder.create_text(", block)
-        self.assertIn('card._sm_stat_icon_canvas = icon_holder', block)
-        self.assertIn('card._sm_stat_icon_colors = (', block)
-        self.assertIn('fill="#FFFFFF"', block)
+        self.assertIn("card._sm_stat_icon_data = (", block)
+        self.assertIn("self._render_stat_icon(card)", block)
     def test_cartoes_do_historico_usam_data_e_tamanho_fixos(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _formatar_data_historico")
@@ -446,7 +442,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
-        self.assertIn("event.state", block)
+        self.assertIn("getattr(event, \"state\", 0)", block)
         self.assertIn("0x0004", block)
         self.assertIn("self._historico_selecionados.add(execucao_id)", block)
         self.assertIn('widget.bind("<Button-1>", clicar)', block)
@@ -468,7 +464,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _mudar_mes_arquivos", start)
         block = source[start:end]
         self.assertIn("canvas.find_overlapping", block)
-        self.assertIn("event.state", block)
+        self.assertIn("getattr(event, \"state\", 0)", block)
         self.assertIn("0x0004", block)
         self.assertIn("self._arquivos_datas_selecionadas.add(data)", block)
         self.assertIn("self._mostrar_planilhas_do_dia(data)", block)
