@@ -1,4 +1,4 @@
-# Testes de inicialização.
+# Testes da inicialização e do runtime principal.
 
 import unittest
 from pathlib import Path
