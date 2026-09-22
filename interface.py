@@ -5116,13 +5116,12 @@ class App:
         self._renderizar_calendario_arquivos()
 
     def _contar_codigos_mes(self, referencia=None):
-        """Retorna a quantidade de códigos do mês exibido no calendário.
+        """Retorna a quantidade de códigos efetivamente registrados em Arquivos no mês exibido.
 
-        A fonte principal é o histórico de execuções. Quando o mês não possui
-        registros de execução (por exemplo, históricos antigos migrados apenas
-        como planilhas salvas), faz fallback para o histórico de Arquivos e soma
-        as linhas preenchidas das planilhas daquele mês. Isso evita que meses
-        antigos apareçam como zero apesar de possuírem arquivos registrados.
+        O contador do calendário deve refletir a mesma fonte usada para os
+        destaques dos dias: o histórico de planilhas salvas. Execuções sem um
+        snapshot salvo não criam indicação no calendário e, portanto, não entram
+        neste contador.
         """
         referencia = referencia or datetime.now()
         if hasattr(referencia, "year") and hasattr(referencia, "month"):
@@ -5132,42 +5131,9 @@ class App:
             hoje = datetime.now()
             ano, mes = hoje.year, hoje.month
 
-        total_execucoes = 0
-        encontrou_execucao = False
-        for execucao in self._filtrar_historico_execucoes_60_dias(self._historico_execucoes):
-            try:
-                inicio = datetime.fromisoformat(str(execucao.get("inicio", "")))
-            except Exception:
-                continue
-            if inicio.year != ano or inicio.month != mes:
-                continue
-            encontrou_execucao = True
-
-            # Compatibilidade com históricos antigos: algumas execuções
-            # podem ter processados=0/ausente mesmo tendo códigos concluídos.
-            # Nesses casos, usamos a soma Executados + Não executados; como
-            # último recurso, usamos o total planejado.
-            processados = int(execucao.get("processados", 0) or 0)
-            sucessos = int(execucao.get("sucessos", 0) or 0)
-            erros = int(execucao.get("erros", 0) or 0)
-            planejados = int(execucao.get("total", 0) or 0)
-
-            if processados > 0:
-                quantidade = processados
-            elif (sucessos + erros) > 0:
-                quantidade = sucessos + erros
-            else:
-                quantidade = planejados
-            total_execucoes += quantidade
-
-        if encontrou_execucao and total_execucoes > 0:
-            return total_execucoes
-
-        # Fallback para meses que possuem Arquivos salvos, mas não possuem
-        # histórico de execução compatível (situação comum em dados antigos).
-        total_arquivos = 0
+        total = 0
         try:
-            for item in self._carregar_historico_planilhas():
+            for item in self._historico_planilhas_visiveis():
                 try:
                     salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
                 except Exception:
@@ -5178,10 +5144,10 @@ class App:
                     preenchidas = int(item.get("filled", 0) or 0)
                 except Exception:
                     preenchidas = 0
-                total_arquivos += max(0, preenchidas)
+                total += max(0, preenchidas)
         except Exception:
-            total_arquivos = 0
-        return total_arquivos
+            return 0
+        return total
 
     def _formatar_contador_arquivos(self, referencia=None):
         valor = self._contar_codigos_mes(referencia)
