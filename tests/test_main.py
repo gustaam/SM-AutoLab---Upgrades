@@ -140,6 +140,43 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("timeout /t 1 /nobreak", block)
         self.assertIn('restart_env["SM_AUTOLAB_UPDATE_HEALTH"]', block)
 
+    def test_atualizador_exibe_barra_de_download(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def download_file(")
+        end = source.index("def _escape_cmd_path", start)
+        block = source[start:end]
+        self.assertIn("Content-Length", block)
+        self.assertIn("progress_callback", block)
+        self.assertIn("progress_callback(downloaded_bytes, total_bytes)", block)
+        self.assertIn("def _mostrar_progresso_atualizacao", source)
+        self.assertIn("ctk.CTkProgressBar(", source)
+        self.assertIn("Baixando atualização v", source)
+        self.assertIn("def _atualizacao_atualizar_progresso", source)
+
+    def test_restore_bloqueia_redesenho_e_forca_repaint_unico(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _set_window_redraw", source)
+        self.assertIn("WM_SETREDRAW = 0x000B", source)
+        self.assertIn("def _redraw_window_now", source)
+        self.assertIn("RDW_ALLCHILDREN = 0x0080", source)
+        self.assertIn('self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")', source)
+        start = source.index("def _estabilizar_apos_retomada")
+        end = source.index("def config_app", start)
+        block = source[start:end]
+        self.assertIn("_set_window_redraw(self.app, True)", block)
+        self.assertIn("_redraw_window_now(self.app)", block)
+        self.assertNotIn("self.app.update_idletasks()", block)
+        self.assertIn("self._janela_redesenho_bloqueado = True", source)
+        self.assertIn('if getattr(self, "_janela_redesenho_bloqueado", False):', source)
+
+    def test_codigo_atual_usa_fonte_menor_sem_negrito(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _stat_card")
+        end = source.index("def _set_stat", start)
+        block = source[start:end]
+        self.assertIn('value_font = ("Segoe UI", 17) if str(title) == "Código atual" else ("Segoe UI", 19, "bold")', block)
+        self.assertIn("font=value_font", block)
+
     def test_bootstrap_sinaliza_inicio_bem_sucedido_para_atualizacao(self):
         source = (self.root / "main.py").read_text(encoding="utf-8")
         self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso", source)
@@ -510,16 +547,20 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _mostrar_menu_configuracoes")
         end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
         block = source[start:end]
-        self.assertLess(block.index('text="Verificar atualizações"'), block.index('text="Ajustes do Feegow"'))
-        self.assertLess(block.index('text="Ajustes do Feegow"'), block.index('text="Aparência  ›"'))
+        self.assertLess(block.index('text="Aparência  ›"'), block.index('text="Ajustes do Feegow"'))
+        self.assertLess(block.index('text="Ajustes do Feegow"'), block.index('text="Verificar atualizações"'))
 
     def test_status_animation_tem_intervalo_reduzido_de_renderizacao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _iniciar_pisca_status")
         end = source.index("def _interpolar_cor", start)
         block = source[start:end]
-        self.assertIn("self._status_anim_interval = 80 if self._status_blink_fast else 110", block)
-        self.assertIn("self._status_anim_frames = 18 if self._status_blink_fast else 20", block)
+        self.assertIn("self._status_anim_interval = 80 if self._status_blink_fast else 60", block)
+        self.assertIn("self._status_anim_frames = 18 if self._status_blink_fast else 24", block)
+        self.assertIn("self._status_anim_colors = cores", block)
+        exec_start = source.index("def _executar_pisca_status")
+        exec_end = source.index("def _aplicar_status", exec_start)
+        self.assertNotIn("self.status_indicator.configure(bg=canvas_bg)", source[exec_start:exec_end])
 
     def test_reposicionamento_de_menus_e_coalescido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
