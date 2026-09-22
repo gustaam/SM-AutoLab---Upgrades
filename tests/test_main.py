@@ -167,10 +167,13 @@ class CanonicalRuntimeTests(unittest.TestCase):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('historico_erros.json', source)
         start = source.index("def _salvar_estado_persistente")
-        end = source.index("def _criar_botao_erro", start)
+        end = source.index("def _salvar_erros_persistentes", start)
         block = source[start:end]
         self.assertNotIn('self._erros_codigos[-200:]', block)
-        self.assertIn("def _salvar_erros_persistentes", source)
+        erros_start = end
+        erros_end = source.index("def _criar_botao_erro", erros_start)
+        erros_block = source[erros_start:erros_end]
+        self.assertIn('self._erros_codigos[-200:]', erros_block)
         self.assertIn("self._salvar_erros_persistentes()", source)
 
     def test_pastas_do_historico_usam_largura_da_janela_no_primeiro_layout(self):
@@ -401,8 +404,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
         self.assertIn('strftime("%d/%m/%Y")', block)
-        self.assertIn("tile_width = 118", block)
-        self.assertIn("tile_height = 96", block)
+        self.assertIn("tile_width = 112", block)
+        self.assertIn("tile_height = 84", block)
         self.assertIn("grid_propagate(False)", block)
         self.assertNotIn('sticky="nsew"', block)
         self.assertNotIn('text=titulo[:24]', block)
@@ -493,8 +496,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _atualizar_visual_selecao_historico", start)
         block = source[start:end]
-        self.assertIn("tile_width = 118", block)
-        self.assertIn("tile_height = 96", block)
+        self.assertIn("tile_width = 112", block)
+        self.assertIn("tile_height = 84", block)
         self.assertIn("icon.pack(pady=(2, 0))", block)
         self.assertIn("error_label.pack(fill=\"x\", padx=2, pady=(2, 0))", block)
         self.assertIn("minsize=0", block)
