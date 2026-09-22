@@ -4,6 +4,7 @@ from __future__ import annotations
 import calendar as pycalendar
 import ctypes
 import hashlib
+import logging
 import json
 import os
 import re
@@ -417,6 +418,8 @@ REPO = "gustaam/SM-AutoLab---Upgrades"
 API_RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
 USER_AGENT = "SM AutoLab"
 UPDATE_CHANNEL = "SM-AUTOLAB-RESET-2026-09"
+LOGGER = logging.getLogger("sm_autolab.interface")
+
 MANIFEST_ASSET_NAMES = {
     "release-manifest.json",
     "sm autolab release manifest.json",
@@ -749,9 +752,6 @@ def launch_updater(update: dict) -> tuple[bool, str]:
         except OSError:
             pass
         return False, str(exc)
-
-if __name__ == "__main__":
-    print("SM AutoLab pronto.")
 
 from typing import Iterable, Mapping, Sequence
 
@@ -1732,7 +1732,6 @@ def _ler_versao_aplicativo():
     return "desconhecida"
 
 APP_VERSION = _ler_versao_aplicativo()
-HISTORICO_DIAS = 60
 ARQUIVOS_DIAS = 60
 
 class App:
@@ -2152,7 +2151,6 @@ class App:
         )
         actions.pack(fill="x", side="bottom")
         actions.pack_propagate(False)
-        actions.pack_propagate(False)
         self.status_label = ctk.CTkLabel(
             actions, text="Pronto para iniciar", text_color=self.SUBTEXT,
             font=("Segoe UI", 13, "bold")
@@ -2315,11 +2313,7 @@ class App:
             except Exception:
                 versao_atual = None
             if not versao_atual:
-                try:
-                    from updater import current_version
-                    versao_atual = current_version()
-                except Exception:
-                    versao_atual = APP_VERSION
+                versao_atual = APP_VERSION
             messagebox.showinfo(
                 "Atualizações",
                 f"Você já está usando a versão mais recente do SM AutoLab.\n\n"
@@ -2558,25 +2552,8 @@ class App:
 
         self.app.update_idletasks()
         self._reposicionar_menus()
-    def _entrar_mudar_feegow(self, _event=None):
-        if self._menu_aparencia is not None:
-            try:
-                self._menu_aparencia.destroy()
-            except Exception:
-                pass
-            self._menu_aparencia = None
-
     def _agendar_fechar_aparencia(self, _event=None):
         self._agendar_fechar_menus(_event)
-
-    def _fechar_submenu_aparencia(self):
-        self._menu_close_job = None
-        if self._menu_aparencia is not None:
-            try:
-                self._menu_aparencia.destroy()
-            except Exception:
-                pass
-            self._menu_aparencia = None
 
     def _cancelar_fechar_menus(self, _event=None):
         if self._menu_close_job is not None:
@@ -3089,21 +3066,6 @@ class App:
         self.atividade.see("end")
         self.atividade.configure(state="disabled")
 
-    def _filtrar_historico_execucoes_60_dias(self, execucoes):
-        agora = datetime.now()
-        limite = agora - timedelta(days=HISTORICO_DIAS)
-        validas = []
-        for execucao in execucoes or []:
-            if not isinstance(execucao, dict):
-                continue
-            try:
-                inicio = datetime.fromisoformat(str(execucao.get("inicio", "")))
-            except Exception:
-                continue
-            if limite <= inicio <= agora:
-                validas.append(execucao)
-        return validas
-
     def _carregar_estado_persistente(self):
         try:
             registros = []
@@ -3170,6 +3132,7 @@ class App:
             ):
                 self._salvar_estado_persistente()
         except Exception:
+            LOGGER.exception("Falha ao carregar o histórico persistente.")
             self._historico_execucoes = []
             self._erros_codigos = []
 
@@ -3186,7 +3149,7 @@ class App:
             self._historico_arquivo.parent.mkdir(parents=True, exist_ok=True)
             atomic_write_json(self._historico_arquivo, dados)
         except Exception:
-            pass
+            LOGGER.exception("Falha ao salvar o estado persistente do aplicativo.")
 
     def _criar_botao_erro(self, codigo, parent):
         codigo = str(codigo)
@@ -3240,26 +3203,47 @@ class App:
 
         proximo = max(1, inicio)
 
-        # The persisted record stores only the spreadsheet filename, so resolve
-        # it from the last selected path when available. The path itself is also
-        # restored by the normal persistent state when present.
-        caminho = self.caminho
-        if not caminho:
-            caminho = self._localizar_planilha_pendente(planilha_nome)
-        if caminho and Path(caminho).exists():
-            self.caminho = str(caminho)
-            self.planilha_label.configure(text=Path(caminho).name)
+        origem = str(pendente.get("origem", "")).strip()
+        if origem != "planilha_interna":
+            # A planilha externa pertence ao fluxo legado, que não faz mais
+            # parte da interface canônica. Não tente acessar widgets removidos
+            # (planilha_label/pagina) nem iniciar a automação interna com dados
+            # que não foram carregados pela grade atual.
+            self._retomada_dialogo_aberto = True
             try:
-                self.pagina.delete(0, "end")
-                self.pagina.insert(0, str(pagina))
-            except Exception:
-                pass
+                pendente["status"] = "Retomada manual necessária"
+                pendente["mensagem"] = (
+                    "A execução interrompida pertence ao fluxo antigo de "
+                    "planilha externa e não pode ser retomada automaticamente "
+                    "pela interface atual."
+                )
+                self._salvar_estado_persistente()
+                messagebox.showwarning(
+                    "Retomada antiga",
+                    "Foi encontrada uma execução interrompida de uma versão "
+                    "anterior do SM AutoLab. O fluxo antigo de planilha externa "
+                    "não está mais disponível para retomada automática. "
+                    "Abra a planilha interna e inicie uma nova execução.",
+                    parent=self.app,
+                )
+            finally:
+                self._retomada_dialogo_aberto = False
+            return
 
+        try:
+            codigos = self._extrair_codigos_planilha()
+            interno = ler_checkpoint_interno(codigos) if codigos else None
+            if interno is not None:
+                inicio = int(interno)
+        except Exception:
+            pass
+
+        proximo = max(1, inicio)
         self._retomada_dialogo_aberto = True
         try:
             detalhes = (
                 "Foi encontrado um processamento interrompido.\n\n"
-                f"Planilha: {planilha_nome or Path(caminho).name if caminho else 'não identificada'}\n"
+                f"Planilha: {planilha_nome or 'Planilha interna'}\n"
                 f"Página: {pagina}\n"
                 f"Próximo código: {proximo}\n\n"
                 "Deseja continuar de onde parou?"
@@ -3267,22 +3251,15 @@ class App:
             resposta = messagebox.askyesno(
                 "Retomar processamento",
                 detalhes,
-                parent=self.app
+                parent=self.app,
             )
             if resposta:
-                if str(pendente.get("origem", "")) == "planilha_interna":
-                    self.iniciar_thread()
-                elif caminho and Path(caminho).exists():
-                    self.iniciar_thread()
-                else:
-                    messagebox.showwarning(
-                        "Planilha não encontrada",
-                        "A planilha do processamento interrompido não foi localizada. "
-                        "Selecione a planilha e clique em Iniciar para continuar.",
-                        parent=self.app
-                    )
+                self.iniciar_thread()
             else:
-                self._add_activity("Retomada recusada na abertura do aplicativo.", self.INFO)
+                self._add_activity(
+                    "Retomada recusada na abertura do aplicativo.",
+                    self.INFO,
+                )
         finally:
             self._retomada_dialogo_aberto = False
 
@@ -3342,7 +3319,6 @@ class App:
         self._execucao_atual["processados"] = int(getattr(resultado, "processados", 0) or 0)
         self._execucao_atual["codigos_erros"] = [str(item.codigo) for item in resultado.itens if item.status == "Erro"]
         self._historico_execucoes.append(dict(self._execucao_atual))
-        self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(self._historico_execucoes)
         self._execucao_atual = None
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
@@ -3356,7 +3332,6 @@ class App:
         self._execucao_atual["status"] = "Erro geral"
         self._execucao_atual["mensagem"] = str(mensagem)
         self._historico_execucoes.append(dict(self._execucao_atual))
-        self._historico_execucoes = self._filtrar_historico_execucoes_60_dias(self._historico_execucoes)
         self._execucao_atual = None
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
@@ -3453,7 +3428,6 @@ class App:
             font=("Segoe UI", 8),
             anchor="center",
         ).pack(pady=(2, 0))
-        detalhe=ctk.CTkToplevel(self.app) if False else None
         def selecionar(_e=None):
             for sibling in self._hist_grid.winfo_children():
                 sibling.configure(border_color=self.BORDER, fg_color=("#FFFFFF", "#2D3338"))
@@ -4239,13 +4213,6 @@ class App:
                     self._planilha_editar_iid(focus,0)
         return "break"
 
-    def _planilha_editar_celula(self,event):
-        tree=self._planilha_tree
-        if tree is None: return
-        row=tree.identify_row(event.y); col=tree.identify_column(event.x)
-        if not row or col not in ("#1","#2","#3"): return
-        self._planilha_editar_iid(row,int(col[1:])-1)
-
     def _planilha_editar_iid(self,iid,col_index):
         tree=self._planilha_tree
         if tree is None:return
@@ -4401,37 +4368,6 @@ class App:
         vals=["\t".join(map(str,tree.item(i,"values"))) for i in rows]
         self.app.clipboard_clear(); self.app.clipboard_append("\n".join(vals)); return "break"
 
-    def _planilha_foco_pertence_a_grade(self):
-        """Retorna True quando o foco atual está dentro da janela/grade da planilha."""
-        tree = getattr(self, "_planilha_tree", None)
-        if tree is None:
-            return False
-        try:
-            focused = self.app.focus_get()
-        except Exception:
-            focused = None
-        if focused is None:
-            return False
-
-        # A edição da célula usa um Entry filho do Treeview; nesse caso o
-        # foco continua pertencendo à planilha, mas o paste deve ser nativo.
-        current = focused
-        try:
-            tree_path = str(tree)
-            while current is not None:
-                if str(current) == tree_path:
-                    return True
-                parent_path = current.winfo_parent()
-                if not parent_path:
-                    break
-                current = current._nametowidget(parent_path)
-        except Exception:
-            try:
-                return str(focused).startswith(str(tree))
-            except Exception:
-                return False
-        return False
-
     def _planilha_colar_entry(self, event=None):
         """Fallback de Ctrl+V para o Entry usado na edição de uma célula."""
         entry = getattr(self, "_planilha_edit_entry", None)
@@ -4450,18 +4386,6 @@ class App:
         except Exception:
             return "break"
         return "break"
-
-    def _planilha_colar_teclado(self, event=None):
-        """Handler redundante de teclado para tornar Ctrl+V independente do Tk."""
-        entry = getattr(self, "_planilha_edit_entry", None)
-        if entry is not None:
-            try:
-                focused = self.app.focus_get()
-            except Exception:
-                focused = None
-            if focused is entry:
-                return self._planilha_colar_entry(event)
-        return self._planilha_colar(event)
 
     def _planilha_colar(self, event=None):
         tree = self._planilha_tree
@@ -5450,9 +5374,6 @@ class App:
         self._renderizar_calendario_arquivos()
         win.update_idletasks()
 
-    def _fechar_janela_planilha(self):
-        self._planilha_encerrar_janela()
-
     def _planilha_salvar_e_iniciar(self):
         self._planilha_fechar_edicao()
         if not self._validar_planilha_antes_execucao():
@@ -5780,12 +5701,6 @@ class App:
             )
         except Exception:
             self._status_blink_job = None
-
-    def _agendar_retorno_pronto(self):
-        if self._status_finalizado_job is not None:
-            try:self.app.after_cancel(self._status_finalizado_job)
-            except Exception:pass
-        self._status_finalizado_job=self.app.after(10000,lambda:self._aplicar_status("Pronto"))
 
     def _aplicar_status(self, texto):
         self.status_label.configure(text=texto.replace("Status:", "").strip())
