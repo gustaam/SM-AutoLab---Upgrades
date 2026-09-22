@@ -1693,6 +1693,7 @@ __all__ = [
 
 # Windows/DWM helpers used directly by the canonical UI.
 
+DWMWA_TRANSITIONS_FORCEDISABLED = 3
 DWMWA_SYSTEMBACKDROP_TYPE = 38
 DWMWCP_ROUND = 2
 DWMSBT_AUTO = 0
@@ -1700,6 +1701,21 @@ DWMSBT_NONE = 1
 DWMSBT_MAINWINDOW = 2
 DWMSBT_TRANSIENTWINDOW = 3
 DWMSBT_TABBEDWINDOW = 4
+
+def desabilitar_transicoes_dwm(window) -> bool:
+    """Desabilita apenas as transições DWM desta janela, sem alterar o Windows globalmente."""
+    if os.name != "nt" or window is None:
+        return False
+    try:
+        window.update_idletasks()
+        hwnd = int(window.winfo_id())
+        return _set_dwm_attribute(
+            hwnd,
+            DWMWA_TRANSITIONS_FORCEDISABLED,
+            ctypes.c_int(1),
+        )
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
 
 def _windows11_available():
     if os.name != "nt":
@@ -1774,47 +1790,6 @@ def atualizar_backdrop_tema(window, dark: bool):
     except Exception:
         return False
     return _set_dwm_attribute(hwnd, 20, ctypes.c_int(1 if dark else 0))
-
-def _set_window_redraw(window, enabled: bool) -> bool:
-    """Bloqueia/libera o redesenho Tk durante minimizar/restaurar."""
-    if os.name != "nt" or window is None:
-        return False
-    try:
-        hwnd = int(window.winfo_id())
-        user32 = ctypes.WinDLL("user32", use_last_error=True)
-        send = user32.SendMessageW
-        send.argtypes = [wintypes.HWND, wintypes.UINT, ctypes.c_size_t, ctypes.c_ssize_t]
-        send.restype = wintypes.LPARAM
-        WM_SETREDRAW = 0x000B
-        send(
-            wintypes.HWND(hwnd),
-            wintypes.UINT(WM_SETREDRAW),
-            ctypes.c_size_t(1 if enabled else 0),
-            ctypes.c_ssize_t(0),
-        )
-        return True
-    except (AttributeError, OSError, TypeError, ValueError):
-        return False
-
-def _redraw_window_now(window) -> bool:
-    """Força um único repaint da janela e dos filhos após a restauração."""
-    if os.name != "nt" or window is None:
-        return False
-    try:
-        hwnd = int(window.winfo_id())
-        user32 = ctypes.WinDLL("user32", use_last_error=True)
-        redraw = user32.RedrawWindow
-        redraw.argtypes = [wintypes.HWND, ctypes.c_void_p, wintypes.HRGN, wintypes.UINT]
-        redraw.restype = wintypes.BOOL
-        RDW_INVALIDATE = 0x0001
-        RDW_ALLCHILDREN = 0x0080
-        RDW_UPDATENOW = 0x0100
-        return bool(redraw(
-            wintypes.HWND(hwnd), None, None,
-            RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW,
-        ))
-    except (AttributeError, OSError, TypeError, ValueError):
-        return False
 
 def _ler_versao_aplicativo():
     """Lê a versão embutida no executável/projeto."""
@@ -1908,7 +1883,6 @@ class App:
         self._status_blink_job = None
         self._status_blink_visible = True
         self._status_blink_fast = False
-        self._janela_redesenho_bloqueado = False
         self._status_finalizado_job = None
         self._execucao_inicio_monotonic = None
         self._execucao_timer_job = None
@@ -1947,37 +1921,20 @@ class App:
     def _agendar_estabilizacao_apos_retomada(self, _event=None):
         if self._closing:
             return
-        job = getattr(self, "_app_restore_job", None)
-        if job is not None:
-            try:
-                self.app.after_cancel(job)
-            except Exception:
-                pass
+        # Não fazemos relayout nem repaint artificial no restore. O DWM está
+        # configurado para não animar a transição dessa janela.
         try:
-            self._app_restore_job = self.app.after(30, self._estabilizar_apos_retomada)
+            desabilitar_transicoes_dwm(self.app)
         except Exception:
-            self._app_restore_job = None
+            pass
 
     def _estabilizar_apos_retomada(self):
-        self._app_restore_job = None
-        if self._closing:
-            return
-        try:
-            _set_window_redraw(self.app, True)
-            _redraw_window_now(self.app)
-            self._janela_redesenho_bloqueado = False
-        except Exception:
-            self._janela_redesenho_bloqueado = False
+        return
 
     def _preparar_minimizacao(self, _event=None):
         if self._closing:
             return
-        try:
-            self._janela_redesenho_bloqueado = True
-            _set_window_redraw(self.app, False)
-        except Exception:
-            pass
-        self._fechar_menus
+        self._fechar_menus()
 
     def config_app(self):
         self.app.title("SM AutoLab")
@@ -1986,6 +1943,12 @@ class App:
         self.app.resizable(True, True)
         self.app.configure(fg_color=self.BG)
         self.app.protocol("WM_DELETE_WINDOW", self._fechar_aplicativo)
+        # O problema observado no vídeo ocorre durante a transição nativa de
+        # minimizar/restaurar. Desabilitamos essa transição somente nesta janela.
+        try:
+            desabilitar_transicoes_dwm(self.app)
+        except Exception:
+            pass
         self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")
         self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada, add="+")
 
@@ -3508,8 +3471,6 @@ class App:
 
     def _ajustar_altura_acompanhamento(self, _event=None):
         """Adapta a área de histórico à altura da janela principal."""
-        if getattr(self, "_janela_redesenho_bloqueado", False):
-            return
         card = getattr(self, "_activity_card", None)
         if card is None:
             return
@@ -6401,12 +6362,12 @@ class App:
                 pass
             self._status_blink_job = None
 
-        # Mantém a implementação visual estável que já funcionava e acelera
-        # somente o intervalo do pulso verde.
+        # Pisca binário visível: ciclo curto e apenas dois itemconfigure por tick.
+        # Isso é mais perceptível que a variação contínua de cor e custa menos.
         self._status_anim_frame = 0
-        self._status_anim_frames = 18 if self._status_blink_fast else 20
-        self._status_anim_interval = 80
-
+        self._status_anim_frames = 2
+        self._status_anim_interval = 250
+        self._status_blink_visible = False
         self._executar_pisca_status()
 
     @staticmethod
@@ -6438,47 +6399,22 @@ class App:
 
     def _executar_pisca_status(self):
         try:
-            import math
-
-            # Quando minimizado, reduzimos o trabalho do Canvas sem cancelar
-            # o ciclo. Isso evita perder a animação ao restaurar a janela.
-            try:
-                minimizado = str(self.app.state()).lower() == "iconic"
-            except Exception:
-                minimizado = False
-
-            if minimizado:
-                self._status_blink_job = self.app.after(500, self._executar_pisca_status)
-                return
-
-            frames = max(2, int(self._status_anim_frames))
-            idx = self._status_anim_frame % frames
-
-            fase = (2.0 * math.pi * idx) / frames
-            fator = (math.sin(fase - math.pi / 2.0) + 1.0) / 2.0
-            fator = fator * fator * (3.0 - 2.0 * fator)
+            self._status_blink_visible = not bool(self._status_blink_visible)
 
             if self._status_blink_fast:
-                halo_base, halo_brilho = "#3B7285", "#8FD4EC"
-                dot_base, dot_brilho = "#2F6F87", "#65B8DB"
+                halo_off, halo_on = "#3B7285", "#8FD4EC"
+                dot_off, dot_on = "#2F6F87", "#65B8DB"
             else:
-                halo_base, halo_brilho = "#4E8054", "#C9F0CC"
-                dot_base, dot_brilho = "#2F7437", "#6ECB72"
+                halo_off, halo_on = "#4E8054", "#C9F0CC"
+                dot_off, dot_on = "#2F7437", "#6ECB72"
 
-            halo = self._interpolar_cor(halo_base, halo_brilho, fator)
-            dot = self._interpolar_cor(dot_base, dot_brilho, fator)
+            halo = halo_on if self._status_blink_visible else halo_off
+            dot = dot_on if self._status_blink_visible else dot_off
 
-            modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-            canvas_bg = (
-                "#183B54" if modo_escuro else "#E5F1FB"
-            ) if self._status_blink_fast else (
-                "#21482A" if modo_escuro else "#E7F5E7"
-            )
-            self.status_indicator.configure(bg=canvas_bg)
+            # O fundo permanece fixo; cada ciclo altera somente os dois objetos.
             self.status_indicator.itemconfigure(self._status_halo, fill=halo)
             self.status_indicator.itemconfigure(self._status_dot, fill=dot)
 
-            self._status_anim_frame = idx + 1
             self._status_blink_job = self.app.after(
                 self._status_anim_interval,
                 self._executar_pisca_status
