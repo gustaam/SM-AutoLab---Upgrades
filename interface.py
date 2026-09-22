@@ -2204,6 +2204,7 @@ class App:
         except Exception:
             pass
 
+        _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
         self._iniciar_pisca_status()
@@ -2394,13 +2395,12 @@ class App:
             yield from self._iterar_descendentes_ui(child)
 
     def _configurar_hover_menu(self, root):
-        """Mantém menus e submenus abertos durante a navegação por hover."""
+        """Mantém os menus responsivos ao movimento do ponteiro."""
         if root is None:
             return
         for widget in self._iterar_descendentes_ui(root):
             try:
                 widget.bind("<Enter>", self._cancelar_fechar_menus, add="+")
-                widget.bind("<Leave>", self._agendar_fechar_menus, add="+")
             except Exception:
                 pass
 
@@ -2418,61 +2418,89 @@ class App:
         except Exception:
             return False
 
+    def _pointer_no_menu_config(self):
+        return self._widget_recebe_pointer(getattr(self, "_menu_config", None))
+
+    def _pointer_no_menu_aparencia(self):
+        return self._widget_recebe_pointer(getattr(self, "_menu_aparencia", None))
+
+    def _pointer_no_botao_aparencia(self):
+        return self._widget_recebe_pointer(getattr(self, "_menu_aparencia_btn", None))
+
     def _pointer_em_area_dos_menus(self):
-        return any(
-            self._widget_recebe_pointer(widget)
-            for widget in (
-                getattr(self, "_menu_config", None),
-                getattr(self, "_menu_aparencia", None),
-                getattr(self, "_menu_aparencia_btn", None),
-                getattr(self, "botao_configuracoes", None),
-            )
+        return (
+            self._pointer_no_menu_config()
+            or self._pointer_no_menu_aparencia()
+            or self._pointer_no_botao_aparencia()
+            or self._widget_recebe_pointer(getattr(self, "botao_configuracoes", None))
         )
 
     def _ativar_clique_fora_menus(self):
-        tag = "_SMAutoLabMenuEvents"
-        if getattr(self, "_menu_bindtag_widgets", None):
-            return
-        originals = {}
-        try:
-            for widget in self._iterar_descendentes_ui(self.app):
-                try:
-                    tags = tuple(widget.bindtags())
-                    if tag not in tags:
-                        originals[widget] = tags
-                        widget.bindtags(tags + (tag,))
-                except Exception:
-                    pass
-            self._menu_bindtag_widgets = originals
-            self.app.bind_class(tag, "<ButtonPress-1>", self._clique_fora_menus, add="+")
-        except Exception:
-            self._menu_bindtag_widgets = {}
+        if self._menu_monitor_job is None:
+            self._menu_monitor_job = self.app.after(80, self._monitorar_menus)
 
     def _desativar_clique_fora_menus(self):
-        tag = "_SMAutoLabMenuEvents"
-        try:
-            self.app.unbind_class(tag, "<ButtonPress-1>")
-        except Exception:
-            pass
-        for widget, tags in tuple(getattr(self, "_menu_bindtag_widgets", {}).items()):
+        job = self._menu_monitor_job
+        self._menu_monitor_job = None
+        if job is not None:
             try:
-                if widget.winfo_exists():
-                    widget.bindtags(tags)
+                self.app.after_cancel(job)
             except Exception:
                 pass
-        self._menu_bindtag_widgets = {}
 
     def _clique_fora_menus(self, _event=None):
-        if self._pointer_em_area_dos_menus():
-            return
-        self._fechar_menus()
-
-    def _fechar_menus_se_fora(self):
-        self._menu_close_job = None
         if not self._pointer_em_area_dos_menus():
             self._fechar_menus()
 
-    def _mostrar_menu_configuracoes(self, _event=None):
+    def _monitorar_menus(self):
+        self._menu_monitor_job = None
+        config_aberto = self._menu_config is not None and self._menu_config.winfo_exists()
+        sub_aberto = self._menu_aparencia is not None and self._menu_aparencia.winfo_exists()
+        if not config_aberto and not sub_aberto:
+            return
+
+        if not self._pointer_em_area_dos_menus():
+            self._fechar_menus()
+            return
+
+        if sub_aberto and not self._pointer_no_menu_aparencia() and not self._pointer_no_botao_aparencia():
+            self._agendar_fechar_aparencia()
+
+        self._menu_monitor_job = self.app.after(80, self._monitorar_menus)
+
+    def _fechar_menu_aparencia(self):
+        self._cancelar_fechar_aparencia()
+        sub = getattr(self, "_menu_aparencia", None)
+        if sub is not None:
+            try:
+                if sub.winfo_exists():
+                    sub.destroy()
+            except Exception:
+                pass
+        self._menu_aparencia = None
+
+    def _cancelar_fechar_aparencia(self, _event=None):
+        job = getattr(self, "_menu_aparencia_close_job", None)
+        if job is not None:
+            try:
+                self.app.after_cancel(job)
+            except Exception:
+                pass
+            self._menu_aparencia_close_job = None
+
+    def _agendar_fechar_aparencia(self, _event=None):
+        self._cancelar_fechar_aparencia()
+        try:
+            self._menu_aparencia_close_job = self.app.after(180, self._fechar_aparencia_se_fora)
+        except Exception:
+            self._menu_aparencia_close_job = None
+
+    def _fechar_aparencia_se_fora(self):
+        self._menu_aparencia_close_job = None
+        if not self._pointer_no_menu_aparencia() and not self._pointer_no_botao_aparencia():
+            self._fechar_menu_aparencia()
+
+    def _mostrar_menu_configuracoes    def _mostrar_menu_configuracoes(self, _event=None):
         """Abre o menu principal de configurações sem bindings concorrentes."""
         self._cancelar_fechar_menus()
 
@@ -2544,23 +2572,19 @@ class App:
         )
         atualizar.pack(fill="x", padx=7, pady=(3, 8))
 
-        # O binding é instalado depois que os filhos existem, para cobrir todo
-        # o submenu sem depender de eventos globais.
         self._configurar_hover_menu(self._menu_config)
         self._ativar_clique_fora_menus()
-        # Captura o hover no botão e também nos widgets internos criados
-        # pelo CustomTkinter, evitando perder o evento ao passar sobre o canvas
-        # interno do botão.
         aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
-        aparencia.bind("<Leave>", self._agendar_fechar_menus, add="+")
+        aparencia.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
         for widget in self._iterar_descendentes_ui(aparencia):
             if widget is aparencia:
                 continue
             try:
                 widget.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
-                widget.bind("<Leave>", self._agendar_fechar_menus, add="+")
+                widget.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
             except Exception:
                 pass
+        _ui_scan_tooltips(self._menu_config)
 
         self.app.update_idletasks()
         self._reposicionar_menus()
@@ -2631,9 +2655,13 @@ class App:
             )
             btn.pack(fill="x", padx=6, pady=2)
 
-        # Depois dos botões existirem, todos os descendentes participam do
-        # mesmo ciclo de hover e a travessia entre pai/submenu fica estável.
         self._configurar_hover_menu(sub)
+        for widget in self._iterar_descendentes_ui(sub):
+            try:
+                widget.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
+            except Exception:
+                pass
+        _ui_scan_tooltips(sub)
 
         self.app.update_idletasks()
         self._reposicionar_menus()
@@ -2646,16 +2674,16 @@ class App:
             self._menu_close_job = None
 
     def _agendar_fechar_menus(self, _event=None):
-        # Fecha somente quando o ponteiro estiver fora do menu principal,
-        # submenu, botão Aparência e botão Configurações.
         self._cancelar_fechar_menus()
         try:
-            self._menu_close_job = self.app.after(
-                180,
-                self._fechar_menus_se_fora,
-            )
+            self._menu_close_job = self.app.after(180, self._fechar_menus_se_fora)
         except Exception:
             self._menu_close_job = None
+
+    def _fechar_menus_se_fora(self):
+        self._menu_close_job = None
+        if not self._pointer_em_area_dos_menus():
+            self._fechar_menus()
 
     def _fechar_menus(self):
         self._menu_close_job = None
