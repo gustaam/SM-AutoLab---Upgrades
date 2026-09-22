@@ -571,6 +571,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("self.status_indicator.configure(bg=canvas_bg)", exec_block)
         self.assertIn("self.status_indicator.itemconfigure(", exec_block)
 
+    def test_scrollbars_usam_referencia_arredondada_com_setas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("class _SMWindowsRoundedScrollbar(tk.Canvas):", source)
+        self.assertIn("ARROW_SIZE = 16", source)
+        self.assertIn("def _rounded_rect", source)
+        self.assertIn("create_polygon", source)
+        self.assertIn("_ui_install_scrollbar_autopatch()", source)
+        self.assertNotIn("ttk.Scrollbar", source)
+
     def test_reposicionamento_de_menus_e_coalescido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _reposicionar_menus")
