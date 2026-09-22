@@ -39,12 +39,14 @@ class ConsolidatedValidationTests(unittest.TestCase):
     def test_workflow_de_main_nao_dispara_release_manual(self):
         root = Path(__file__).resolve().parents[1]
         workflow = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
-        self.assertEqual(workflow.count("gh workflow run release.yml"), 1)
+        self.assertNotIn("gh workflow run release.yml", workflow)
         self.assertIn("github.event_name == 'push'", workflow)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
-        self.assertIn("if: steps.release.outputs.published != 'true'", workflow)
-        self.assertIn('gh workflow run release.yml --repo "${GITHUB_REPOSITORY}" --ref "${RELEASE_TAG}"', workflow)
-        self.assertNotIn('gh workflow run release.yml --repo "\\${GITHUB_REPOSITORY}"', workflow)
+        release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_run:", release)
+        self.assertIn('- "Validate main for release"', release)
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", release)
+        self.assertNotIn("push:\n    tags:", release)
 
     def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):
         self.assertTrue(callable(validate_dependencies))
