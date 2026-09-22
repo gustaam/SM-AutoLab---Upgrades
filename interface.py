@@ -1732,6 +1732,7 @@ def _ler_versao_aplicativo():
     return "desconhecida"
 
 APP_VERSION = _ler_versao_aplicativo()
+HISTORICO_DIAS = 60
 ARQUIVOS_DIAS = 60
 
 class App:
@@ -3065,6 +3066,22 @@ class App:
             self._log_count -= 1
         self.atividade.see("end")
         self.atividade.configure(state="disabled")
+
+    def _filtrar_historico_execucoes_60_dias(self, execucoes):
+        """Limita apenas a exibição do histórico aos últimos 60 dias."""
+        agora = datetime.now()
+        limite = agora - timedelta(days=HISTORICO_DIAS)
+        validas = []
+        for execucao in execucoes or []:
+            if not isinstance(execucao, dict):
+                continue
+            try:
+                inicio = datetime.fromisoformat(str(execucao.get("inicio", "")))
+            except Exception:
+                continue
+            if limite <= inicio <= agora:
+                validas.append(execucao)
+        return validas
 
     def _carregar_estado_persistente(self):
         try:
