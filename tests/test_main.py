@@ -289,7 +289,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn('icone = "📁"', block)
         self.assertIn("icone_widget = ctk.CTkLabel(", block)
-        self.assertIn("for w in (tile,icone_widget):", block)
+        self.assertIn("for widget in (tile, icone_widget):", block)
         self.assertNotIn("for w in (tile,icone):", block)
 
     def test_tempo_estimado_usa_mesma_fonte_do_tempo_decorrido(self):
