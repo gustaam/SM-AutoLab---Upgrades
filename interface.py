@@ -651,7 +651,7 @@ move /Y "%SM_TARGET%" "%SM_BACKUP%" >nul 2>&1
 if not exist "%SM_TARGET%" goto install_new
 set /a SM_REPLACE_WAIT+=1
 if %SM_REPLACE_WAIT% GEQ 45 goto abort_update
-timeout /t 1 /nobreak >nul
+powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
 goto wait_replace
 
 :install_new
@@ -669,15 +669,15 @@ if exist "%SM_HEALTH%" goto success
 if not exist "%SM_TARGET%" goto rollback
 set /a SM_HEALTH_WAIT+=1
 if %SM_HEALTH_WAIT% GEQ 30 goto rollback
-timeout /t 1 /nobreak >nul
+powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
 goto wait_health
 
 :rollback
 if defined SM_PID taskkill /PID %SM_PID% /T /F >nul 2>&1
-timeout /t 1 /nobreak >nul
+powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
 move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
 if exist "%SM_TARGET%" (
-    timeout /t 1 /nobreak >nul
+    powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1" >nul 2>&1
     move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
 )
 move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
@@ -2537,9 +2537,10 @@ class App:
             self._menu_aparencia_close_job = None
 
     def _agendar_fechar_aparencia(self, _event=None):
-        self._cancelar_fechar_aparencia()
+        if self._menu_aparencia_close_job is not None:
+            return
         try:
-            self._menu_aparencia_close_job = self.app.after(180, self._fechar_aparencia_se_fora)
+            self._menu_aparencia_close_job = self.app.after(120, self._fechar_aparencia_se_fora)
         except Exception:
             self._menu_aparencia_close_job = None
 
@@ -2627,6 +2628,7 @@ class App:
                 "<Configure>", self._reposicionar_menus, add="+"
             )
         aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
+        aparencia.bind("<Enter>", self._cancelar_fechar_aparencia, add="+")
         aparencia.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
         for widget in self._iterar_descendentes_ui(aparencia):
             if widget is aparencia:
@@ -2653,6 +2655,7 @@ class App:
     def _mostrar_menu_aparencia(self, _event=None):
         """Abre o submenu de aparência; um segundo clique não o fecha acidentalmente."""
         self._cancelar_fechar_menus()
+        self._cancelar_fechar_aparencia()
 
         if self._menu_config is None or not self._menu_config.winfo_exists():
             self._mostrar_menu_configuracoes()
@@ -2710,6 +2713,7 @@ class App:
         self._configurar_hover_menu(sub)
         for widget in self._iterar_descendentes_ui(sub):
             try:
+                widget.bind("<Enter>", self._cancelar_fechar_aparencia, add="+")
                 widget.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
             except Exception:
                 pass

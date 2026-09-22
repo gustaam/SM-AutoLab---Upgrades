@@ -136,6 +136,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('if exist "%SM_HEALTH%" goto success', block)
         self.assertIn('taskkill /PID %SM_PID%', block)
         self.assertIn('move /Y "%SM_BACKUP%" "%SM_TARGET%"', block)
+        self.assertIn('powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Sleep -Seconds 1"', block)
+        self.assertNotIn("timeout /t 1 /nobreak", block)
         self.assertIn('restart_env["SM_AUTOLAB_UPDATE_HEALTH"]', block)
 
     def test_bootstrap_sinaliza_inicio_bem_sucedido_para_atualizacao(self):
@@ -577,6 +579,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("self._pointer_no_botao_aparencia()", block)
         self.assertIn("self._agendar_fechar_aparencia()", block)
         self.assertIn("self._cancelar_fechar_aparencia()", block)
+        self.assertIn("if self._menu_aparencia_close_job is not None:", source)
+        self.assertIn("self._menu_aparencia_close_job = self.app.after(120,", source)
+        self.assertIn('aparencia.bind("<Enter>", self._cancelar_fechar_aparencia, add="+")', source)
+        self.assertIn('widget.bind("<Enter>", self._cancelar_fechar_aparencia, add="+")', source)
         self.assertIn("def _fechar_menu_aparencia", source)
 
     def test_icones_estatisticos_usa_imagem_superamostrada_para_bordas_suaves(self):
