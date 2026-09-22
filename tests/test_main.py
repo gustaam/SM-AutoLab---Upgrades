@@ -555,20 +555,17 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertLess(block.index('text="Aparência  ›"'), block.index('text="Ajustes do Feegow"'))
         self.assertLess(block.index('text="Ajustes do Feegow"'), block.index('text="Verificar atualizações"'))
 
-    def test_status_animation_tem_pisca_binario_leve(self):
+    def test_status_animation_reproduz_configuracao_da_v2_99_35(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _iniciar_pisca_status")
-        end = source.index("def _interpolar_cor", start)
+        end = source.index("def _agendar_retorno_pronto", start)
         block = source[start:end]
-        self.assertIn("self._status_anim_frames = 2", block)
-        self.assertIn("self._status_anim_interval = 250", block)
-        self.assertIn("self._status_blink_visible = False", block)
-        exec_start = source.index("def _executar_pisca_status")
-        exec_end = source.index("def _aplicar_status", exec_start)
-        exec_block = source[exec_start:exec_end]
-        self.assertIn("self._status_blink_visible = not bool(self._status_blink_visible)", exec_block)
-        self.assertIn("self.status_indicator.itemconfigure(self._status_halo, fill=halo)", exec_block)
-        self.assertIn("self.status_indicator.itemconfigure(self._status_dot, fill=dot)", exec_block)
+        self.assertIn("self._status_anim_frames = 28 if self._status_blink_fast else 36", block)
+        self.assertIn("self._status_anim_interval = 28 if self._status_blink_fast else 32", block)
+        self.assertIn("import math", block)
+        self.assertIn("math.sin", block)
+        self.assertIn("self.status_indicator.configure(bg=canvas_bg)", block)
+        self.assertIn("self.status_indicator.itemconfigure(", block)
 
     def test_reposicionamento_de_menus_e_coalescido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
