@@ -1780,6 +1780,7 @@ class App:
         self._execucao_atual = None
         self._erros_codigos = []
         self._historico_arquivo = Path.home() / "SM AutoLab" / "historico_execucoes.json"
+        self._erros_arquivo = Path.home() / "SM AutoLab" / "historico_erros.json"
         self._historico_arquivo_legado = Path.home() / ".sm_autolab_historico.json"
         self._planilha_arquivo = Path.home() / "SM AutoLab" / "planilha_interna.json"
         self._planilha_rascunho_arquivo = Path.home() / "SM AutoLab" / "planilha_rascunho.json"
@@ -1836,6 +1837,7 @@ class App:
         self._historico_layout_width = 0
         self._activity_card = None
         self._ultimo_tamanho_app_config = None
+        self._app_restore_job = None
         self._carregar_estado_persistente()
         ctk.set_appearance_mode(self._tema)
         ctk.set_default_color_theme("blue")
@@ -1851,6 +1853,31 @@ class App:
             # Ícone é somente visual; falha aqui não deve impedir a abertura.
             pass
 
+    def _agendar_estabilizacao_apos_retomada(self, _event=None):
+        if self._closing:
+            return
+        job = getattr(self, "_app_restore_job", None)
+        if job is not None:
+            try:
+                self.app.after_cancel(job)
+            except Exception:
+                pass
+        try:
+            self._app_restore_job = self.app.after_idle(self._estabilizar_apos_retomada)
+        except Exception:
+            self._app_restore_job = None
+
+    def _estabilizar_apos_retomada(self):
+        self._app_restore_job = None
+        if self._closing:
+            return
+        try:
+            self.app.update_idletasks()
+            self._reposicionar_menus()
+            self._ajustar_altura_acompanhamento()
+        except Exception:
+            pass
+
     def config_app(self):
         self.app.title("SM AutoLab")
         self.app.geometry("900x600")
@@ -1859,6 +1886,7 @@ class App:
         self.app.configure(fg_color=self.BG)
         self.app.protocol("WM_DELETE_WINDOW", self._fechar_aplicativo)
         self.app.bind("<Unmap>", self._fechar_menus, add="+")
+        self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada, add="+")
 
         # Abre a janela em tamanho maior e centralizada na tela.
         self.app.update_idletasks()
@@ -2213,15 +2241,10 @@ class App:
         self.botao_iniciar.pack(side="left")
 
         # Tooltips passam a ser gerenciados globalmente pela camada visual da Etapa 7.
-        try:
-            aplicar_backdrop_sistema(self.app, "mica", dark=ctk.get_appearance_mode().lower() == "dark")
-        except Exception:
-            pass
-
         _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
-        self._parar_pisca_status()
+        self._aplicar_status("Pronto")
         self.app.after(350, self._verificar_retomada_pendente)
         self.app.after(1200, self._verificar_atualizacao_automatica)
 
@@ -2491,7 +2514,7 @@ class App:
             else:
                 self._agendar_fechar_aparencia()
 
-        self._menu_monitor_job = self.app.after(80, self._monitorar_menus)
+        self._menu_monitor_job = self.app.after(100, self._monitorar_menus)
 
     def _fechar_menu_aparencia(self):
         self._cancelar_fechar_aparencia()
@@ -3145,21 +3168,32 @@ class App:
         foreground = self._cor_fluente(icon_color)
         image = Image.new("RGB", (size, size), background)
         draw = ImageDraw.Draw(image)
-        inset = scale
-        draw.ellipse(
-            (inset, inset, size - inset - 1, size - inset - 1),
-            fill=foreground,
-        )
-        font = self._fonte_icone_estatistica(icon_font * scale)
-        bbox = draw.textbbox((0, 0), str(icon), font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        x = (size - text_width) / 2 - bbox[0]
-        y = (size - text_height) / 2 - bbox[1]
-        draw.text((x, y), str(icon), font=font, fill="#FFFFFF")
-        return ImageTk.PhotoImage(
-            image.resize((logical, logical), Image.Resampling.LANCZOS)
-        )
+        draw.ellipse((scale, scale, size - scale - 1, size - scale - 1), fill=foreground)
+
+        white = "#FFFFFF"
+        stroke = max(2, 2 * scale)
+        if str(icon) == "✓":
+            draw.line(
+                [(14 * scale, 23 * scale), (19 * scale, 29 * scale), (31 * scale, 16 * scale)],
+                fill=white, width=stroke, joint="curve"
+            )
+        elif str(icon) == "▥":
+            draw.rounded_rectangle(
+                (15 * scale, 10 * scale, 29 * scale, 34 * scale),
+                radius=2 * scale, outline=white, width=stroke
+            )
+            draw.line([(19 * scale, 17 * scale), (25 * scale, 17 * scale)], fill=white, width=scale)
+            draw.line([(19 * scale, 22 * scale), (25 * scale, 22 * scale)], fill=white, width=scale)
+        else:
+            font = self._fonte_icone_estatistica(icon_font * scale)
+            bbox = draw.textbbox((0, 0), str(icon), font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            x = (size - text_width) / 2 - bbox[0]
+            y = (size - text_height) / 2 - bbox[1]
+            draw.text((x, y), str(icon), font=font, fill=white)
+
+        return ImageTk.PhotoImage(image.resize((logical, logical), Image.Resampling.LANCZOS))
 
     def _render_stat_icon(self, card):
         canvas = getattr(card, "_sm_stat_icon_canvas", None)
@@ -3325,27 +3359,28 @@ class App:
             registros = []
             erros = []
             tema = "system"
-
-            # Lê a localização atual e a antiga durante a migração. Os registros
-            # são mesclados por ID para que nenhuma execução existente seja perdida.
             for caminho in (self._historico_arquivo, self._historico_arquivo_legado):
                 if not caminho.exists():
                     continue
                 dados = read_json_with_backup(caminho, {})
                 if not isinstance(dados, dict):
                     continue
-
                 execucoes = dados.get("historico_execucoes", [])
                 if isinstance(execucoes, list):
                     registros.extend(item for item in execucoes if isinstance(item, dict))
-
                 lista_erros = dados.get("erros", [])
                 if isinstance(lista_erros, list):
                     erros.extend(str(item).strip() for item in lista_erros if str(item).strip())
-
                 valor_tema = dados.get("tema")
                 if valor_tema in ("light", "dark", "system"):
                     tema = valor_tema
+
+            if self._erros_arquivo.exists():
+                dados_erros = read_json_with_backup(self._erros_arquivo, {})
+                if isinstance(dados_erros, dict):
+                    lista_dedicada = dados_erros.get("erros", [])
+                    if isinstance(lista_dedicada, list):
+                        erros.extend(str(item).strip() for item in lista_dedicada if str(item).strip())
 
             unicos = {}
             for item in registros:
@@ -3359,32 +3394,22 @@ class App:
                 unicos[chave] = item
 
             self._tema = tema
-            # O histórico armazenado é permanente. O limite de 60 dias é apenas
-            # uma regra de exibição/navegação, nunca de exclusão do arquivo.
             self._historico_execucoes = list(unicos.values())
 
-            # Reconstrói o índice de erros a partir das próprias execuções salvas.
-            # Assim, mesmo que a lista auxiliar esteja vazia ou antiga, os códigos
-            # continuam disponíveis nos detalhes das execuções.
             erros_reconstruidos = []
             for execucao in self._historico_execucoes:
                 for codigo in execucao.get("codigos_erros", []) or []:
                     texto = str(codigo).strip()
                     if texto and texto not in erros_reconstruidos:
                         erros_reconstruidos.append(texto)
-
             for codigo in erros:
                 texto = str(codigo).strip()
                 if texto and texto not in erros_reconstruidos:
                     erros_reconstruidos.append(texto)
 
             self._erros_codigos = erros_reconstruidos[-200:]
-
-            if (
-                not self._historico_arquivo.exists()
-                and (self._historico_execucoes or self._erros_codigos)
-            ):
-                self._salvar_estado_persistente()
+            if self._erros_codigos and not self._erros_arquivo.exists():
+                self._salvar_erros_persistentes()
         except Exception:
             LOGGER.exception("Falha ao carregar o histórico persistente.")
             self._historico_execucoes = []
@@ -3392,18 +3417,28 @@ class App:
 
     def _salvar_estado_persistente(self):
         try:
-            # Nunca excluir registros antigos durante um simples salvamento.
             dados = {
-                "version": 2,
+                "version": 3,
                 "historico_execucoes": self._historico_execucoes,
-                "erros": self._erros_codigos[-200:],
                 "tema": self._tema,
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
             self._historico_arquivo.parent.mkdir(parents=True, exist_ok=True)
             atomic_write_json(self._historico_arquivo, dados)
         except Exception:
-            LOGGER.exception("Falha ao salvar o estado persistente do aplicativo.")
+            LOGGER.exception("Falha ao salvar o histórico de execuções.")
+
+    def _salvar_erros_persistentes(self):
+        try:
+            dados = {
+                "version": 1,
+                "erros": self._erros_codigos[-200:],
+                "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            self._erros_arquivo.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(self._erros_arquivo, dados)
+        except Exception:
+            LOGGER.exception("Falha ao salvar o histórico de erros.")
 
     def _criar_botao_erro(self, codigo, parent, command=None):
         codigo = str(codigo)
@@ -3424,7 +3459,7 @@ class App:
         if codigo in self._erros_codigos:
             return
         self._erros_codigos.append(codigo)
-        self._salvar_estado_persistente()
+        self._salvar_erros_persistentes()
 
     def _copiar_codigo(self, codigo):
         self.app.clipboard_clear()
@@ -3622,15 +3657,20 @@ class App:
 
     def _criar_pasta_historico(self, execucao, atual=False):
         parent = self.historico_lista
-        tile_width = 118
-        tile_height = 96
+        tile_width = 112
+        tile_height = 84
         execucao_id = self._id_historico_execucao(execucao)
 
         if not hasattr(self, "_hist_grid") or self._hist_grid is None:
             self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
             self._hist_grid.pack(fill="x", padx=8, pady=5)
 
-        largura = max(parent.winfo_width(), tile_width + 2)
+        try:
+            largura_parent = int(parent.winfo_width())
+            largura_app = int(self.app.winfo_width())
+        except Exception:
+            largura_parent = largura_app = 0
+        largura = max(largura_parent, largura_app - 80, tile_width + 2)
         colunas = max(1, min(8, int(largura // (tile_width + 2))))
         for col in range(colunas):
             # O tamanho real do tile já é determinado pelo próprio widget.
@@ -3662,10 +3702,10 @@ class App:
         icon = ctk.CTkLabel(
             tile,
             text=icone,
-            font=("Segoe UI Emoji", 20),
+            font=("Segoe UI Emoji", 18),
             text_color=self.ACCENT,
         )
-        icon.pack(pady=(3, 0))
+        icon.pack(pady=(2, 0))
         date_label = ctk.CTkLabel(
             tile,
             text=self._formatar_data_historico(inicio),
@@ -3673,7 +3713,7 @@ class App:
             font=("Segoe UI", 9, "bold"),
             anchor="center",
         )
-        date_label.pack(fill="x", padx=3)
+        date_label.pack(fill="x", padx=2)
         time_label = ctk.CTkLabel(
             tile,
             text=horario,
@@ -3681,7 +3721,7 @@ class App:
             font=("Segoe UI", 8),
             anchor="center",
         )
-        time_label.pack(fill="x", padx=3, pady=(0, 0))
+        time_label.pack(fill="x", padx=2, pady=(0, 0))
         error_label = ctk.CTkLabel(
             tile,
             text=f"{erros} não executado(s)",
@@ -3689,9 +3729,9 @@ class App:
             font=("Segoe UI", 8),
             anchor="center",
             justify="center",
-            wraplength=tile_width - 10,
+            wraplength=tile_width - 6,
         )
-        error_label.pack(fill="x", padx=3, pady=(3, 0))
+        error_label.pack(fill="x", padx=2, pady=(2, 0))
 
         widgets = (tile, icon, date_label, time_label, error_label)
         self._historico_tiles[execucao_id] = tile
@@ -6255,10 +6295,7 @@ class App:
         modo = ctk.get_appearance_mode().lower()
         canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
         self.status_indicator.configure(bg=canvas_bg)
-        if self._status_blink_fast:
-            self._iniciar_pisca_status()
-        else:
-            self._parar_pisca_status()
+        self._iniciar_pisca_status()
 
     def atualizar_progresso(self, processados, total, sucessos, erros, codigo):
         if self._closing:
