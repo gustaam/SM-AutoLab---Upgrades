@@ -1,4 +1,4 @@
-<!-- Documentação do projeto. -->
+<!-- Documentação e uso do projeto. -->
 
 # SM AutoLab
 
