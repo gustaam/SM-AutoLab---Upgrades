@@ -147,7 +147,7 @@ def validate_workflow_runtime(root: Path) -> None:
         fail("build_windows.bat deve instalar PyInstaller pelo interpretador Python configurado")
     release = read_text(root, ".github/workflows/release.yml")
     if "python -m pip install pyinstaller==6.22.3" not in release:
-        fail("release.yml deve fixar PyInstaller em 6.22.2")
+        fail("release.yml deve fixar PyInstaller em 6.22.3")
     if "python -m PyInstaller --noconfirm --clean" not in release:
         fail("release.yml deve executar PyInstaller pelo interpretador Python configurado")
 
@@ -514,7 +514,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validação consolidada do SM AutoLab.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("all", help="Arquitetura, VERSION e qualidade.")
+    subparsers.add_parser("all", help="Arquitetura, VERSION, dependências, workflows e qualidade.")
 
     subparsers.add_parser("architecture", help="Arquitetura e integração.")
 
