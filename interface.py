@@ -424,6 +424,81 @@ def _walk_widgets(widget):
     for child in children:
         yield from _walk_widgets(child)
 
+
+def _ui_windows_scrollbar_colors():
+    """Cores da barra clássica do Tk, ajustadas ao tema atual."""
+    dark = str(ctk.get_appearance_mode()).lower() == "dark"
+    if dark:
+        return {
+            "bg": "#5F5F5F",
+            "activebackground": "#7A7A7A",
+            "troughcolor": "#252525",
+        }
+    return {
+        "bg": "#858585",
+        "activebackground": "#6E6E6E",
+        "troughcolor": "#E4E4E4",
+    }
+
+
+def _ui_update_windows_scrollbar(scrollable):
+    """Atualiza as cores da barra clássica sem interferir no canvas."""
+    bar = getattr(scrollable, "_sm_windows_scrollbar", None)
+    if bar is None:
+        return
+    try:
+        if not bar.winfo_exists():
+            return
+        bar.configure(**_ui_windows_scrollbar_colors())
+    except Exception:
+        pass
+
+
+def _ui_install_windows_scrollbar(scrollable):
+    """
+    Substitui apenas a barra visual do CTkScrollableFrame pela barra clássica
+    do Tk/Windows, preservando o canvas e toda a lógica de rolagem existente.
+    A barra nativa fornece automaticamente as setas superior/inferior.
+    """
+    try:
+        if getattr(scrollable, "_sm_windows_scrollbar", None) is not None:
+            _ui_update_windows_scrollbar(scrollable)
+            return
+
+        parent = getattr(scrollable, "_parent_frame", None)
+        canvas = getattr(scrollable, "_parent_canvas", None)
+        old_scrollbar = getattr(scrollable, "_scrollbar", None)
+        if parent is None or canvas is None:
+            return
+
+        if old_scrollbar is not None:
+            try:
+                old_scrollbar.grid_remove()
+            except Exception:
+                try:
+                    old_scrollbar.grid_forget()
+                except Exception:
+                    pass
+
+        bar = tk.Scrollbar(
+            parent,
+            orient="vertical",
+            command=canvas.yview,
+            width=16,
+            borderwidth=0,
+            relief="flat",
+            highlightthickness=0,
+            takefocus=False,
+        )
+        bar.grid(row=1, column=1, sticky="ns", padx=0, pady=0)
+
+        canvas.configure(yscrollcommand=bar.set)
+        scrollable._sm_windows_scrollbar = bar
+        _ui_update_windows_scrollbar(scrollable)
+    except Exception:
+        LOGGER.debug("Não foi possível instalar a barra clássica do Windows.", exc_info=True)
+
+
 _ui_install_button_tooltips()
 
 REPO = "gustaam/SM-AutoLab---Upgrades"
@@ -2072,6 +2147,8 @@ class App:
             scrollbar_button_hover_color=("#AFAFAF", "#777777")
         )
         main.pack(fill="both", expand=True, padx=16, pady=8)
+        self._main_scrollable = main
+        _ui_install_windows_scrollbar(main)
 
         top = ctk.CTkFrame(main, fg_color="transparent")
         top.pack(fill="x", pady=(0, 8))
@@ -2968,6 +3045,7 @@ class App:
             return
         self._tema = tema
         ctk.set_appearance_mode(tema)
+        _ui_update_windows_scrollbar(getattr(self, "_main_scrollable", None))
         self._atualizar_icones_cards_estatistica()
         try:
             dark = ctk.get_appearance_mode().lower() == "dark"
