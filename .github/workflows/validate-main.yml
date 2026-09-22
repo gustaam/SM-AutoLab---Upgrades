@@ -57,6 +57,7 @@ jobs:
           python -m unittest discover -s tests -p "test_*.py" -v
           if ($LASTEXITCODE -ne 0) { throw "Falha nos testes automatizados." }
           python -c "from interface import App; from main import install_ui, _validar_base_aplicacao; install_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
+          python scripts/smoke_ui.py
 
       - name: Verificar Defender
         shell: pwsh
