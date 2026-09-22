@@ -3609,11 +3609,11 @@ class App:
             self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
             self._hist_grid.pack(fill="x", padx=8, pady=5)
 
-        largura = max(parent.winfo_width(), tile_width + 16)
-        colunas = max(1, min(8, int((largura - 16) // (tile_width + 8))))
+        largura = max(parent.winfo_width(), tile_width + 8)
+        colunas = max(1, min(8, int((largura - 8) // (tile_width + 4))))
         for col in range(colunas):
             self._hist_grid.grid_columnconfigure(
-                col, weight=0, minsize=tile_width + 8
+                col, weight=0, minsize=tile_width + 4
             )
 
         count = len(self._hist_grid.winfo_children())
@@ -3627,7 +3627,7 @@ class App:
             width=tile_width,
             height=tile_height,
         )
-        tile.grid(row=row, column=col, padx=4, pady=4)
+        tile.grid(row=row, column=col, padx=1, pady=2)
         tile.grid_propagate(False)
 
         inicio = str(execucao.get("inicio", "") or "")
