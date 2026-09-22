@@ -438,6 +438,41 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertTrue(interface.App._historico_execucao_tem_erros({"status": "Erro geral", "erros": 0}))
         self.assertFalse(interface.App._historico_execucao_tem_erros({"status": "Concluída", "erros": 0}))
 
+    def test_planilha_processada_persiste_e_impede_reabertura_da_mesma_revisao(self):
+        import interface
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            obj = object.__new__(interface.App)
+            obj._planilha_arquivo = Path(temp_dir) / "planilha_interna.json"
+            obj._planilha_data = {"0,0": "1", "0,1": "ABC", "0,2": "Item"}
+            obj._salvar_planilha_interna_data()
+
+            self.assertFalse(obj._planilha_foi_processada(obj._planilha_data))
+            obj._marcar_planilha_interna_processada(obj._planilha_data)
+            self.assertTrue(obj._planilha_foi_processada(obj._planilha_data))
+
+            data = interface.read_json_with_backup(obj._planilha_arquivo, {})
+            self.assertEqual(
+                data.get("processed_fingerprint"),
+                obj._planilha_fingerprint(obj._planilha_data),
+            )
+
+    def test_planilha_nova_revisao_limpa_marcador_de_processamento(self):
+        import interface
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            obj = object.__new__(interface.App)
+            obj._planilha_arquivo = Path(temp_dir) / "planilha_interna.json"
+            obj._planilha_data = {"0,0": "1", "0,1": "ABC"}
+            obj._salvar_planilha_interna_data()
+            obj._marcar_planilha_interna_processada(obj._planilha_data)
+            obj._planilha_data = {"0,0": "2", "0,1": "XYZ"}
+            obj._salvar_planilha_interna_data()
+
+            data = interface.read_json_with_backup(obj._planilha_arquivo, {})
+            self.assertEqual(data.get("processed_fingerprint"), "")
+            self.assertFalse(obj._planilha_foi_processada(obj._planilha_data))
+
     def test_planilha_salva_e_recarrega_dados_pelo_mesmo_caminho(self):
         import tempfile
         import interface
