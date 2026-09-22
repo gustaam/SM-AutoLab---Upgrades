@@ -1,4 +1,4 @@
-# Interface desktop e planilha.
+# Interface desktop, planilha e histórico.
 from __future__ import annotations
 
 import calendar as pycalendar
