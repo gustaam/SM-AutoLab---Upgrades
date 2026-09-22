@@ -188,8 +188,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
-        self.assertIn("tile_width = 132", block)
-        self.assertIn("tile_height = 104", block)
+        self.assertIn("tile_width = 118", block)
+        self.assertIn("tile_height = 96", block)
         self.assertIn("colunas = max(1, min(8", block)
         self.assertIn("wraplength=tile_width - 20", block)
         self.assertNotIn('text=titulo[:24]', block)
@@ -350,8 +350,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
         self.assertIn('strftime("%d/%m/%Y")', block)
-        self.assertIn("tile_width = 132", block)
-        self.assertIn("tile_height = 104", block)
+        self.assertIn("tile_width = 118", block)
+        self.assertIn("tile_height = 96", block)
         self.assertIn("grid_propagate(False)", block)
         self.assertNotIn('sticky="nsew"', block)
         self.assertNotIn('text=titulo[:24]', block)
@@ -416,17 +416,17 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _apagar_historico_selecionados", source)
         self.assertIn('self._historico_selecionados', source)
 
-    def test_planilha_ctrl_clique_tem_acao_apagar_selecionados(self):
+    def test_planilha_nao_usa_ctrl_clique_para_selecao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _planilha_clicar_celula")
         end = source.index("def _planilha_arrastar_selecao", start)
         block = source[start:end]
-        self.assertIn('getattr(event, "state", 0)', block)
-        self.assertIn("0x0004", block)
-        self.assertIn("ctrl_multiselect=True", block)
-        self.assertIn("def _planilha_apagar_selecionados", source)
-        self.assertIn('text="Apagar selecionados"', source)
+        self.assertNotIn("0x0004", block)
+        self.assertNotIn("ctrl_multiselect", block)
+        self.assertNotIn("botao_planilha_apagar_selecionados", source)
+        self.assertNotIn("def _planilha_apagar_selecionados", source)
 
+    def test_historico_erros_aceita_ctrl_clique_e_apagar_selecionados(self):
     def test_historico_erros_aceita_ctrl_clique_e_apagar_selecionados(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _preencher_detalhe_pasta")
@@ -443,10 +443,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _atualizar_visual_selecao_historico", start)
         block = source[start:end]
-        self.assertIn("tile_width = 132", block)
-        self.assertIn("tile_height = 104", block)
-        self.assertIn("icon.pack(pady=(5, 1))", block)
-        self.assertIn("error_label.pack(fill=\"x\", padx=8, pady=(5, 0))", block)
+        self.assertIn("tile_width = 118", block)
+        self.assertIn("tile_height = 96", block)
+        self.assertIn("icon.pack(pady=(3, 0))", block)
+        self.assertIn("error_label.pack(fill=\"x\", padx=3, pady=(3, 0))", block)
 
     def test_menus_configuracoes_trocam_ordem_aparencia_atualizacoes(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -472,10 +472,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("self.app.after_idle(self._reposicionar_menus)", block)
         self.assertNotIn("self.app.update_idletasks()", block)
 
-    def test_selecao_planilha_tem_escape_para_limpar(self):
+    def test_planilha_nao_tem_modo_ctrl_selecao_exclusivo(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("def _planilha_limpar_selecao", source)
-        self.assertIn('tree.bind("<Escape>", self._planilha_limpar_selecao', source)
+        self.assertNotIn("_planilha_ctrl_multiselect", source)
+        self.assertNotIn("def _planilha_limpar_selecao", source)
 
     def test_menus_nao_sao_criados_visiveis_em_00(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -574,7 +574,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("getattr(event, \"state\", 0)", block)
         self.assertIn("0x0004", block)
         self.assertIn("self._arquivos_datas_selecionadas.add(data)", block)
+        self.assertIn("self._atualizar_botao_apagar_datas_arquivos()", block)
         self.assertIn("self._mostrar_planilhas_do_dia(data)", block)
+        self.assertIn("def _apagar_datas_arquivos_selecionadas", source)
+        self.assertIn('text="Apagar selecionados"', source)
 
     def test_botao_abrir_continua_com_tooltip_canonico(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
