@@ -60,7 +60,7 @@ if errorlevel 1 goto :erro
 if errorlevel 1 goto :erro
 %PYTHON% -m pip check
 if errorlevel 1 goto :erro
-%PYTHON% -m pip install pyinstaller==6.22.2
+%PYTHON% -m pip install pyinstaller==6.22.3
 if errorlevel 1 goto :erro
 
 if exist build rmdir /s /q build
@@ -83,6 +83,12 @@ if errorlevel 1 (
 %PYTHON% -c "from interface import App; from main import install_ui, _validar_base_aplicacao; install_ui(App); _validar_base_aplicacao(); print('Integracao consolidada: OK')"
 if errorlevel 1 (
     echo ERRO: falha na integracao das camadas da base.
+    goto :erro
+)
+
+%PYTHON% scripts\smoke_ui.py
+if errorlevel 1 (
+    echo ERRO: falha no smoke test da interface real.
     goto :erro
 )
 
