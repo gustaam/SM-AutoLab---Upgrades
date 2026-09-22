@@ -195,9 +195,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("tile_height = 116", block)
         self.assertIn("colunas = max(1, min(8", block)
         self.assertIn("wraplength=tile_width - 20", block)
-        self.assertIn('strftime("%d/%m/%Y")', block)
         self.assertNotIn('text=titulo[:24]', block)
         self.assertNotIn("sticky=\"nsew\"", block)
+        self.assertIn("def _formatar_data_historico", source)
+        self.assertIn('strftime("%d/%m/%Y")', source)
     def test_interface_remove_titulo_historico_de_execucoes(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertNotIn('text="Histórico de execuções"', source)
