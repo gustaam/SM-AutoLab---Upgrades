@@ -4,7 +4,7 @@
 
 Automação de autorizações no Feegow em um aplicativo desktop para Windows, com planilha virtualizada, histórico, recuperação de execução, atualização integrada e interface moderna.
 
-**Versão em preparação:** `2.99.39`  
+**Versão em preparação:** `2.99.42`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -74,7 +74,7 @@ O projeto valida continuamente:
 - metadados e estrutura do executável;
 - Windows Defender.
 
-O CI utiliza **Python 3.14.7** e **pip 26.2.1**. O build oficial usa **PyInstaller 6.22.2**.
+O CI utiliza **Python 3.14.7** e **pip 26.2.1**. O build oficial usa **PyInstaller 6.22.3**.
 
 ## Build do Windows
 
@@ -86,9 +86,9 @@ O executável recebe ícone, assets, versão e metadados do produto durante a ge
 
 ## Release e atualização
 
-A release atualmente publicada é **v2.99.38**.
+A release atualmente publicada é **v2.99.41**.
 
-A próxima versão preparada no `main` é a **v2.99.39**.
+A próxima versão preparada no `main` é a **v2.99.42**.
 
 A **v2.99.32** restaura os tooltips da interface e o efeito de hover dos cards **Executados**, **Não executados** e **Código atual**, mantendo a aba **Não executados** removida.
 
@@ -100,7 +100,7 @@ A **v2.99.35** corrige o salvamento da planilha interna, disponibilizando a fun�
 
 A **v2.99.36** adiciona validação pré-execução da planilha, dashboard de execução com métricas de tempo/progresso e atualização segura com backup e rollback automático.
 
-O fluxo valida a base, cria o executável, verifica PE/metadados e Defender, gera um manifesto com SHA-256 e publica o asset. O aplicativo usa esse manifesto para localizar versões compatíveis e validar a integridade antes da atualização.
+O fluxo valida a base, executa um smoke test real da interface, cria o executável, verifica PE/metadados e Defender, gera um manifesto com SHA-256 e publica o asset. O aplicativo usa esse manifesto para localizar versões compatíveis e validar a integridade antes da atualização.
 
 ---
 
