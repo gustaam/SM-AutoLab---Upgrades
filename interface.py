@@ -426,7 +426,7 @@ def _walk_widgets(widget):
 
 
 def _ui_windows_scrollbar_colors():
-    """Cores da barra clássica do Tk, ajustadas ao tema atual."""
+    """Paleta da barra clássica de rolagem usada em todo o aplicativo."""
     dark = str(ctk.get_appearance_mode()).lower() == "dark"
     if dark:
         return {
@@ -442,7 +442,7 @@ def _ui_windows_scrollbar_colors():
 
 
 def _ui_update_windows_scrollbar(scrollable):
-    """Atualiza as cores da barra clássica sem interferir no canvas."""
+    """Atualiza a barra clássica conforme o tema atual."""
     bar = getattr(scrollable, "_sm_windows_scrollbar", None)
     if bar is None:
         return
@@ -456,9 +456,8 @@ def _ui_update_windows_scrollbar(scrollable):
 
 def _ui_install_windows_scrollbar(scrollable):
     """
-    Substitui apenas a barra visual do CTkScrollableFrame pela barra clássica
-    do Tk/Windows, preservando o canvas e toda a lógica de rolagem existente.
-    A barra nativa fornece automaticamente as setas superior/inferior.
+    Substitui a barra vertical do CTkScrollableFrame por tk.Scrollbar.
+    O tk.Scrollbar usa as setas clássicas superior/inferior do Windows.
     """
     try:
         if getattr(scrollable, "_sm_windows_scrollbar", None) is not None:
@@ -489,15 +488,68 @@ def _ui_install_windows_scrollbar(scrollable):
             relief="flat",
             highlightthickness=0,
             takefocus=False,
+            **_ui_windows_scrollbar_colors(),
         )
         bar.grid(row=1, column=1, sticky="ns", padx=0, pady=0)
-
         canvas.configure(yscrollcommand=bar.set)
         scrollable._sm_windows_scrollbar = bar
-        _ui_update_windows_scrollbar(scrollable)
     except Exception:
-        LOGGER.debug("Não foi possível instalar a barra clássica do Windows.", exc_info=True)
+        LOGGER.debug("Não foi possível instalar a barra clássica.", exc_info=True)
 
+
+def _ui_install_scrollbar_autopatch():
+    """Faz com que toda nova CTkScrollableFrame receba a barra de referência."""
+    cls = ctk.CTkScrollableFrame
+    if getattr(cls, "_sm_windows_scrollbar_installed", False):
+        return
+
+    original_init = cls.__init__
+
+    def init_with_windows_scrollbar(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        _ui_install_windows_scrollbar(self)
+
+    cls.__init__ = init_with_windows_scrollbar
+    cls._sm_windows_scrollbar_installed = True
+
+
+def _ui_make_windows_scrollbar(parent, orient, command):
+    """Cria a mesma barra clássica para widgets Tk/ttk."""
+    return tk.Scrollbar(
+        parent,
+        orient=orient,
+        command=command,
+        width=16,
+        borderwidth=0,
+        relief="flat",
+        highlightthickness=0,
+        takefocus=False,
+        **_ui_windows_scrollbar_colors(),
+    )
+
+
+def _ui_refresh_all_windows_scrollbars(root):
+    """Reaplica a paleta da referência em todas as barras instaladas."""
+    if root is None:
+        return
+    stack = [root]
+    while stack:
+        widget = stack.pop()
+        bar = getattr(widget, "_sm_windows_scrollbar", None)
+        if bar is not None:
+            _ui_update_windows_scrollbar(widget)
+        if isinstance(widget, tk.Scrollbar):
+            try:
+                widget.configure(**_ui_windows_scrollbar_colors())
+            except Exception:
+                pass
+        try:
+            stack.extend(widget.winfo_children())
+        except Exception:
+            pass
+
+
+_ui_install_scrollbar_autopatch()
 
 _ui_install_button_tooltips()
 
@@ -2148,7 +2200,6 @@ class App:
         )
         main.pack(fill="both", expand=True, padx=16, pady=8)
         self._main_scrollable = main
-        _ui_install_windows_scrollbar(main)
 
         top = ctk.CTkFrame(main, fg_color="transparent")
         top.pack(fill="x", pady=(0, 8))
@@ -3045,7 +3096,7 @@ class App:
             return
         self._tema = tema
         ctk.set_appearance_mode(tema)
-        _ui_update_windows_scrollbar(getattr(self, "_main_scrollable", None))
+        _ui_refresh_all_windows_scrollbars(self.app)
         self._atualizar_icones_cards_estatistica()
         try:
             dark = ctk.get_appearance_mode().lower() == "dark"
@@ -4562,14 +4613,15 @@ class App:
             except Exception:
                 pass
 
-        y=ttk.Scrollbar(body,orient="vertical",command=tree.yview)
-        x=ttk.Scrollbar(body,orient="horizontal",command=tree.xview)
+        y=_ui_make_windows_scrollbar(body,"vertical",tree.yview)
+        x=_ui_make_windows_scrollbar(body,"horizontal",tree.xview)
         tree.configure(yscrollcommand=_sync_row_header,xscrollcommand=x.set)
 
         row_header_frame.grid(row=0,column=0,sticky="ns")
         tree.grid(row=0,column=1,sticky="nsew")
         y.grid(row=0,column=2,sticky="ns")
         x.grid(row=1,column=1,sticky="ew")
+        self._planilha_scrollbars = (y, x)
         body.grid_rowconfigure(0,weight=1)
         body.grid_columnconfigure(1,weight=1)
 
