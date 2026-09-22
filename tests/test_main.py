@@ -557,12 +557,13 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _iniciar_pisca_status")
         end = source.index("def _interpolar_cor", start)
         block = source[start:end]
-        self.assertIn("self._status_anim_interval = 80 if self._status_blink_fast else 60", block)
-        self.assertIn("self._status_anim_frames = 18 if self._status_blink_fast else 24", block)
-        self.assertIn("self._status_anim_colors = cores", block)
+        self.assertIn("self._status_anim_interval = 80", block)
+        self.assertIn("self._status_anim_frames = 18 if self._status_blink_fast else 20", block)
+        self.assertIn("self.status_indicator.itemconfigure(self._status_halo, fill=halo)", source)
+        self.assertIn("self.status_indicator.itemconfigure(self._status_dot, fill=dot)", source)
         exec_start = source.index("def _executar_pisca_status")
         exec_end = source.index("def _aplicar_status", exec_start)
-        self.assertNotIn("self.status_indicator.configure(bg=canvas_bg)", source[exec_start:exec_end])
+        self.assertIn('str(self.app.state()).lower() == "iconic"', source[exec_start:exec_end])
 
     def test_reposicionamento_de_menus_e_coalescido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
