@@ -188,8 +188,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
-        self.assertIn("tile_width = 144", block)
-        self.assertIn("tile_height = 116", block)
+        self.assertIn("tile_width = 132", block)
+        self.assertIn("tile_height = 104", block)
         self.assertIn("colunas = max(1, min(8", block)
         self.assertIn("wraplength=tile_width - 20", block)
         self.assertNotIn('text=titulo[:24]', block)
@@ -350,8 +350,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
         self.assertIn('strftime("%d/%m/%Y")', block)
-        self.assertIn("tile_width = 144", block)
-        self.assertIn("tile_height = 116", block)
+        self.assertIn("tile_width = 132", block)
+        self.assertIn("tile_height = 104", block)
         self.assertIn("grid_propagate(False)", block)
         self.assertNotIn('sticky="nsew"', block)
         self.assertNotIn('text=titulo[:24]', block)
