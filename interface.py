@@ -23,6 +23,7 @@ LOGGER = logging.getLogger(__name__)
 from tkinter import Canvas, Entry, Menu, messagebox, ttk
 
 import customtkinter as ctk
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from app import (
     atomic_write_json,
@@ -111,14 +112,12 @@ class _SMAutoLabTooltip:
             try:
                 enter_id = child.bind("<Enter>", self._on_enter, add="+")
                 leave_id = child.bind("<Leave>", self._on_leave, add="+")
-                motion_id = child.bind("<Motion>", self._on_motion, add="+")
                 press_id = child.bind("<ButtonPress>", self._on_press, add="+")
                 focus_id = child.bind("<FocusOut>", self._on_focus_out, add="+")
                 destroy_id = child.bind("<Destroy>", self._on_destroy, add="+")
                 self._bindings.extend([
                     (child, ("<Enter>", enter_id)),
                     (child, ("<Leave>", leave_id)),
-                    (child, ("<Motion>", motion_id)),
                     (child, ("<ButtonPress>", press_id)),
                     (child, ("<FocusOut>", focus_id)),
                     (child, ("<Destroy>", destroy_id)),
@@ -339,6 +338,18 @@ def _ui_attach_tooltip(widget):
         )
     except Exception:
         widget._sm_autolab_tooltip = None
+
+def _ui_scan_tooltips(root):
+    if root is None:
+        return
+    stack = [root]
+    while stack:
+        widget = stack.pop()
+        _ui_attach_tooltip(widget)
+        try:
+            stack.extend(widget.winfo_children())
+        except Exception:
+            pass
 
 def _ui_install_button_tooltips():
     cls = ctk.CTkButton
@@ -1792,6 +1803,11 @@ class App:
         self._menu_config = None
         self._menu_aparencia = None
         self._menu_close_job = None
+        self._menu_aparencia_close_job = None
+        self._menu_monitor_job = None
+        self._historico_selecionados = set()
+        self._arquivos_datas_selecionadas = set()
+        self._stat_icon_font_cache = {}
         self._planilha_historico_window = None
         self._arquivos_body = None
         self._arquivos_calendar_canvas = None
@@ -2980,24 +2996,14 @@ class App:
             bg=self._cor_fluente(palette["card"]),
         )
         icon_holder.pack(side="left", padx=(0, 11))
-        circle_color = self._cor_fluente(palette["icon"])
-        icon_holder.create_oval(
-            1, 1, icon_holder_size - 1, icon_holder_size - 1,
-            fill=circle_color,
-            outline=circle_color,
-        )
-        icon_holder.create_text(
-            icon_holder_size / 2,
-            icon_holder_size / 2,
-            text=icon,
-            fill="#FFFFFF",
-            font=("Segoe UI", icon_font, "bold"),
-        )
         card._sm_stat_icon_canvas = icon_holder
-        card._sm_stat_icon_colors = (
+        card._sm_stat_icon_data = (
+            icon,
+            icon_font,
             palette["card"],
             palette["icon"],
         )
+        self._render_stat_icon(card)
 
         text_box = ctk.CTkFrame(row, fg_color="transparent")
         text_box.pack(side="left", fill="both", expand=True)
@@ -3036,25 +3042,77 @@ class App:
                 card._sm_autolab_tooltip = None
         return card
 
+    def _fonte_icone_estatistica(self, size):
+        size = max(8, int(size))
+        cached = self._stat_icon_font_cache.get(size)
+        if cached is not None:
+            return cached
+        fonts_dir = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+        candidates = (
+            fonts_dir / "segoeuib.ttf",
+            fonts_dir / "segoeui.ttf",
+            fonts_dir / "arial.ttf",
+        )
+        for path in candidates:
+            try:
+                if path.exists():
+                    font = ImageFont.truetype(str(path), size)
+                    self._stat_icon_font_cache[size] = font
+                    return font
+            except Exception:
+                pass
+        font = ImageFont.load_default()
+        self._stat_icon_font_cache[size] = font
+        return font
+
+    def _criar_imagem_icone_estatistica(self, icon, icon_font, card_color, icon_color):
+        scale = 4
+        logical = 44
+        size = logical * scale
+        background = self._cor_fluente(card_color)
+        foreground = self._cor_fluente(icon_color)
+        image = Image.new("RGB", (size, size), background)
+        draw = ImageDraw.Draw(image)
+        inset = scale
+        draw.ellipse(
+            (inset, inset, size - inset - 1, size - inset - 1),
+            fill=foreground,
+        )
+        font = self._fonte_icone_estatistica(icon_font * scale)
+        bbox = draw.textbbox((0, 0), str(icon), font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        x = (size - text_width) / 2 - bbox[0]
+        y = (size - text_height) / 2 - bbox[1]
+        draw.text((x, y), str(icon), font=font, fill="#FFFFFF")
+        return ImageTk.PhotoImage(
+            image.resize((logical, logical), Image.Resampling.LANCZOS)
+        )
+
+    def _render_stat_icon(self, card):
+        canvas = getattr(card, "_sm_stat_icon_canvas", None)
+        data = getattr(card, "_sm_stat_icon_data", None)
+        if canvas is None or data is None:
+            return
+        icon, icon_font, card_color, icon_color = data
+        try:
+            photo = self._criar_imagem_icone_estatistica(
+                icon, icon_font, card_color, icon_color
+            )
+            canvas.configure(bg=self._cor_fluente(card_color))
+            canvas.delete("all")
+            canvas.create_image(22, 22, image=photo)
+            card._sm_stat_icon_photo = photo
+        except Exception:
+            pass
+
     def _atualizar_icones_cards_estatistica(self):
         for card in (
             getattr(self, "sucesso_card", None),
             getattr(self, "erro_card", None),
             getattr(self, "codigo_card", None),
         ):
-            canvas = getattr(card, "_sm_stat_icon_canvas", None)
-            colors = getattr(card, "_sm_stat_icon_colors", None)
-            if canvas is None or not colors:
-                continue
-            try:
-                canvas.configure(bg=self._cor_fluente(colors[0]))
-                canvas.itemconfigure(
-                    1,
-                    fill=self._cor_fluente(colors[1]),
-                    outline=self._cor_fluente(colors[1]),
-                )
-            except Exception:
-                pass
+            self._render_stat_icon(card)
 
     @staticmethod
     def _formatar_duracao(segundos):
