@@ -3598,8 +3598,8 @@ class App:
 
     def _criar_pasta_historico(self, execucao, atual=False):
         parent = self.historico_lista
-        tile_width = 144
-        tile_height = 116
+        tile_width = 132
+        tile_height = 104
         execucao_id = self._id_historico_execucao(execucao)
 
         if not hasattr(self, "_hist_grid") or self._hist_grid is None:
@@ -3638,7 +3638,7 @@ class App:
             font=("Segoe UI Emoji", 20),
             text_color=self.ACCENT,
         )
-        icon.pack(pady=(8, 2))
+        icon.pack(pady=(5, 1))
         date_label = ctk.CTkLabel(
             tile,
             text=self._formatar_data_historico(inicio),
@@ -3654,7 +3654,7 @@ class App:
             font=("Segoe UI", 8),
             anchor="center",
         )
-        time_label.pack(fill="x", padx=6, pady=(1, 0))
+        time_label.pack(fill="x", padx=6, pady=(0, 0))
         error_label = ctk.CTkLabel(
             tile,
             text=f"{erros} não executado(s)",
@@ -3664,7 +3664,7 @@ class App:
             justify="center",
             wraplength=tile_width - 20,
         )
-        error_label.pack(fill="x", padx=8, pady=(8, 0))
+        error_label.pack(fill="x", padx=8, pady=(5, 0))
 
         widgets = (tile, icon, date_label, time_label, error_label)
         self._historico_tiles[execucao_id] = tile
@@ -3918,7 +3918,7 @@ class App:
             def selecionar_erro(codigo, event=None):
                 ctrl = bool(event is not None and (getattr(event, "state", 0) & 0x0004))
                 if not ctrl:
-                    return "break"
+                    return None
                 if codigo in selecionados:
                     selecionados.remove(codigo)
                 else:
