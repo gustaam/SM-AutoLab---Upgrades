@@ -68,7 +68,7 @@ jobs:
   tag:
     needs: validate
     if: >-
-      \${{ needs.validate.result == 'success' &&
+      ${{ needs.validate.result == 'success' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
