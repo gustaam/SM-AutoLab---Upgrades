@@ -408,6 +408,36 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Tempo estimado restante"', block)
         self.assertIn('font=("Segoe UI", 8, "bold")', block)
 
+    def test_planilha_recupera_ultima_apenas_quando_nao_processada(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _planilha_fingerprint", source)
+        self.assertIn("def _planilha_foi_processada", source)
+        self.assertIn('status != "concluída"', source)
+        self.assertIn('text="A última planilha salva ainda não foi processada.', source)
+
+    def test_planilha_processada_abre_nova_vazia_e_apaga_rascunho(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def abrir_planilha(self, dados_iniciais=None):")
+        end = source.index("def _", start + 10)
+        block = source[start:end]
+        self.assertIn("if self._planilha_foi_processada(ultima):", block)
+        self.assertIn("self._planilha_apagar_rascunho()", block)
+        self.assertIn("self._planilha_data = {}", block)
+
+    def test_historico_de_erros_renderiza_pasta_apenas_com_erros(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _restaurar_historico_na_tela")
+        end = source.index("def _id_historico_execucao", start)
+        block = source[start:end]
+        self.assertIn("self._historico_execucao_tem_erros(item)", block)
+        self.assertIn('Nenhuma execução com erros registrada ainda.', block)
+
+    def test_historico_de_erros_considera_erro_geral(self):
+        import interface
+        self.assertTrue(interface.App._historico_execucao_tem_erros({"erros": 1}))
+        self.assertTrue(interface.App._historico_execucao_tem_erros({"status": "Erro geral", "erros": 0}))
+        self.assertFalse(interface.App._historico_execucao_tem_erros({"status": "Concluída", "erros": 0}))
+
     def test_planilha_salva_e_recarrega_dados_pelo_mesmo_caminho(self):
         import tempfile
         import interface
