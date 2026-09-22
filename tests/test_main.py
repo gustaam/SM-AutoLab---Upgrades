@@ -558,7 +558,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_status_animation_reproduz_configuracao_da_v2_99_35(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _iniciar_pisca_status")
-        end = source.index("def _agendar_retorno_pronto", start)
+        end = source.index("def _interpolar_cor", start)
         block = source[start:end]
         self.assertIn("self._status_anim_frames = 28 if self._status_blink_fast else 36", block)
         self.assertIn("self._status_anim_interval = 28 if self._status_blink_fast else 32", block)
