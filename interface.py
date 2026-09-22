@@ -66,6 +66,12 @@ _UI_TOOLTIP_MESSAGES = {
     "claro": "Usa o tema claro.",
     "escuro": "Usa o tema escuro.",
     "padrão do windows": "Segue automaticamente o tema do Windows.",
+    "atividade": "Mostra os eventos da execução atual.",
+    "histórico": "Mostra as execuções anteriores.",
+    "↶": "Desfaz a última alteração.",
+    "↷": "Refaz a última alteração.",
+    "‹": "Mostra o mês anterior.",
+    "›": "Mostra o mês seguinte.",
 }
 
 class _SMAutoLabTooltip:
@@ -140,7 +146,11 @@ class _SMAutoLabTooltip:
             return False
 
     def update_message(self, message):
-        self.message = str(message or "").strip()
+        message = str(message or "").strip()
+        if message == self.message:
+            return
+        self.message = message
+        self._rendered_message = None
         if not self.message:
             self.hide()
             return
@@ -171,7 +181,6 @@ class _SMAutoLabTooltip:
 
     def _on_motion(self, _event=None):
         self._cancel_after("_hide_id")
-        self._bind_widget_tree()
         if self._window is not None:
             self._position()
 
@@ -218,6 +227,7 @@ class _SMAutoLabTooltip:
             )
             label.pack()
             self._window.update_idletasks()
+            self._rendered_message = self.message
         except Exception:
             self.hide()
 
@@ -233,11 +243,9 @@ class _SMAutoLabTooltip:
                 self._window = tk.Toplevel(self.widget)
                 self._window._sm_autolab_tooltip_window = True
                 self._window.overrideredirect(True)
-                try:
-                    self._window.attributes("-topmost", True)
-                except Exception:
-                    pass
-            self._render()
+                self._rendered_message = None
+            if self._rendered_message != self.message:
+                self._render()
             self._position()
             self._window.deiconify()
             self._window.lift()
@@ -336,19 +344,12 @@ def _ui_install_button_tooltips():
     if getattr(cls, "_sm_autolab_tooltip_installed", False):
         return
     original_init = cls.__init__
-    original_configure = cls.configure
 
     def init_with_tooltip(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
         _ui_attach_tooltip(self)
 
-    def configure_with_tooltip(self, *args, **kwargs):
-        result = original_configure(self, *args, **kwargs)
-        _ui_attach_tooltip(self)
-        return result
-
     cls.__init__ = init_with_tooltip
-    cls.configure = configure_with_tooltip
     cls._sm_autolab_tooltip_installed = True
 
 def _ui_bind_card_hover(card, accent):
@@ -2386,6 +2387,74 @@ class App:
             except Exception:
                 pass
 
+    def _widget_recebe_pointer(self, widget):
+        if widget is None:
+            return False
+        try:
+            if not widget.winfo_exists():
+                return False
+            x = widget.winfo_pointerx()
+            y = widget.winfo_pointery()
+            left = widget.winfo_rootx()
+            top = widget.winfo_rooty()
+            return left <= x < left + widget.winfo_width() and top <= y < top + widget.winfo_height()
+        except Exception:
+            return False
+
+    def _pointer_em_area_dos_menus(self):
+        return any(
+            self._widget_recebe_pointer(widget)
+            for widget in (
+                getattr(self, "_menu_config", None),
+                getattr(self, "_menu_aparencia", None),
+                getattr(self, "_menu_aparencia_btn", None),
+                getattr(self, "botao_configuracoes", None),
+            )
+        )
+
+    def _ativar_clique_fora_menus(self):
+        tag = "_SMAutoLabMenuEvents"
+        if getattr(self, "_menu_bindtag_widgets", None):
+            return
+        originals = {}
+        try:
+            for widget in self._iterar_descendentes_ui(self.app):
+                try:
+                    tags = tuple(widget.bindtags())
+                    if tag not in tags:
+                        originals[widget] = tags
+                        widget.bindtags(tags + (tag,))
+                except Exception:
+                    pass
+            self._menu_bindtag_widgets = originals
+            self.app.bind_class(tag, "<ButtonPress-1>", self._clique_fora_menus, add="+")
+        except Exception:
+            self._menu_bindtag_widgets = {}
+
+    def _desativar_clique_fora_menus(self):
+        tag = "_SMAutoLabMenuEvents"
+        try:
+            self.app.unbind_class(tag, "<ButtonPress-1>")
+        except Exception:
+            pass
+        for widget, tags in tuple(getattr(self, "_menu_bindtag_widgets", {}).items()):
+            try:
+                if widget.winfo_exists():
+                    widget.bindtags(tags)
+            except Exception:
+                pass
+        self._menu_bindtag_widgets = {}
+
+    def _clique_fora_menus(self, _event=None):
+        if self._pointer_em_area_dos_menus():
+            return
+        self._fechar_menus()
+
+    def _fechar_menus_se_fora(self):
+        self._menu_close_job = None
+        if not self._pointer_em_area_dos_menus():
+            self._fechar_menus()
+
     def _mostrar_menu_configuracoes(self, _event=None):
         """Abre o menu principal de configurações sem bindings concorrentes."""
         self._cancelar_fechar_menus()
@@ -2461,6 +2530,7 @@ class App:
         # O binding é instalado depois que os filhos existem, para cobrir todo
         # o submenu sem depender de eventos globais.
         self._configurar_hover_menu(self._menu_config)
+        self._ativar_clique_fora_menus()
         # Captura o hover no botão e também nos widgets internos criados
         # pelo CustomTkinter, evitando perder o evento ao passar sobre o canvas
         # interno do botão.
@@ -2559,19 +2629,20 @@ class App:
             self._menu_close_job = None
 
     def _agendar_fechar_menus(self, _event=None):
-        # Fecha o submenu somente depois de uma pequena tolerância, permitindo
-        # mover o ponteiro de Aparência até as opções sem fechar o menu.
+        # Fecha somente quando o ponteiro estiver fora do menu principal,
+        # submenu, botão Aparência e botão Configurações.
         self._cancelar_fechar_menus()
         try:
             self._menu_close_job = self.app.after(
-                220,
-                self._fechar_menus,
+                180,
+                self._fechar_menus_se_fora,
             )
         except Exception:
             self._menu_close_job = None
 
     def _fechar_menus(self):
         self._menu_close_job = None
+        self._desativar_clique_fora_menus()
         hover_binding = getattr(self, "_config_hover_binding", None)
         if hover_binding:
             try:
@@ -3339,6 +3410,16 @@ class App:
         except ValueError:
             return data
 
+    def _formatar_data_historico(self, valor):
+        texto = str(valor or "").strip()
+        if not texto:
+            return ""
+        data = texto.split(" ", 1)[0]
+        try:
+            return datetime.strptime(data, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except ValueError:
+            return data
+
     def _criar_pasta_historico(self, execucao, atual=False):
         parent = self.historico_lista
         tile_width = 144
@@ -3375,8 +3456,10 @@ class App:
         icone = "📁"
 
         icone_widget = ctk.CTkLabel(
-            tile, text=icone, font=("Segoe UI Emoji", 20),
-            text_color=self.ACCENT
+            tile,
+            text=icone,
+            font=("Segoe UI Emoji", 20),
+            text_color=self.ACCENT,
         )
         icone_widget.pack(pady=(8, 2))
         ctk.CTkLabel(
@@ -3403,24 +3486,44 @@ class App:
             justify="center",
             wraplength=tile_width - 20,
         ).pack(fill="x", padx=8, pady=(8, 0))
+
         def selecionar(_e=None):
             for sibling in self._hist_grid.winfo_children():
-                sibling.configure(border_color=self.BORDER, fg_color=("#FFFFFF", "#2D3338"))
-            tile.configure(border_color=self.ACCENT, fg_color=("#EAF4FF", "#1B3C53"))
+                sibling.configure(
+                    border_color=self.BORDER,
+                    fg_color=("#FFFFFF", "#2D3338"),
+                )
+            tile.configure(
+                border_color=self.ACCENT,
+                fg_color=("#EAF4FF", "#1B3C53"),
+            )
+
         def abrir(_e=None):
-            selecionar(); self._abrir_detalhe_historico(execucao)
+            selecionar()
+            self._abrir_detalhe_historico(execucao)
+
         def enter(_e=None):
-            tile.configure(border_color=self.ACCENT_HOVER, fg_color=("#EAF4FC", "#263F50"))
+            tile.configure(
+                border_color=self.ACCENT_HOVER,
+                fg_color=("#EAF4FC", "#263F50"),
+            )
+
         def leave(_e=None):
-            # keep selection highlight if selected; otherwise restore neutral
             if tile.cget("border_color") not in (self.ACCENT,):
-                tile.configure(border_color=self.BORDER, fg_color=("#FFFFFF", "#2D3338"))
-        for w in (tile,icone_widget):
+                tile.configure(
+                    border_color=self.BORDER,
+                    fg_color=("#FFFFFF", "#2D3338"),
+                )
+
+        for widget in (tile, icone_widget):
             try:
-                w.configure(cursor="hand2")
+                widget.configure(cursor="hand2")
             except Exception:
                 pass
-            w.bind("<Enter>", enter); w.bind("<Leave>", leave); w.bind("<Button-1>", selecionar); w.bind("<Double-1>", abrir)
+            widget.bind("<Enter>", enter)
+            widget.bind("<Leave>", leave)
+            widget.bind("<Button-1>", selecionar)
+            widget.bind("<Double-1>", abrir)
         tile.bind("<Double-1>", abrir)
 
     def _abrir_detalhe_historico(self, execucao):
