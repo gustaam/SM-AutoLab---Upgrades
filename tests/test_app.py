@@ -1,4 +1,4 @@
-# Testes do núcleo operacional.
+# Testes do núcleo de automação e persistência.
 
 import json
 import tempfile
