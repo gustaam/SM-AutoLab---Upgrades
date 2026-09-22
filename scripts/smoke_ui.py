@@ -1,4 +1,4 @@
-# Teste de inicialização real da interface.
+# Teste de inicialização da interface desktop.
 from __future__ import annotations
 
 import sys
