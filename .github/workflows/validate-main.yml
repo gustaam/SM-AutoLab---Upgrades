@@ -173,8 +173,8 @@ jobs:
         if: steps.release.outputs.published != 'true'
         shell: bash
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: \${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
           gh workflow run release.yml --repo "\${GITHUB_REPOSITORY}" --ref "\${RELEASE_TAG}" -f "release_tag=\${RELEASE_TAG}"
