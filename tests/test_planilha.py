@@ -1,4 +1,4 @@
-# Testes da planilha e grade virtualizada.
+# Testes da planilha, edição e grade virtualizada.
 
 import json
 import tempfile
