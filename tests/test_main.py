@@ -427,7 +427,6 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("def _planilha_apagar_selecionados", source)
 
     def test_historico_erros_aceita_ctrl_clique_e_apagar_selecionados(self):
-    def test_historico_erros_aceita_ctrl_clique_e_apagar_selecionados(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _preencher_detalhe_pasta")
         end = source.index("def _limpar_historico", start)
