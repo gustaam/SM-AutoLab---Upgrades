@@ -208,6 +208,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("altura = max(300, min(440, janela_h - 260))", source)
         self.assertIn('self.app.bind("<Configure>", self._ajustar_altura_acompanhamento, add="+")', source)
 
+    def test_icones_dos_cards_sao_atualizados_ao_mudar_o_tema(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _atualizar_icones_cards_estatistica", source)
+        start = source.index("def _atualizar_icones_cards_estatistica")
+        end = source.index("@staticmethod", start)
+        block = source[start:end]
+        self.assertIn("canvas.configure(bg=self._cor_fluente(colors[0]))", block)
+        self.assertIn("canvas.itemconfigure(", block)
     def test_cards_de_estatisticas_usam_cores_e_icones_por_categoria(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _stat_card")
@@ -330,13 +338,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _stat_card")
         end = source.index("@staticmethod", start)
         block = source[start:end]
-        self.assertIn("icon_holder = ctk.CTkLabel(", block)
+        self.assertIn("icon_holder = Canvas(", block)
         self.assertIn("width=icon_holder_size,", block)
         self.assertIn("height=icon_holder_size,", block)
         self.assertIn("icon_holder_size = 44", block)
-        self.assertIn("corner_radius=icon_holder_size // 2", block)
-        self.assertIn('fg_color=palette["icon"]', block)
-        self.assertIn('text_color="#FFFFFF"', block)
+        self.assertIn("icon_holder.create_oval(", block)
+        self.assertIn("icon_holder.create_text(", block)
+        self.assertIn('card._sm_stat_icon_canvas = icon_holder', block)
+        self.assertIn('card._sm_stat_icon_colors = (', block)
+        self.assertIn('fill="#FFFFFF"', block)
     def test_cartoes_do_historico_usam_data_e_tamanho_fixos(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _formatar_data_historico")
