@@ -2222,7 +2222,7 @@ class App:
         _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
-        self._iniciar_pisca_status()
+        self._parar_pisca_status()
         self.app.after(350, self._verificar_retomada_pendente)
         self.app.after(1200, self._verificar_atualizacao_automatica)
 
@@ -6256,7 +6256,7 @@ class App:
         modo = ctk.get_appearance_mode().lower()
         canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
         self.status_indicator.configure(bg=canvas_bg)
-        if self._status_blink_fast or self._status_text_base == "Pronto":
+        if self._status_blink_fast:
             self._iniciar_pisca_status()
         else:
             self._parar_pisca_status()
