@@ -328,13 +328,13 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _stat_card")
         end = source.index("@staticmethod", start)
         block = source[start:end]
-        self.assertIn("icon_holder = ctk.CTkFrame(", block)
+        self.assertIn("icon_holder = ctk.CTkLabel(", block)
         self.assertIn("width=icon_holder_size,", block)
         self.assertIn("height=icon_holder_size,", block)
         self.assertIn("icon_holder_size = 44", block)
         self.assertIn("corner_radius=icon_holder_size // 2", block)
-        self.assertIn("icon_holder.pack_propagate(False)", block)
-        self.assertIn('fg_color="transparent"', block)
+        self.assertIn('fg_color=palette["icon"]', block)
+        self.assertIn('text_color="#FFFFFF"', block)
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)

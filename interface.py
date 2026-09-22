@@ -2897,25 +2897,17 @@ class App:
         icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 21}
         icon_font = icon_sizes.get(str(icon), 21)
         icon_holder_size = 44
-        icon_holder = ctk.CTkFrame(
+        icon_holder = ctk.CTkLabel(
             row,
-            width=icon_holder_size,
-            height=icon_holder_size,
-            corner_radius=icon_holder_size // 2,
-            fg_color=palette["icon"],
-        )
-        icon_holder.pack(side="left", padx=(0, 11))
-        icon_holder.pack_propagate(False)
-        ctk.CTkLabel(
-            icon_holder,
             text=icon,
             width=icon_holder_size,
             height=icon_holder_size,
             corner_radius=icon_holder_size // 2,
-            fg_color="transparent",
+            fg_color=palette["icon"],
             text_color="#FFFFFF",
             font=("Segoe UI", icon_font, "bold"),
-        ).place(relx=0.5, rely=0.5, anchor="center")
+        )
+        icon_holder.pack(side="left", padx=(0, 11))
 
         text_box = ctk.CTkFrame(row, fg_color="transparent")
         text_box.pack(side="left", fill="both", expand=True)
