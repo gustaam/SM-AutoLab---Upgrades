@@ -3633,8 +3633,11 @@ class App:
         largura = max(parent.winfo_width(), tile_width + 2)
         colunas = max(1, min(8, int(largura // (tile_width + 2))))
         for col in range(colunas):
+            # O tamanho real do tile já é determinado pelo próprio widget.
+            # Não usar minsize baseado em tile_width evita espaçamento excessivo
+            # quando o Tk aplica escalonamento de DPI diferente ao conteúdo.
             self._hist_grid.grid_columnconfigure(
-                col, weight=0, minsize=tile_width + 2
+                col, weight=0, minsize=0
             )
 
         count = len(self._hist_grid.winfo_children())
@@ -3648,7 +3651,7 @@ class App:
             width=tile_width,
             height=tile_height,
         )
-        tile.grid(row=row, column=col, padx=0, pady=1)
+        tile.grid(row=row, column=col, padx=1, pady=1)
         tile.grid_propagate(False)
 
         inicio = str(execucao.get("inicio", "") or "")
