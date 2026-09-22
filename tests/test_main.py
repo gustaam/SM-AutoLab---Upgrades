@@ -459,6 +459,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('execucao.get("codigos_erro")', block)
         self.assertIn('item.get("codigo")', block)
 
+    def test_contador_arquivos_ignora_execucoes_sem_planilha_salva(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _contar_codigos_mes")
+        end = source.index("def _formatar_contador_arquivos", start)
+        block = source[start:end]
+        self.assertIn("self._historico_planilhas_visiveis()", block)
+        self.assertNotIn("self._historico_execucoes", block)
+        self.assertIn('int(item.get("filled", 0) or 0)', block)
+
     def test_calendar_aceita_ctrl_multiseleção_e_hit_test_exato(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _clique_calendario_arquivos")
