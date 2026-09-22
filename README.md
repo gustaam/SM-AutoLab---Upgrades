@@ -40,6 +40,7 @@ Automação de autorizações no Feegow em um aplicativo desktop para Windows, c
 | `tests/test_planilha.py` | Testes da planilha e grade |
 | `tests/test_patch.py` | Testes de regressão arquitetural |
 | `tests/test_validation.py` | Testes de validação e release |
+| `tests/test_history.py` | Regressões de histórico e retomada |
 
 ### Workflows e assets
 
