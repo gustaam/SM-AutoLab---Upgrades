@@ -77,7 +77,7 @@ _UI_TOOLTIP_MESSAGES = {
 class _SMAutoLabTooltip:
     """Tooltip leve para controles da interface, sem bindings globais."""
     DELAY_MS = 450
-    HIDE_GRACE_MS = 80
+    HIDE_GRACE_MS = 120
     MAX_WIDTH = 340
 
     def __init__(self, widget, message, bind_children=True):
@@ -3400,16 +3400,6 @@ class App:
 
         for execucao in reversed(historico_visivel):
             self._criar_pasta_historico(execucao)
-
-    def _formatar_data_historico(self, valor):
-        texto = str(valor or "").strip()
-        if not texto:
-            return ""
-        data = texto.split(" ", 1)[0]
-        try:
-            return datetime.strptime(data, "%Y-%m-%d").strftime("%d/%m/%Y")
-        except ValueError:
-            return data
 
     def _formatar_data_historico(self, valor):
         texto = str(valor or "").strip()
