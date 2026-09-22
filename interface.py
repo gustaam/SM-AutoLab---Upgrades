@@ -2666,6 +2666,7 @@ class App:
             return
         self._tema = tema
         ctk.set_appearance_mode(tema)
+        self._atualizar_icones_cards_estatistica()
         try:
             dark = ctk.get_appearance_mode().lower() == "dark"
             atualizar_backdrop_tema(self.app, dark)
@@ -2969,17 +2970,34 @@ class App:
         icon_sizes = {"✓": 21, "!": 21, "▥": 21, "›": 21}
         icon_font = icon_sizes.get(str(icon), 21)
         icon_holder_size = 44
-        icon_holder = ctk.CTkLabel(
+        icon_holder = Canvas(
             row,
-            text=icon,
             width=icon_holder_size,
             height=icon_holder_size,
-            corner_radius=icon_holder_size // 2,
-            fg_color=palette["icon"],
-            text_color="#FFFFFF",
-            font=("Segoe UI", icon_font, "bold"),
+            bd=0,
+            highlightthickness=0,
+            relief="flat",
+            bg=self._cor_fluente(palette["card"]),
         )
         icon_holder.pack(side="left", padx=(0, 11))
+        circle_color = self._cor_fluente(palette["icon"])
+        icon_holder.create_oval(
+            1, 1, icon_holder_size - 1, icon_holder_size - 1,
+            fill=circle_color,
+            outline=circle_color,
+        )
+        icon_holder.create_text(
+            icon_holder_size / 2,
+            icon_holder_size / 2,
+            text=icon,
+            fill="#FFFFFF",
+            font=("Segoe UI", icon_font, "bold"),
+        )
+        card._sm_stat_icon_canvas = icon_holder
+        card._sm_stat_icon_colors = (
+            palette["card"],
+            palette["icon"],
+        )
 
         text_box = ctk.CTkFrame(row, fg_color="transparent")
         text_box.pack(side="left", fill="both", expand=True)
@@ -3017,6 +3035,26 @@ class App:
             except Exception:
                 card._sm_autolab_tooltip = None
         return card
+
+    def _atualizar_icones_cards_estatistica(self):
+        for card in (
+            getattr(self, "sucesso_card", None),
+            getattr(self, "erro_card", None),
+            getattr(self, "codigo_card", None),
+        ):
+            canvas = getattr(card, "_sm_stat_icon_canvas", None)
+            colors = getattr(card, "_sm_stat_icon_colors", None)
+            if canvas is None or not colors:
+                continue
+            try:
+                canvas.configure(bg=self._cor_fluente(colors[0]))
+                canvas.itemconfigure(
+                    1,
+                    fill=self._cor_fluente(colors[1]),
+                    outline=self._cor_fluente(colors[1]),
+                )
+            except Exception:
+                pass
 
     @staticmethod
     def _formatar_duracao(segundos):
