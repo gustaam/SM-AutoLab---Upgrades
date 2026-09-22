@@ -3192,17 +3192,6 @@ class App:
         pagina = int(pendente.get("pagina", 1) or 1)
         inicio = int(pendente.get("checkpoint", pendente.get("inicio_indice", 1)) or 1)
 
-        if str(pendente.get("origem", "")) == "planilha_interna":
-            try:
-                codigos = self._extrair_codigos_planilha()
-                interno = ler_checkpoint_interno(codigos) if codigos else None
-                if interno is not None:
-                    inicio = int(interno)
-            except Exception:
-                pass
-
-        proximo = max(1, inicio)
-
         origem = str(pendente.get("origem", "")).strip()
         if origem != "planilha_interna":
             # A planilha externa pertence ao fluxo legado, que não faz mais
