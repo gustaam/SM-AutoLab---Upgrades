@@ -5,7 +5,41 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate import parse_version, validate_pe, validate_quality, validate_version
+from scripts.validate import (
+    _cli_all,
+    parse_version,
+    validate_dependencies,
+    validate_pe,
+    validate_quality,
+    validate_version,
+    validate_workflow_pins,
+    validate_workflow_security,
+)
+
+class ConsolidatedValidationTests(unittest.TestCase):
+    def test_cli_all_executa_validadores_de_dependencias_e_workflow(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with patch("scripts.validate.validate_architecture") as architecture, \
+                 patch("scripts.validate.validate_version") as version, \
+                 patch("scripts.validate.validate_dependencies") as dependencies, \
+                 patch("scripts.validate.validate_workflow_pins") as pins, \
+                 patch("scripts.validate.validate_workflow_security") as security, \
+                 patch("scripts.validate.validate_quality") as quality:
+                self.assertEqual(_cli_all(root), 0)
+
+            architecture.assert_called_once_with(root)
+            version.assert_called_once_with(root / "VERSION")
+            dependencies.assert_called_once_with(root)
+            pins.assert_called_once_with(root)
+            security.assert_called_once_with(root)
+            quality.assert_called_once_with(root)
+
+    def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):
+        self.assertTrue(callable(validate_dependencies))
+        self.assertTrue(callable(validate_workflow_pins))
+        self.assertTrue(callable(validate_workflow_security))
+
 
 # tests/test_validate_executable.py
 
