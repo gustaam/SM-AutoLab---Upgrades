@@ -1809,8 +1809,6 @@ class App:
         self._menu_monitor_job = None
         self._historico_selecionados = set()
         self._historico_tiles = {}
-        self._planilha_ctrl_multiselect = False
-        self._planilha_borda_job = None
         self._arquivos_datas_selecionadas = set()
         self._stat_icon_font_cache = {}
         self._planilha_historico_window = None
@@ -3624,19 +3622,19 @@ class App:
 
     def _criar_pasta_historico(self, execucao, atual=False):
         parent = self.historico_lista
-        tile_width = 132
-        tile_height = 104
+        tile_width = 118
+        tile_height = 96
         execucao_id = self._id_historico_execucao(execucao)
 
         if not hasattr(self, "_hist_grid") or self._hist_grid is None:
             self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
             self._hist_grid.pack(fill="x", padx=8, pady=5)
 
-        largura = max(parent.winfo_width(), tile_width + 8)
-        colunas = max(1, min(8, int((largura - 8) // (tile_width + 4))))
+        largura = max(parent.winfo_width(), tile_width + 2)
+        colunas = max(1, min(8, int(largura // (tile_width + 2))))
         for col in range(colunas):
             self._hist_grid.grid_columnconfigure(
-                col, weight=0, minsize=tile_width + 4
+                col, weight=0, minsize=tile_width + 2
             )
 
         count = len(self._hist_grid.winfo_children())
@@ -3650,7 +3648,7 @@ class App:
             width=tile_width,
             height=tile_height,
         )
-        tile.grid(row=row, column=col, padx=1, pady=2)
+        tile.grid(row=row, column=col, padx=0, pady=1)
         tile.grid_propagate(False)
 
         inicio = str(execucao.get("inicio", "") or "")
@@ -3664,7 +3662,7 @@ class App:
             font=("Segoe UI Emoji", 20),
             text_color=self.ACCENT,
         )
-        icon.pack(pady=(5, 1))
+        icon.pack(pady=(3, 0))
         date_label = ctk.CTkLabel(
             tile,
             text=self._formatar_data_historico(inicio),
@@ -3672,7 +3670,7 @@ class App:
             font=("Segoe UI", 9, "bold"),
             anchor="center",
         )
-        date_label.pack(fill="x", padx=6)
+        date_label.pack(fill="x", padx=3)
         time_label = ctk.CTkLabel(
             tile,
             text=horario,
@@ -3680,7 +3678,7 @@ class App:
             font=("Segoe UI", 8),
             anchor="center",
         )
-        time_label.pack(fill="x", padx=6, pady=(0, 0))
+        time_label.pack(fill="x", padx=3, pady=(0, 0))
         error_label = ctk.CTkLabel(
             tile,
             text=f"{erros} não executado(s)",
@@ -3688,9 +3686,9 @@ class App:
             font=("Segoe UI", 8),
             anchor="center",
             justify="center",
-            wraplength=tile_width - 20,
+            wraplength=tile_width - 10,
         )
-        error_label.pack(fill="x", padx=8, pady=(5, 0))
+        error_label.pack(fill="x", padx=3, pady=(3, 0))
 
         widgets = (tile, icon, date_label, time_label, error_label)
         self._historico_tiles[execucao_id] = tile
@@ -4129,8 +4127,6 @@ class App:
         self._planilha_undo=[]
         self._planilha_redo=[]
         self._planilha_efetuou_alteracao=False
-        self._planilha_ctrl_multiselect=False
-        self._planilha_borda_job=None
         self._planilha_contador_label=None
         win=ctk.CTkToplevel(self.app)
         self._planilha_window=win
@@ -4169,14 +4165,6 @@ class App:
         self._planilha_contador_label=ctk.CTkLabel(title_bar,text="0 preenchidas",text_color=self.SUBTEXT,font=("Segoe UI",10))
         self._planilha_contador_label.pack(side="left", padx=(10,0))
         actions=ctk.CTkFrame(toolbar,fg_color="transparent"); actions.pack(side="right",padx=16,pady=9)
-        self.botao_planilha_apagar_selecionados = ctk.CTkButton(
-            actions,text="Apagar selecionados",command=self._planilha_apagar_selecionados,
-            width=128,height=36,corner_radius=8,fg_color=self.CARD,
-            hover_color=("#FDECEC","#3A2424"),border_width=1,border_color=self.ERROR,
-            text_color=self.ERROR,font=("Segoe UI",11,"bold")
-        )
-        self.botao_planilha_apagar_selecionados.pack(side="left",padx=4)
-        self.botao_planilha_apagar_selecionados.pack_forget()
         ctk.CTkButton(actions,text="Limpar",command=self._planilha_limpar,width=80,height=36,corner_radius=8,fg_color=self.CARD,hover_color=("#FDECEC","#3A2424"),border_width=1,border_color=self.ERROR,text_color=self.ERROR,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
         ctk.CTkButton(actions,text="Salvar e Sair",command=self._planilha_salvar_e_sair,width=115,height=36,corner_radius=8,fg_color=self.CARD,hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,text_color=self.TEXT,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
         ctk.CTkButton(actions,text="Salvar e Iniciar",command=self._planilha_salvar_e_iniciar,width=150,height=46,corner_radius=8,fg_color=self.ACCENT,hover_color=self.ACCENT_HOVER,font=("Segoe UI",14,"bold")).pack(side="left",padx=4)
@@ -4279,7 +4267,6 @@ class App:
 
         def _clicar_cabecalho(event):
             try:
-                ctrl = bool(getattr(event, "state", 0) & 0x0004)
                 first = float(tree.yview()[0])
                 total = tree.total_rows
                 row_height = tree.row_height
@@ -4295,23 +4282,7 @@ class App:
                 tree.focus(iid)
                 tree.see(iid)
                 cells = {(row_index, col) for col in range(3)}
-                if ctrl:
-                    selected = set(getattr(self, "_planilha_celulas_selecionadas", set()) or ())
-                    if cells.issubset(selected):
-                        selected.difference_update(cells)
-                    else:
-                        selected.update(cells)
-                    self._planilha_definir_selecao(
-                        selected,
-                        active=(row_index, 0),
-                        ctrl_multiselect=True,
-                    )
-                else:
-                    self._planilha_definir_selecao(
-                        cells,
-                        active=(row_index, 0),
-                        ctrl_multiselect=False,
-                    )
+                self._planilha_definir_selecao(cells, active=(row_index, 0))
             except Exception:
                 pass
             return "break"
@@ -4324,7 +4295,6 @@ class App:
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
         tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
-        tree.bind("<Escape>", self._planilha_limpar_selecao, add="+")
         tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
         tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
         tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)
@@ -4343,7 +4313,7 @@ class App:
             current = tree.identify_cell(event.x, event.y)
             if current is not None:
                 row, col = current
-                self._planilha_definir_selecao({current}, active=current, ctrl_multiselect=False)
+                self._planilha_definir_selecao({current}, active=current)
                 tree.focus(str(row))
                 tree.focus_set()
             try:
@@ -4364,7 +4334,6 @@ class App:
         self._planilha_tree=tree
         self._planilha_row_header=row_header
         self._planilha_context_menu = self._criar_menu_contexto_planilha(tree)
-        self._atualizar_botao_apagar_planilha()
         self._planilha_implementacao = "grade-virtual"
         tree.refresh()
         # Todos os atalhos da planilha ficam limitados ao Canvas/Entry.
@@ -4474,7 +4443,6 @@ class App:
 
     def _planilha_desenhar_borda(self):
         """Desenha a seleção diretamente no Canvas da grade, sem widgets sobrepostos."""
-        self._planilha_borda_job = None
         tree = getattr(self, "_planilha_tree", None)
         if tree is None:
             return
@@ -4548,52 +4516,7 @@ class App:
         except tk.TclError:
             pass
 
-    def _atualizar_botao_apagar_planilha(self):
-        btn = getattr(self, "botao_planilha_apagar_selecionados", None)
-        if btn is None:
-            return
-        try:
-            if self._planilha_ctrl_multiselect and self._planilha_celulas_selecionadas:
-                btn.pack(side="left", padx=4)
-            else:
-                btn.pack_forget()
-        except Exception:
-            pass
-
-    def _planilha_limpar_selecao(self, _event=None):
-        self._planilha_celulas_selecionadas = set()
-        self._planilha_linhas_selecionadas = set()
-        self._planilha_celula_ativa = None
-        self._planilha_ctrl_multiselect = False
-        self._atualizar_botao_apagar_planilha()
-        self._agendar_planilha_borda()
-        return "break"
-
-    def _planilha_apagar_selecionados(self):
-        if not self._planilha_ctrl_multiselect or not self._planilha_celulas_selecionadas:
-            return "break"
-        selected = set(self._planilha_celulas_selecionadas)
-        updated, changed = clear_cells(self._planilha_data, selected)
-        if not changed:
-            self._planilha_limpar_selecao()
-            return "break"
-        self._planilha_push_undo()
-        self._planilha_redo = []
-        self._planilha_data = updated
-        self._planilha_atualizar_grade()
-        self._planilha_marcar_alteracao()
-        self._planilha_limpar_selecao()
-        return "break"
-
-    def _agendar_planilha_borda(self):
-        if getattr(self, "_planilha_borda_job", None) is not None:
-            return
-        try:
-            self._planilha_borda_job = self.app.after_idle(self._planilha_desenhar_borda)
-        except Exception:
-            self._planilha_borda_job = None
-
-    def _planilha_definir_selecao(self, cells, active=None, ctrl_multiselect=None):
+    def _planilha_definir_selecao(self, cells, active=None):
         """Mantém seleção de células em um único estado canônico."""
         normalized = set()
         for cell in cells or ():
@@ -4606,9 +4529,6 @@ class App:
 
         self._planilha_celulas_selecionadas = normalized
         self._planilha_linhas_selecionadas = {str(row) for row, _ in normalized}
-        if ctrl_multiselect is not None:
-            self._planilha_ctrl_multiselect = bool(ctrl_multiselect)
-        self._atualizar_botao_apagar_planilha()
 
         if active is not None:
             self._planilha_celula_ativa = (str(int(active[0])), int(active[1]))
@@ -4618,7 +4538,7 @@ class App:
         else:
             self._planilha_celula_ativa = None
 
-        self._agendar_planilha_borda()
+        self._planilha_desenhar_borda()
 
     def _planilha_retangulo_selecao(self, inicio, fim):
         return rectangle_selection(inicio, fim)
@@ -4628,30 +4548,19 @@ class App:
         tree = self._planilha_tree
         if tree is None:
             return "break"
-
         current = tree.identify_cell(event.x, event.y)
         if current is None:
             return "break"
 
-        selected = set(getattr(self, "_planilha_celulas_selecionadas", set()) or ())
         active = getattr(self, "_planilha_celula_ativa", None)
-        ctrl = bool(getattr(event, "state", 0) & 0x0004)
         shift = bool(getattr(event, "state", 0) & 0x0001)
-
-        if ctrl:
-            if current in selected:
-                selected.remove(current)
-            else:
-                selected.add(current)
-            self._planilha_definir_selecao(selected, active=current, ctrl_multiselect=True)
-        elif shift and active:
+        if shift and active:
             self._planilha_definir_selecao(
                 self._planilha_retangulo_selecao(active, current),
                 active=current,
-                ctrl_multiselect=False,
             )
         else:
-            self._planilha_definir_selecao({current}, active=current, ctrl_multiselect=False)
+            self._planilha_definir_selecao({current}, active=current)
 
         self._planilha_drag_anchor = current
         self._planilha_drag_start_xy = (event.x, event.y)
@@ -4732,7 +4641,6 @@ class App:
         if self._planilha_tree:
             self._planilha_definir_selecao(
                 non_empty_cells(self._planilha_data),
-                ctrl_multiselect=False,
             )
         return "break"
 
@@ -5098,8 +5006,7 @@ class App:
                 self.app.after_cancel(job)
             except Exception:
                 pass
-            self._planilha_borda_job = None
-        self._planilha_edit_entry=None
+            self._planilha_edit_entry=None
         self._planilha_edit_context=None
         if self._planilha_context_menu is not None:
             try:
@@ -5765,12 +5672,62 @@ class App:
                 self._arquivos_datas_selecionadas.remove(data)
             else:
                 self._arquivos_datas_selecionadas.add(data)
+            self._atualizar_botao_apagar_datas_arquivos()
             self._desenhar_calendario_arquivos()
             return "break"
 
         self._arquivos_datas_selecionadas = {data}
+        self._atualizar_botao_apagar_datas_arquivos()
         self._desenhar_calendario_arquivos()
         self._mostrar_planilhas_do_dia(data)
+        return "break"
+
+    def _atualizar_botao_apagar_datas_arquivos(self):
+        btn = getattr(self, "_arquivos_btn_apagar_selecionados", None)
+        if btn is None:
+            return
+        try:
+            if self._arquivos_datas_selecionadas:
+                btn.pack(side="right", padx=(0, 6))
+            else:
+                btn.pack_forget()
+        except Exception:
+            pass
+
+    def _apagar_datas_arquivos_selecionadas(self):
+        selecionadas = set(self._arquivos_datas_selecionadas)
+        if not selecionadas:
+            return "break"
+
+        itens = self._carregar_historico_planilhas()
+        restantes = []
+        removidos = 0
+        for item in itens:
+            try:
+                data = datetime.fromisoformat(str(item.get("saved_at", ""))).date()
+            except Exception:
+                restantes.append(item)
+                continue
+            if data in selecionadas:
+                removidos += 1
+            else:
+                restantes.append(item)
+
+        confirmar = messagebox.askyesno(
+            "Apagar selecionados",
+            f"Tem certeza que deseja apagar os arquivos de {len(selecionadas)} data(s) selecionada(s)?\n\n"
+            f"Isso removerá {removidos} planilha(s) do histórico.",
+            parent=self._planilha_historico_window,
+        )
+        if not confirmar:
+            return "break"
+
+        self._salvar_historico_planilhas(restantes)
+        self._arquivos_datas_selecionadas.clear()
+        self._arquivos_data_selecionada = None
+        self._atualizar_botao_apagar_datas_arquivos()
+        self._desenhar_calendario_arquivos()
+        self._atualizar_contador_arquivos(self._arquivos_mes)
         return "break"
 
     def _mudar_mes_arquivos(self, direcao):
@@ -5780,6 +5737,7 @@ class App:
             return
         self._arquivos_mes = novo
         self._arquivos_datas_selecionadas.clear()
+        self._atualizar_botao_apagar_datas_arquivos()
         self._atualizar_contador_arquivos(novo)
         self._desenhar_calendario_arquivos()
 
@@ -5800,6 +5758,8 @@ class App:
                 itens.append(item)
 
         self._arquivos_data_selecionada = data
+        self._arquivos_datas_selecionadas.clear()
+        self._atualizar_botao_apagar_datas_arquivos()
         for widget in self._arquivos_body.winfo_children():
             widget.destroy()
 
@@ -5890,6 +5850,19 @@ class App:
         ctk.CTkLabel(header, text="Arquivos", text_color=self.TEXT, font=("Segoe UI", 20, "bold")).pack(side="left")
         self._arquivos_contador_janela = ctk.CTkLabel(header, text="0 códigos no mês", text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold"))
         self._arquivos_contador_janela.pack(side="left", padx=(10, 0))
+        self._arquivos_btn_apagar_selecionados = ctk.CTkButton(
+            header,
+            text="Apagar selecionados",
+            command=self._apagar_datas_arquivos_selecionadas,
+            width=128, height=32, corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#FDECEC", "#3A2424"),
+            border_width=1, border_color=self.ERROR,
+            text_color=self.ERROR, font=("Segoe UI", 10, "bold")
+        )
+        self._arquivos_btn_apagar_selecionados.pack(side="right", padx=(0, 6))
+        self._arquivos_btn_apagar_selecionados.pack_forget()
+
         ctk.CTkButton(
             header, text="Limpar histórico", command=self._limpar_historico_planilhas,
             width=125, height=32, corner_radius=8, fg_color=self.CARD,
