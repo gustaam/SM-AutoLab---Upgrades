@@ -1,4 +1,4 @@
-# Validação estrutural e de release.
+# Validação estrutural, dependências e release.
 from __future__ import annotations
 
 import argparse
