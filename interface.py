@@ -23,6 +23,7 @@ LOGGER = logging.getLogger(__name__)
 from tkinter import Canvas, Entry, Menu, messagebox, ttk
 
 import customtkinter as ctk
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from app import (
     atomic_write_json,
@@ -111,14 +112,12 @@ class _SMAutoLabTooltip:
             try:
                 enter_id = child.bind("<Enter>", self._on_enter, add="+")
                 leave_id = child.bind("<Leave>", self._on_leave, add="+")
-                motion_id = child.bind("<Motion>", self._on_motion, add="+")
                 press_id = child.bind("<ButtonPress>", self._on_press, add="+")
                 focus_id = child.bind("<FocusOut>", self._on_focus_out, add="+")
                 destroy_id = child.bind("<Destroy>", self._on_destroy, add="+")
                 self._bindings.extend([
                     (child, ("<Enter>", enter_id)),
                     (child, ("<Leave>", leave_id)),
-                    (child, ("<Motion>", motion_id)),
                     (child, ("<ButtonPress>", press_id)),
                     (child, ("<FocusOut>", focus_id)),
                     (child, ("<Destroy>", destroy_id)),
@@ -339,6 +338,18 @@ def _ui_attach_tooltip(widget):
         )
     except Exception:
         widget._sm_autolab_tooltip = None
+
+def _ui_scan_tooltips(root):
+    if root is None:
+        return
+    stack = [root]
+    while stack:
+        widget = stack.pop()
+        _ui_attach_tooltip(widget)
+        try:
+            stack.extend(widget.winfo_children())
+        except Exception:
+            pass
 
 def _ui_install_button_tooltips():
     cls = ctk.CTkButton
@@ -1792,6 +1803,11 @@ class App:
         self._menu_config = None
         self._menu_aparencia = None
         self._menu_close_job = None
+        self._menu_aparencia_close_job = None
+        self._menu_monitor_job = None
+        self._historico_selecionados = set()
+        self._arquivos_datas_selecionadas = set()
+        self._stat_icon_font_cache = {}
         self._planilha_historico_window = None
         self._arquivos_body = None
         self._arquivos_calendar_canvas = None
@@ -2188,6 +2204,7 @@ class App:
         except Exception:
             pass
 
+        _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
         self._iniciar_pisca_status()
@@ -2378,13 +2395,12 @@ class App:
             yield from self._iterar_descendentes_ui(child)
 
     def _configurar_hover_menu(self, root):
-        """Mantém menus e submenus abertos durante a navegação por hover."""
+        """Mantém os menus responsivos ao movimento do ponteiro."""
         if root is None:
             return
         for widget in self._iterar_descendentes_ui(root):
             try:
                 widget.bind("<Enter>", self._cancelar_fechar_menus, add="+")
-                widget.bind("<Leave>", self._agendar_fechar_menus, add="+")
             except Exception:
                 pass
 
@@ -2402,59 +2418,90 @@ class App:
         except Exception:
             return False
 
+    def _pointer_no_menu_config(self):
+        return self._widget_recebe_pointer(getattr(self, "_menu_config", None))
+
+    def _pointer_no_menu_aparencia(self):
+        return self._widget_recebe_pointer(getattr(self, "_menu_aparencia", None))
+
+    def _pointer_no_botao_aparencia(self):
+        return self._widget_recebe_pointer(getattr(self, "_menu_aparencia_btn", None))
+
     def _pointer_em_area_dos_menus(self):
-        return any(
-            self._widget_recebe_pointer(widget)
-            for widget in (
-                getattr(self, "_menu_config", None),
-                getattr(self, "_menu_aparencia", None),
-                getattr(self, "_menu_aparencia_btn", None),
-                getattr(self, "botao_configuracoes", None),
-            )
+        return (
+            self._pointer_no_menu_config()
+            or self._pointer_no_menu_aparencia()
+            or self._pointer_no_botao_aparencia()
+            or self._widget_recebe_pointer(getattr(self, "botao_configuracoes", None))
         )
 
     def _ativar_clique_fora_menus(self):
-        tag = "_SMAutoLabMenuEvents"
-        if getattr(self, "_menu_bindtag_widgets", None):
-            return
-        originals = {}
-        try:
-            for widget in self._iterar_descendentes_ui(self.app):
-                try:
-                    tags = tuple(widget.bindtags())
-                    if tag not in tags:
-                        originals[widget] = tags
-                        widget.bindtags(tags + (tag,))
-                except Exception:
-                    pass
-            self._menu_bindtag_widgets = originals
-            self.app.bind_class(tag, "<ButtonPress-1>", self._clique_fora_menus, add="+")
-        except Exception:
-            self._menu_bindtag_widgets = {}
+        if self._menu_monitor_job is None:
+            self._menu_monitor_job = self.app.after(80, self._monitorar_menus)
 
     def _desativar_clique_fora_menus(self):
-        tag = "_SMAutoLabMenuEvents"
-        try:
-            self.app.unbind_class(tag, "<ButtonPress-1>")
-        except Exception:
-            pass
-        for widget, tags in tuple(getattr(self, "_menu_bindtag_widgets", {}).items()):
+        job = self._menu_monitor_job
+        self._menu_monitor_job = None
+        if job is not None:
             try:
-                if widget.winfo_exists():
-                    widget.bindtags(tags)
+                self.app.after_cancel(job)
             except Exception:
                 pass
-        self._menu_bindtag_widgets = {}
 
     def _clique_fora_menus(self, _event=None):
-        if self._pointer_em_area_dos_menus():
-            return
-        self._fechar_menus()
-
-    def _fechar_menus_se_fora(self):
-        self._menu_close_job = None
         if not self._pointer_em_area_dos_menus():
             self._fechar_menus()
+
+    def _monitorar_menus(self):
+        self._menu_monitor_job = None
+        config_aberto = self._menu_config is not None and self._menu_config.winfo_exists()
+        sub_aberto = self._menu_aparencia is not None and self._menu_aparencia.winfo_exists()
+        if not config_aberto and not sub_aberto:
+            return
+
+        if not self._pointer_em_area_dos_menus():
+            self._fechar_menus()
+            return
+
+        if sub_aberto:
+            if self._pointer_no_menu_aparencia() or self._pointer_no_botao_aparencia():
+                self._cancelar_fechar_aparencia()
+            else:
+                self._agendar_fechar_aparencia()
+
+        self._menu_monitor_job = self.app.after(80, self._monitorar_menus)
+
+    def _fechar_menu_aparencia(self):
+        self._cancelar_fechar_aparencia()
+        sub = getattr(self, "_menu_aparencia", None)
+        if sub is not None:
+            try:
+                if sub.winfo_exists():
+                    sub.destroy()
+            except Exception:
+                pass
+        self._menu_aparencia = None
+
+    def _cancelar_fechar_aparencia(self, _event=None):
+        job = getattr(self, "_menu_aparencia_close_job", None)
+        if job is not None:
+            try:
+                self.app.after_cancel(job)
+            except Exception:
+                pass
+            self._menu_aparencia_close_job = None
+
+    def _agendar_fechar_aparencia(self, _event=None):
+        self._cancelar_fechar_aparencia()
+        try:
+            self._menu_aparencia_close_job = self.app.after(180, self._fechar_aparencia_se_fora)
+        except Exception:
+            self._menu_aparencia_close_job = None
+
+    def _fechar_aparencia_se_fora(self):
+        self._menu_aparencia_close_job = None
+        if not self._pointer_no_menu_aparencia() and not self._pointer_no_botao_aparencia():
+            self._fechar_menu_aparencia()
 
     def _mostrar_menu_configuracoes(self, _event=None):
         """Abre o menu principal de configurações sem bindings concorrentes."""
@@ -2528,23 +2575,19 @@ class App:
         )
         atualizar.pack(fill="x", padx=7, pady=(3, 8))
 
-        # O binding é instalado depois que os filhos existem, para cobrir todo
-        # o submenu sem depender de eventos globais.
         self._configurar_hover_menu(self._menu_config)
         self._ativar_clique_fora_menus()
-        # Captura o hover no botão e também nos widgets internos criados
-        # pelo CustomTkinter, evitando perder o evento ao passar sobre o canvas
-        # interno do botão.
         aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
-        aparencia.bind("<Leave>", self._agendar_fechar_menus, add="+")
+        aparencia.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
         for widget in self._iterar_descendentes_ui(aparencia):
             if widget is aparencia:
                 continue
             try:
                 widget.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
-                widget.bind("<Leave>", self._agendar_fechar_menus, add="+")
+                widget.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
             except Exception:
                 pass
+        _ui_scan_tooltips(self._menu_config)
 
         self.app.update_idletasks()
         self._reposicionar_menus()
@@ -2615,9 +2658,13 @@ class App:
             )
             btn.pack(fill="x", padx=6, pady=2)
 
-        # Depois dos botões existirem, todos os descendentes participam do
-        # mesmo ciclo de hover e a travessia entre pai/submenu fica estável.
         self._configurar_hover_menu(sub)
+        for widget in self._iterar_descendentes_ui(sub):
+            try:
+                widget.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
+            except Exception:
+                pass
+        _ui_scan_tooltips(sub)
 
         self.app.update_idletasks()
         self._reposicionar_menus()
@@ -2630,16 +2677,16 @@ class App:
             self._menu_close_job = None
 
     def _agendar_fechar_menus(self, _event=None):
-        # Fecha somente quando o ponteiro estiver fora do menu principal,
-        # submenu, botão Aparência e botão Configurações.
         self._cancelar_fechar_menus()
         try:
-            self._menu_close_job = self.app.after(
-                180,
-                self._fechar_menus_se_fora,
-            )
+            self._menu_close_job = self.app.after(180, self._fechar_menus_se_fora)
         except Exception:
             self._menu_close_job = None
+
+    def _fechar_menus_se_fora(self):
+        self._menu_close_job = None
+        if not self._pointer_em_area_dos_menus():
+            self._fechar_menus()
 
     def _fechar_menus(self):
         self._menu_close_job = None
@@ -2895,6 +2942,7 @@ class App:
         )
         salvar_btn.pack(side="left")
         atualizar_estado_salvar()
+        _ui_scan_tooltips(popup)
 
     def _selecionar_aba(self, nome):
         for frame in (self.aba_atividade, self.aba_historico):
@@ -2980,24 +3028,14 @@ class App:
             bg=self._cor_fluente(palette["card"]),
         )
         icon_holder.pack(side="left", padx=(0, 11))
-        circle_color = self._cor_fluente(palette["icon"])
-        icon_holder.create_oval(
-            1, 1, icon_holder_size - 1, icon_holder_size - 1,
-            fill=circle_color,
-            outline=circle_color,
-        )
-        icon_holder.create_text(
-            icon_holder_size / 2,
-            icon_holder_size / 2,
-            text=icon,
-            fill="#FFFFFF",
-            font=("Segoe UI", icon_font, "bold"),
-        )
         card._sm_stat_icon_canvas = icon_holder
-        card._sm_stat_icon_colors = (
+        card._sm_stat_icon_data = (
+            icon,
+            icon_font,
             palette["card"],
             palette["icon"],
         )
+        self._render_stat_icon(card)
 
         text_box = ctk.CTkFrame(row, fg_color="transparent")
         text_box.pack(side="left", fill="both", expand=True)
@@ -3036,25 +3074,77 @@ class App:
                 card._sm_autolab_tooltip = None
         return card
 
+    def _fonte_icone_estatistica(self, size):
+        size = max(8, int(size))
+        cached = self._stat_icon_font_cache.get(size)
+        if cached is not None:
+            return cached
+        fonts_dir = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+        candidates = (
+            fonts_dir / "segoeuib.ttf",
+            fonts_dir / "segoeui.ttf",
+            fonts_dir / "arial.ttf",
+        )
+        for path in candidates:
+            try:
+                if path.exists():
+                    font = ImageFont.truetype(str(path), size)
+                    self._stat_icon_font_cache[size] = font
+                    return font
+            except Exception:
+                pass
+        font = ImageFont.load_default()
+        self._stat_icon_font_cache[size] = font
+        return font
+
+    def _criar_imagem_icone_estatistica(self, icon, icon_font, card_color, icon_color):
+        scale = 4
+        logical = 44
+        size = logical * scale
+        background = self._cor_fluente(card_color)
+        foreground = self._cor_fluente(icon_color)
+        image = Image.new("RGB", (size, size), background)
+        draw = ImageDraw.Draw(image)
+        inset = scale
+        draw.ellipse(
+            (inset, inset, size - inset - 1, size - inset - 1),
+            fill=foreground,
+        )
+        font = self._fonte_icone_estatistica(icon_font * scale)
+        bbox = draw.textbbox((0, 0), str(icon), font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        x = (size - text_width) / 2 - bbox[0]
+        y = (size - text_height) / 2 - bbox[1]
+        draw.text((x, y), str(icon), font=font, fill="#FFFFFF")
+        return ImageTk.PhotoImage(
+            image.resize((logical, logical), Image.Resampling.LANCZOS)
+        )
+
+    def _render_stat_icon(self, card):
+        canvas = getattr(card, "_sm_stat_icon_canvas", None)
+        data = getattr(card, "_sm_stat_icon_data", None)
+        if canvas is None or data is None:
+            return
+        icon, icon_font, card_color, icon_color = data
+        try:
+            photo = self._criar_imagem_icone_estatistica(
+                icon, icon_font, card_color, icon_color
+            )
+            canvas.configure(bg=self._cor_fluente(card_color))
+            canvas.delete("all")
+            canvas.create_image(22, 22, image=photo)
+            card._sm_stat_icon_photo = photo
+        except Exception:
+            pass
+
     def _atualizar_icones_cards_estatistica(self):
         for card in (
             getattr(self, "sucesso_card", None),
             getattr(self, "erro_card", None),
             getattr(self, "codigo_card", None),
         ):
-            canvas = getattr(card, "_sm_stat_icon_canvas", None)
-            colors = getattr(card, "_sm_stat_icon_colors", None)
-            if canvas is None or not colors:
-                continue
-            try:
-                canvas.configure(bg=self._cor_fluente(colors[0]))
-                canvas.itemconfigure(
-                    1,
-                    fill=self._cor_fluente(colors[1]),
-                    outline=self._cor_fluente(colors[1]),
-                )
-            except Exception:
-                pass
+            self._render_stat_icon(card)
 
     @staticmethod
     def _formatar_duracao(segundos):
@@ -3392,7 +3482,12 @@ class App:
         self._execucao_atual["sucessos"] = int(getattr(resultado, "sucessos", 0) or 0)
         self._execucao_atual["erros"] = int(getattr(resultado, "erros", 0) or 0)
         self._execucao_atual["processados"] = int(getattr(resultado, "processados", 0) or 0)
-        self._execucao_atual["codigos_erros"] = [str(item.codigo) for item in resultado.itens if item.status == "Erro"]
+        self._execucao_atual["codigos_erros"] = [
+            str(item.codigo).strip()
+            for item in getattr(resultado, "itens", [])
+            if str(getattr(item, "status", "")).strip().casefold() == "erro"
+            and str(getattr(item, "codigo", "")).strip()
+        ]
         self._historico_execucoes.append(dict(self._execucao_atual))
         self._execucao_atual = None
         self._salvar_estado_persistente()
@@ -3436,8 +3531,25 @@ class App:
             ).pack(anchor="w", padx=8, pady=8)
             return
 
+        validos = {
+            self._id_historico_execucao(item)
+            for item in historico_visivel
+        }
+        self._historico_selecionados.intersection_update(validos)
+
         for execucao in reversed(historico_visivel):
             self._criar_pasta_historico(execucao)
+
+    def _id_historico_execucao(self, execucao):
+        if not isinstance(execucao, dict):
+            return str(id(execucao))
+        valor = str(execucao.get("id", "")).strip()
+        if valor:
+            return valor
+        return "|".join(
+            str(execucao.get(campo, "")).strip()
+            for campo in ("inicio", "fim", "planilha", "pagina")
+        )
 
     def _formatar_data_historico(self, valor):
         texto = str(valor or "").strip()
@@ -3453,6 +3565,7 @@ class App:
         parent = self.historico_lista
         tile_width = 144
         tile_height = 116
+        execucao_id = self._id_historico_execucao(execucao)
 
         if not hasattr(self, "_hist_grid") or self._hist_grid is None:
             self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
@@ -3484,29 +3597,30 @@ class App:
         erros = int(execucao.get("erros", 0) or 0)
         icone = "📁"
 
-        icone_widget = ctk.CTkLabel(
+        icon = ctk.CTkLabel(
             tile,
             text=icone,
             font=("Segoe UI Emoji", 20),
             text_color=self.ACCENT,
         )
-        icone_widget.pack(pady=(8, 2))
-        ctk.CTkLabel(
+        icon.pack(pady=(8, 2))
+        date_label = ctk.CTkLabel(
             tile,
             text=self._formatar_data_historico(inicio),
             text_color=self.TEXT,
             font=("Segoe UI", 9, "bold"),
             anchor="center",
-            justify="center",
-        ).pack(fill="x", padx=6)
-        ctk.CTkLabel(
+        )
+        date_label.pack(fill="x", padx=6)
+        time_label = ctk.CTkLabel(
             tile,
             text=horario,
             text_color=self.SUBTEXT,
             font=("Segoe UI", 8),
             anchor="center",
-        ).pack(fill="x", padx=6, pady=(1, 0))
-        ctk.CTkLabel(
+        )
+        time_label.pack(fill="x", padx=6, pady=(1, 0))
+        error_label = ctk.CTkLabel(
             tile,
             text=f"{erros} não executado(s)",
             text_color=self.ERROR if erros else self.SUBTEXT,
@@ -3514,46 +3628,59 @@ class App:
             anchor="center",
             justify="center",
             wraplength=tile_width - 20,
-        ).pack(fill="x", padx=8, pady=(8, 0))
+        )
+        error_label.pack(fill="x", padx=8, pady=(8, 0))
 
-        def selecionar(_e=None):
-            for sibling in self._hist_grid.winfo_children():
-                sibling.configure(
-                    border_color=self.BORDER,
-                    fg_color=("#FFFFFF", "#2D3338"),
+        widgets = (tile, icon, date_label, time_label, error_label)
+
+        def atualizar_visual(hover=False):
+            selecionado = execucao_id in self._historico_selecionados
+            if selecionado:
+                tile.configure(
+                    border_color=self.ACCENT,
+                    fg_color=("#EAF4FF", "#1B3C53"),
                 )
-            tile.configure(
-                border_color=self.ACCENT,
-                fg_color=("#EAF4FF", "#1B3C53"),
-            )
-
-        def abrir(_e=None):
-            selecionar()
-            self._abrir_detalhe_historico(execucao)
-
-        def enter(_e=None):
-            tile.configure(
-                border_color=self.ACCENT_HOVER,
-                fg_color=("#EAF4FC", "#263F50"),
-            )
-
-        def leave(_e=None):
-            if tile.cget("border_color") not in (self.ACCENT,):
+            elif hover:
+                tile.configure(
+                    border_color=self.ACCENT_HOVER,
+                    fg_color=("#EAF4FC", "#263F50"),
+                )
+            else:
                 tile.configure(
                     border_color=self.BORDER,
                     fg_color=("#FFFFFF", "#2D3338"),
                 )
 
-        for widget in (tile, icone_widget):
+        def clicar(event=None):
+            ctrl = bool(event is not None and (getattr(event, "state", 0) & 0x0004))
+            if ctrl:
+                if execucao_id in self._historico_selecionados:
+                    self._historico_selecionados.remove(execucao_id)
+                else:
+                    self._historico_selecionados.add(execucao_id)
+                self._restaurar_historico_na_tela()
+                return "break"
+
+            self._historico_selecionados = {execucao_id}
+            atualizar_visual()
+            self._abrir_detalhe_historico(execucao)
+            return "break"
+
+        def entrar(_event=None):
+            atualizar_visual(hover=True)
+
+        def sair(_event=None):
+            atualizar_visual()
+
+        for widget in widgets:
             try:
                 widget.configure(cursor="hand2")
             except Exception:
                 pass
-            widget.bind("<Enter>", enter)
-            widget.bind("<Leave>", leave)
-            widget.bind("<Button-1>", selecionar)
-            widget.bind("<Double-1>", abrir)
-        tile.bind("<Double-1>", abrir)
+            widget.bind("<Enter>", entrar)
+            widget.bind("<Leave>", sair)
+            widget.bind("<Button-1>", clicar)
+        return tile
 
     def _abrir_detalhe_historico(self, execucao):
         win = ctk.CTkToplevel(self.app)
@@ -3570,6 +3697,7 @@ class App:
         except Exception:
             pass
         self._preencher_detalhe_pasta(win, execucao)
+        _ui_scan_tooltips(win)
 
     def _preencher_detalhe_pasta(self, parent, execucao):
         for w in parent.winfo_children():
@@ -3583,7 +3711,21 @@ class App:
         total = execucao.get("total", 0)
         sucessos = execucao.get("sucessos", 0)
         erros = int(execucao.get("erros", 0) or 0)
-        codigos = [str(x) for x in execucao.get("codigos_erros", [])]
+        codigos_raw = (
+            execucao.get("codigos_erros")
+            or execucao.get("erros_codigos")
+            or execucao.get("codigos_erro")
+            or []
+        )
+        if isinstance(codigos_raw, str):
+            codigos_raw = [codigos_raw]
+        codigos = []
+        for item in codigos_raw:
+            if isinstance(item, dict):
+                item = item.get("codigo") or item.get("code") or ""
+            item = str(item).strip()
+            if item and item not in codigos:
+                codigos.append(item)
 
         ctk.CTkLabel(
             parent,
@@ -5280,11 +5422,16 @@ class App:
                 valido = limite <= data <= hoje
                 tem_arquivo = data in por_dia
                 eh_hoje = data == hoje
+                selecionado = data in self._arquivos_datas_selecionadas
                 fill = bg
                 outline = border
                 fg = text if valido else disabled
                 width = 1
-                if tem_arquivo and valido:
+                if selecionado and valido:
+                    fill = "#DDEEFF" if not modo_escuro else "#214F70"
+                    outline = accent
+                    width = 2
+                elif tem_arquivo and valido:
                     fill = "#EAF4FF" if not modo_escuro else "#183B54"
                     outline = accent
                     width = 1
@@ -5315,24 +5462,41 @@ class App:
         if canvas is None:
             return
         try:
-            item_id = canvas.find_closest(event.x, event.y)[0]
+            item_ids = canvas.find_overlapping(event.x, event.y, event.x, event.y)
         except Exception:
             return
-        tags = canvas.gettags(item_id)
         data = None
-        for tag in tags:
-            if tag.startswith("dia:"):
-                try:
-                    data = datetime.fromisoformat(tag[4:]).date()
-                except Exception:
-                    data = None
+        for item_id in reversed(item_ids):
+            for tag in canvas.gettags(item_id):
+                if tag.startswith("dia:"):
+                    try:
+                        data = datetime.fromisoformat(tag[4:]).date()
+                    except Exception:
+                        data = None
+                    break
+            if data is not None:
                 break
         if data is None:
             return
+
         hoje = datetime.now().date()
         limite = hoje - timedelta(days=ARQUIVOS_DIAS)
-        if limite <= data <= hoje:
-            self._mostrar_planilhas_do_dia(data)
+        if not (limite <= data <= hoje):
+            return
+
+        ctrl = bool(getattr(event, "state", 0) & 0x0004)
+        if ctrl:
+            if data in self._arquivos_datas_selecionadas:
+                self._arquivos_datas_selecionadas.remove(data)
+            else:
+                self._arquivos_datas_selecionadas.add(data)
+            self._desenhar_calendario_arquivos()
+            return "break"
+
+        self._arquivos_datas_selecionadas = {data}
+        self._desenhar_calendario_arquivos()
+        self._mostrar_planilhas_do_dia(data)
+        return "break"
 
     def _mudar_mes_arquivos(self, direcao):
         atual = self._arquivos_mes or self._mes_atual_arquivos()
@@ -5340,6 +5504,7 @@ class App:
         if novo < self._mes_minimo_arquivos() or novo > self._mes_atual_arquivos():
             return
         self._arquivos_mes = novo
+        self._arquivos_datas_selecionadas.clear()
         self._atualizar_contador_arquivos(novo)
         self._desenhar_calendario_arquivos()
 
@@ -5464,6 +5629,7 @@ class App:
         self._atualizar_contador_arquivos()
         self._renderizar_calendario_arquivos()
         win.update_idletasks()
+        _ui_scan_tooltips(win)
 
     def _planilha_salvar_e_iniciar(self):
         self._planilha_fechar_edicao()

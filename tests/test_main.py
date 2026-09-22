@@ -26,7 +26,6 @@ class CanonicalRuntimeTests(unittest.TestCase):
         for marker in (
             "def _localizar_planilha_pendente",
             "def _filtrar_arquivos_60_dias",
-            "def _agendar_fechar_aparencia",
             "self.caminho",
             "self.pagina",
             "salvar_checkpoint,",
@@ -214,8 +213,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _atualizar_icones_cards_estatistica")
         end = source.index("@staticmethod", start)
         block = source[start:end]
-        self.assertIn("canvas.configure(bg=self._cor_fluente(colors[0]))", block)
-        self.assertIn("canvas.itemconfigure(", block)
+        self.assertIn("self._render_stat_icon(card)", block)
+        self.assertIn("def _render_stat_icon", source)
     def test_cards_de_estatisticas_usam_cores_e_icones_por_categoria(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _stat_card")
@@ -296,9 +295,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
         self.assertIn('icone = "📁"', block)
-        self.assertIn("icone_widget = ctk.CTkLabel(", block)
-        self.assertIn("for widget in (tile, icone_widget):", block)
-        self.assertNotIn("for w in (tile,icone):", block)
+        self.assertIn("icon = ctk.CTkLabel(", block)
+        self.assertIn("widgets = (tile, icon, date_label, time_label, error_label)", block)
+        self.assertIn('widget.bind("<Button-1>", clicar)', block)
+        self.assertNotIn('widget.bind("<Double-1>"', block)
 
     def test_tempo_estimado_usa_mesma_fonte_do_tempo_decorrido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -342,11 +342,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("width=icon_holder_size,", block)
         self.assertIn("height=icon_holder_size,", block)
         self.assertIn("icon_holder_size = 44", block)
-        self.assertIn("icon_holder.create_oval(", block)
-        self.assertIn("icon_holder.create_text(", block)
-        self.assertIn('card._sm_stat_icon_canvas = icon_holder', block)
-        self.assertIn('card._sm_stat_icon_colors = (', block)
-        self.assertIn('fill="#FFFFFF"', block)
+        self.assertIn("card._sm_stat_icon_data = (", block)
+        self.assertIn("self._render_stat_icon(card)", block)
     def test_cartoes_do_historico_usam_data_e_tamanho_fixos(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _formatar_data_historico")
@@ -402,6 +399,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("self._rendered_message != self.message", block)
         self.assertIn("self._destroy_window()", block)
         self.assertIn("def _destroy_window(self):", block)
+        self.assertNotIn('child.bind("<Motion>"', block)
         self.assertNotIn('self._window.attributes("-topmost", True)', block)
         self.assertNotIn("original_configure = cls.configure", block)
 
@@ -410,19 +408,67 @@ class CanonicalRuntimeTests(unittest.TestCase):
         for key in ("atividade", "histórico", "↶", "↷", "‹", "›"):
             self.assertIn(f'"{key}":', source)
 
-    def test_menu_configuracoes_fecha_ao_clicar_fora(self):
+    def test_menu_configuracoes_fecha_ao_sair_da_area(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('tag = "_SMAutoLabMenuEvents"', source)
-        self.assertIn('widget.bindtags(tags + (tag,))', source)
-        self.assertIn('self._fechar_menus()', source[source.index("def _clique_fora_menus"):source.index("def _fechar_menus_se_fora")])
+        self.assertIn("def _monitorar_menus", source)
+        self.assertIn("def _pointer_em_area_dos_menus", source)
+        self.assertIn("if not self._pointer_em_area_dos_menus():", source)
+        self.assertIn("self._fechar_menus()", source[source.index("def _monitorar_menus"):source.index("def _fechar_menu_aparencia")])
+        self.assertNotIn("_SMAutoLabMenuEvents", source)
 
-    def test_menu_aparencia_fecha_somente_fora_das_areas_validas(self):
+    def test_menu_aparencia_fecha_ao_mudar_para_outro_item(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _agendar_fechar_menus")
-        end = source.index("def _fechar_menus", start)
+        start = source.index("def _monitorar_menus")
+        end = source.index("def _cancelar_fechar_menus", start)
         block = source[start:end]
-        self.assertIn("self._fechar_menus_se_fora", block)
-        self.assertIn("not self._pointer_em_area_dos_menus()", source)
+        self.assertIn("self._pointer_no_menu_aparencia()", block)
+        self.assertIn("self._pointer_no_botao_aparencia()", block)
+        self.assertIn("self._agendar_fechar_aparencia()", block)
+        self.assertIn("self._cancelar_fechar_aparencia()", block)
+        self.assertIn("def _fechar_menu_aparencia", source)
+
+    def test_icones_estatisticos_usa_imagem_superamostrada_para_bordas_suaves(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("from PIL import Image, ImageDraw, ImageFont, ImageTk", source)
+        self.assertIn("def _criar_imagem_icone_estatistica", source)
+        start = source.index("def _criar_imagem_icone_estatistica")
+        end = source.index("def _render_stat_icon", start)
+        block = source[start:end]
+        self.assertIn("scale = 4", block)
+        self.assertIn("Image.Resampling.LANCZOS", block)
+        self.assertIn("ImageTk.PhotoImage", block)
+
+    def test_history_pasta_aceita_clique_unico_e_ctrl_multiseleciona(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_pasta_historico")
+        end = source.index("def _abrir_detalhe_historico", start)
+        block = source[start:end]
+        self.assertIn("getattr(event, \"state\", 0)", block)
+        self.assertIn("0x0004", block)
+        self.assertIn("self._historico_selecionados.add(execucao_id)", block)
+        self.assertIn('widget.bind("<Button-1>", clicar)', block)
+        self.assertNotIn('widget.bind("<Double-1>"', block)
+
+    def test_history_detalhes_recuperam_codigos_de_erro(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _preencher_detalhe_pasta")
+        end = source.index("def _limpar_historico", start)
+        block = source[start:end]
+        self.assertIn('execucao.get("codigos_erros")', block)
+        self.assertIn('execucao.get("erros_codigos")', block)
+        self.assertIn('execucao.get("codigos_erro")', block)
+        self.assertIn('item.get("codigo")', block)
+
+    def test_calendar_aceita_ctrl_multiseleção_e_hit_test_exato(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _clique_calendario_arquivos")
+        end = source.index("def _mudar_mes_arquivos", start)
+        block = source[start:end]
+        self.assertIn("canvas.find_overlapping", block)
+        self.assertIn("getattr(event, \"state\", 0)", block)
+        self.assertIn("0x0004", block)
+        self.assertIn("self._arquivos_datas_selecionadas.add(data)", block)
+        self.assertIn("self._mostrar_planilhas_do_dia(data)", block)
 
     def test_botao_abrir_continua_com_tooltip_canonico(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
