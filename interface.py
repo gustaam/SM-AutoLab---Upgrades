@@ -1804,6 +1804,7 @@ class App:
         self._menu_aparencia = None
         self._menu_close_job = None
         self._menu_reposition_job = None
+        self._menu_reposition_binding = None
         self._menu_aparencia_close_job = None
         self._menu_monitor_job = None
         self._historico_selecionados = set()
@@ -1836,6 +1837,7 @@ class App:
         self._historico_reflow_job = None
         self._historico_layout_width = 0
         self._activity_card = None
+        self._ultimo_tamanho_app_config = None
         self._carregar_estado_persistente()
         ctk.set_appearance_mode(self._tema)
         ctk.set_default_color_theme("blue")
@@ -1858,7 +1860,6 @@ class App:
         self.app.resizable(True, True)
         self.app.configure(fg_color=self.BG)
         self.app.protocol("WM_DELETE_WINDOW", self._fechar_aplicativo)
-        self.app.bind("<Configure>", self._reposicionar_menus, add="+")
         self.app.bind("<Unmap>", self._fechar_menus, add="+")
 
         # Abre a janela em tamanho maior e centralizada na tela.
@@ -2548,7 +2549,7 @@ class App:
             width=218,
             height=150,
         )
-        menu.place(x=0, y=0)
+        menu.place_forget()
         menu.pack_propagate(False)
         self._menu_config = menu
 
@@ -2600,6 +2601,10 @@ class App:
 
         self._configurar_hover_menu(self._menu_config)
         self._ativar_clique_fora_menus()
+        if self._menu_reposition_binding is None:
+            self._menu_reposition_binding = self.app.bind(
+                "<Configure>", self._reposicionar_menus, add="+"
+            )
         aparencia.bind("<Enter>", self._mostrar_menu_aparencia, add="+")
         aparencia.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
         for widget in self._iterar_descendentes_ui(aparencia):
@@ -2651,7 +2656,7 @@ class App:
             width=225,
             height=158,
         )
-        sub.place(x=0, y=0)
+        sub.place_forget()
         sub.pack_propagate(False)
         self._menu_aparencia = sub
 
@@ -2721,6 +2726,13 @@ class App:
                 pass
             self._menu_reposition_job = None
         self._desativar_clique_fora_menus()
+        binding = getattr(self, "_menu_reposition_binding", None)
+        if binding:
+            try:
+                self.app.unbind("<Configure>", binding)
+            except Exception:
+                pass
+        self._menu_reposition_binding = None
         hover_binding = getattr(self, "_config_hover_binding", None)
         if hover_binding:
             try:
@@ -3238,7 +3250,18 @@ class App:
         if card is None:
             return
         try:
+            janela_w = int(self.app.winfo_width())
             janela_h = max(590, int(self.app.winfo_height()))
+        except Exception:
+            return
+
+        tamanho = (janela_w, janela_h)
+        anterior_tamanho = getattr(self, "_ultimo_tamanho_app_config", None)
+        if anterior_tamanho == tamanho:
+            return
+        self._ultimo_tamanho_app_config = tamanho
+
+        try:
             altura = max(300, min(440, janela_h - 260))
             atual = int(card.cget("height") or 0)
             if abs(atual - altura) > 3:
