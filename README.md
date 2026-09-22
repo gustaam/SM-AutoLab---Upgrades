@@ -4,7 +4,7 @@
 
 Automação de autorizações no Feegow em um aplicativo desktop para Windows, com planilha virtualizada, histórico, recuperação de execução, atualização integrada e interface moderna.
 
-**Versão em preparação:** `2.99.43`  
+**Versão em preparação:** `2.99.44`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -87,9 +87,9 @@ O executável recebe ícone, assets, versão e metadados do produto durante a ge
 
 ## Release e atualização
 
-A release atualmente publicada é **v2.99.42**.
+A release atualmente publicada é **v2.99.44**.
 
-A próxima versão preparada no `main` é a **v2.99.43**.
+A próxima versão preparada no `main` é a **v2.99.45**.
 
 A **v2.99.32** restaura os tooltips da interface e o efeito de hover dos cards **Executados**, **Não executados** e **Código atual**, mantendo a aba **Não executados** removida.
 
