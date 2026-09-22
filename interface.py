@@ -1908,8 +1908,6 @@ class App:
         self._status_blink_job = None
         self._status_blink_visible = True
         self._status_blink_fast = False
-        self._status_anim_colors = []
-        self._status_blink_paused_on_minimize = False
         self._janela_redesenho_bloqueado = False
         self._status_finalizado_job = None
         self._execucao_inicio_monotonic = None
@@ -1968,9 +1966,6 @@ class App:
             _set_window_redraw(self.app, True)
             _redraw_window_now(self.app)
             self._janela_redesenho_bloqueado = False
-            if self._status_blink_paused_on_minimize:
-                self._status_blink_paused_on_minimize = False
-                self._iniciar_pisca_status()
         except Exception:
             self._janela_redesenho_bloqueado = False
 
@@ -1978,10 +1973,6 @@ class App:
         if self._closing:
             return
         try:
-            self._status_blink_paused_on_minimize = self._status_blink_job is not None
-            if self._status_blink_job is not None:
-                self.app.after_cancel(self._status_blink_job)
-            self._status_blink_job = None
             self._janela_redesenho_bloqueado = True
             _set_window_redraw(self.app, False)
         except Exception:
@@ -6410,33 +6401,12 @@ class App:
                 pass
             self._status_blink_job = None
 
-        # Muitos frames + intervalo curto = pulso visual contínuo, em vez de
-        # aparência de GIF. A geometria permanece idêntica.
+        # Mantém a implementação visual estável que já funcionava e acelera
+        # somente o intervalo do pulso verde.
         self._status_anim_frame = 0
-        self._status_anim_frames = 18 if self._status_blink_fast else 24
-        self._status_anim_interval = 80 if self._status_blink_fast else 60
+        self._status_anim_frames = 18 if self._status_blink_fast else 20
+        self._status_anim_interval = 80
 
-        if self._status_blink_fast:
-            halo_base, halo_brilho = "#3B7285", "#8FD4EC"
-            dot_base, dot_brilho = "#2F6F87", "#65B8DB"
-            canvas_bg = "#183B54" if ctk.get_appearance_mode().lower() == "dark" else "#E5F1FB"
-        else:
-            halo_base, halo_brilho = "#4E8054", "#C9F0CC"
-            dot_base, dot_brilho = "#2F7437", "#6ECB72"
-            canvas_bg = "#21482A" if ctk.get_appearance_mode().lower() == "dark" else "#E7F5E7"
-
-        import math
-        cores = []
-        for idx in range(self._status_anim_frames):
-            fase = (2.0 * math.pi * idx) / self._status_anim_frames
-            fator = (math.sin(fase - math.pi / 2.0) + 1.0) / 2.0
-            fator = fator * fator * (3.0 - 2.0 * fator)
-            cores.append((
-                self._interpolar_cor(halo_base, halo_brilho, fator),
-                self._interpolar_cor(dot_base, dot_brilho, fator),
-            ))
-        self._status_anim_colors = cores
-        self.status_indicator.configure(bg=canvas_bg)
         self._executar_pisca_status()
 
     @staticmethod
@@ -6468,13 +6438,43 @@ class App:
 
     def _executar_pisca_status(self):
         try:
-            cores = getattr(self, "_status_anim_colors", None) or ()
-            if not cores or getattr(self, "status_indicator", None) is None:
-                self._status_blink_job = None
+            import math
+
+            # Quando minimizado, reduzimos o trabalho do Canvas sem cancelar
+            # o ciclo. Isso evita perder a animação ao restaurar a janela.
+            try:
+                minimizado = str(self.app.state()).lower() == "iconic"
+            except Exception:
+                minimizado = False
+
+            if minimizado:
+                self._status_blink_job = self.app.after(500, self._executar_pisca_status)
                 return
 
-            idx = self._status_anim_frame % len(cores)
-            halo, dot = cores[idx]
+            frames = max(2, int(self._status_anim_frames))
+            idx = self._status_anim_frame % frames
+
+            fase = (2.0 * math.pi * idx) / frames
+            fator = (math.sin(fase - math.pi / 2.0) + 1.0) / 2.0
+            fator = fator * fator * (3.0 - 2.0 * fator)
+
+            if self._status_blink_fast:
+                halo_base, halo_brilho = "#3B7285", "#8FD4EC"
+                dot_base, dot_brilho = "#2F6F87", "#65B8DB"
+            else:
+                halo_base, halo_brilho = "#4E8054", "#C9F0CC"
+                dot_base, dot_brilho = "#2F7437", "#6ECB72"
+
+            halo = self._interpolar_cor(halo_base, halo_brilho, fator)
+            dot = self._interpolar_cor(dot_base, dot_brilho, fator)
+
+            modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+            canvas_bg = (
+                "#183B54" if modo_escuro else "#E5F1FB"
+            ) if self._status_blink_fast else (
+                "#21482A" if modo_escuro else "#E7F5E7"
+            )
+            self.status_indicator.configure(bg=canvas_bg)
             self.status_indicator.itemconfigure(self._status_halo, fill=halo)
             self.status_indicator.itemconfigure(self._status_dot, fill=dot)
 
