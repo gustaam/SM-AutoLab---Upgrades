@@ -4288,17 +4288,20 @@ class App:
         except Exception:
             self._historico_layout_width = 0
 
-        if self._execucao_atual:
+        if self._execucao_atual and self._historico_execucao_tem_erros(self._execucao_atual):
             self._criar_pasta_historico(self._execucao_atual, atual=True)
 
-        historico_visivel = list(self._historico_execucoes)
+        historico_visivel = [
+            item for item in self._historico_execucoes
+            if self._historico_execucao_tem_erros(item)
+        ]
 
-        if not historico_visivel and not self._execucao_atual:
+        if not historico_visivel:
             self._historico_selecionados.clear()
             self._atualizar_visual_selecao_historico()
             self._atualizar_botao_apagar_historico()
             ctk.CTkLabel(
-                self.historico_lista, text="Nenhuma execução registrada ainda.",
+                self.historico_lista, text="Nenhuma execução com erros registrada ainda.",
                 text_color=self.SUBTEXT, font=("Segoe UI", 10)
             ).pack(anchor="w", padx=8, pady=8)
             return
@@ -4313,6 +4316,17 @@ class App:
             self._criar_pasta_historico(execucao)
         self._atualizar_visual_selecao_historico()
         self._atualizar_botao_apagar_historico()
+
+    @staticmethod
+    def _historico_execucao_tem_erros(execucao):
+        if not isinstance(execucao, dict):
+            return False
+        try:
+            if int(execucao.get("erros", 0) or 0) > 0:
+                return True
+        except (TypeError, ValueError):
+            pass
+        return str(execucao.get("status", "")).strip().casefold() == "erro geral"
 
     def _id_historico_execucao(self, execucao):
         if not isinstance(execucao, dict):
@@ -4789,6 +4803,36 @@ class App:
                 "A planilha foi gravada, mas a conferência do arquivo "
                 "não corresponde aos dados atuais.",
             )
+    @staticmethod
+    def _planilha_fingerprint(cells):
+        """Gera uma impressão estável do conteúdo relevante da planilha."""
+        normalizados = {
+            str(chave): str(valor)
+            for chave, valor in (cells or {}).items()
+            if str(valor) != ""
+        }
+        payload = json.dumps(
+            sorted(normalizados.items()),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _planilha_foi_processada(self, cells):
+        """Retorna True somente quando esta planilha foi concluída anteriormente."""
+        fingerprint = self._planilha_fingerprint(cells)
+        for execucao in reversed(getattr(self, "_historico_execucoes", [])):
+            if not isinstance(execucao, dict):
+                continue
+            if str(execucao.get("origem", "")).strip() != "planilha_interna":
+                continue
+            status = str(execucao.get("status", "")).strip().casefold()
+            if status != "concluída":
+                continue
+            if str(execucao.get("planilha_fingerprint", "")).strip() == fingerprint:
+                return True
+        return False
+
     def _planilha_tem_alteracoes(self):
         return self._planilha_data != self._planilha_salva_data
 
@@ -4841,9 +4885,30 @@ class App:
             except Exception:
                 pass
 
+        recuperar_rascunho = False
         if dados_iniciais is None:
             self._preparar_planilha_do_dia()
-            self._planilha_data=self._carregar_planilha_interna()
+            ultima = self._carregar_planilha_interna()
+            if ultima:
+                if self._planilha_foi_processada(ultima):
+                    self._planilha_apagar_rascunho()
+                    self._planilha_data = {}
+                else:
+                    recuperar = messagebox.askyesno(
+                        "Recuperar última planilha",
+                        "A última planilha salva ainda não foi processada.\\n\\n"
+                        "Deseja recuperá-la?",
+                        parent=self.app,
+                    )
+                    if recuperar:
+                        self._planilha_data = dict(ultima)
+                        recuperar_rascunho = True
+                    else:
+                        self._planilha_apagar_rascunho()
+                        self._planilha_data = {}
+            else:
+                self._planilha_data = {}
+                recuperar_rascunho = True
         else:
             self._planilha_data={str(k):str(v) for k,v in dados_iniciais.items() if str(v)!=""}
         self._planilha_salva_data=dict(self._planilha_data)
@@ -4872,7 +4937,8 @@ class App:
         except Exception:
             pass
 
-        self._planilha_recuperar_rascunho_se_houver()
+        if recuperar_rascunho:
+            self._planilha_recuperar_rascunho_se_houver()
 
         toolbar=ctk.CTkFrame(win, fg_color=self.CARD, corner_radius=0, height=64)
         toolbar.pack(fill="x"); toolbar.pack_propagate(False)
@@ -6695,6 +6761,7 @@ class App:
 
         self._iniciar_historico_execucao("Planilha interna",0,start)
         self._execucao_atual["origem"] = "planilha_interna"
+        self._execucao_atual["planilha_fingerprint"] = self._planilha_fingerprint(self._planilha_data)
         self._execucao_atual["total"] = len(codigos)
         self._execucao_atual["checkpoint"] = int(start)
         self._execucao_atual["proximo_indice"] = int(start)
