@@ -335,6 +335,28 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("corner_radius=icon_holder_size // 2", block)
         self.assertIn('fg_color=palette["icon"]', block)
         self.assertIn('text_color="#FFFFFF"', block)
+    def test_cartoes_do_historico_usam_data_e_tamanho_fixos(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _formatar_data_historico")
+        end = source.index("def _abrir_detalhe_historico", start)
+        block = source[start:end]
+        self.assertIn('strftime("%d/%m/%Y")', block)
+        self.assertIn("tile_width = 144", block)
+        self.assertIn("tile_height = 116", block)
+        self.assertIn("grid_propagate(False)", block)
+        self.assertNotIn('sticky="nsew"', block)
+        self.assertNotIn('text=titulo[:24]', block)
+        self.assertNotIn('text="Concluída"', block)
+        self.assertIn("wraplength=tile_width - 20", block)
+
+    def test_data_do_historico_e_formatada_no_padrao_brasileiro(self):
+        import interface
+        obj = object.__new__(interface.App)
+        self.assertEqual(
+            obj._formatar_data_historico("2026-09-21 21:47:26"),
+            "21/09/2026",
+        )
+
     def test_tooltips_e_hover_dos_cards_estao_na_interface_canonica(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("class _SMAutoLabTooltip:", source)
