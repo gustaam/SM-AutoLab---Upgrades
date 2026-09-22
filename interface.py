@@ -3267,33 +3267,6 @@ class App:
         finally:
             self._retomada_dialogo_aberto = False
 
-    def _localizar_planilha_pendente(self, nome):
-        if not nome:
-            return None
-        # Prefer common user folders; avoid a broad recursive scan of the whole
-        # drive during startup.
-        candidatos = [
-            Path.cwd(),
-            Path.home() / "Downloads",
-            Path.home() / "Documents",
-            Path.home() / "Desktop",
-            Path.home() / "OneDrive" / "Documents",
-            Path.home() / "OneDrive" / "Desktop",
-        ]
-        encontrados=[]
-        for base in candidatos:
-            try:
-                if not base.exists():
-                    continue
-                for p in base.glob(nome):
-                    if p.is_file():
-                        encontrados.append(p)
-            except Exception:
-                continue
-            if encontrados:
-                return str(encontrados[0])
-        return None
-
     def _iniciar_historico_execucao(self, planilha, pagina, inicio):
         agora = datetime.now()
         self._execucao_atual = {
@@ -4710,22 +4683,6 @@ class App:
             mensagem,
             parent=self._planilha_window or self.app,
         )
-
-    def _filtrar_arquivos_60_dias(self, itens):
-        agora = datetime.now()
-        limite = agora - timedelta(days=ARQUIVOS_DIAS)
-        validos = []
-        for item in itens or []:
-            if not isinstance(item, dict):
-                continue
-            try:
-                salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
-            except Exception:
-                continue
-            if limite <= salvo <= agora:
-                validos.append(item)
-        validos.sort(key=lambda item: str(item.get("saved_at", "")))
-        return validos
 
     def _assinatura_historico_planilhas(self):
         try:
