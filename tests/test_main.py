@@ -1,7 +1,5 @@
 # Testes de inicialização.
 
-# Testes de inicialização.
-
 import unittest
 from pathlib import Path
 
