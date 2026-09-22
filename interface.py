@@ -2463,8 +2463,11 @@ class App:
             self._fechar_menus()
             return
 
-        if sub_aberto and not self._pointer_no_menu_aparencia() and not self._pointer_no_botao_aparencia():
-            self._agendar_fechar_aparencia()
+        if sub_aberto:
+            if self._pointer_no_menu_aparencia() or self._pointer_no_botao_aparencia():
+                self._cancelar_fechar_aparencia()
+            else:
+                self._agendar_fechar_aparencia()
 
         self._menu_monitor_job = self.app.after(80, self._monitorar_menus)
 
@@ -3716,7 +3719,13 @@ class App:
         )
         if isinstance(codigos_raw, str):
             codigos_raw = [codigos_raw]
-        codigos = [str(x).strip() for x in codigos_raw if str(x).strip()]
+        codigos = []
+        for item in codigos_raw:
+            if isinstance(item, dict):
+                item = item.get("codigo") or item.get("code") or ""
+            item = str(item).strip()
+            if item and item not in codigos:
+                codigos.append(item)
 
         ctk.CTkLabel(
             parent,
