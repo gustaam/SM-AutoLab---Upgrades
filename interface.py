@@ -6458,22 +6458,6 @@ class App:
         v = tuple(round(a[i] + (b[i] - a[i]) * fator) for i in range(3))
         return "#" + "".join(f"{x:02X}" for x in v)
 
-    def _parar_pisca_status(self, manter_estado=True):
-        try:
-            job = getattr(self, "_status_blink_job", None)
-            if job is not None:
-                self.app.after_cancel(job)
-            self._status_blink_job = None
-
-            if manter_estado and getattr(self, "status_indicator", None) is not None:
-                modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
-                self.status_indicator.configure(bg=canvas_bg)
-                self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
-                self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
-        except Exception:
-            self._status_blink_job = None
-
     def _executar_pisca_status(self):
         try:
             import math
@@ -6518,6 +6502,22 @@ class App:
                 self._status_anim_interval,
                 self._executar_pisca_status
             )
+        except Exception:
+            self._status_blink_job = None
+
+    def _parar_pisca_status(self, manter_estado=True):
+        try:
+            job = getattr(self, "_status_blink_job", None)
+            if job is not None:
+                self.app.after_cancel(job)
+            self._status_blink_job = None
+
+            if manter_estado and getattr(self, "status_indicator", None) is not None:
+                modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
+                self.status_indicator.configure(bg=canvas_bg)
+                self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
+                self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
         except Exception:
             self._status_blink_job = None
 
