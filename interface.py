@@ -30,7 +30,6 @@ from app import (
     ler_checkpoint_interno,
     principal_interno,
     restaurar_configuracoes,
-    salvar_checkpoint,
     salvar_checkpoint_interno,
     salvar_configuracoes,
 )
@@ -1757,7 +1756,6 @@ class App:
     def __init__(self):
         self.app = ctk.CTk()
         self._configurar_icone_janela()
-        self.caminho = None
         self._parar = False
         self._closing = False
         self._checkpoint_indice_seguro = 0
@@ -2551,9 +2549,6 @@ class App:
 
         self.app.update_idletasks()
         self._reposicionar_menus()
-    def _agendar_fechar_aparencia(self, _event=None):
-        self._agendar_fechar_menus(_event)
-
     def _cancelar_fechar_menus(self, _event=None):
         if self._menu_close_job is not None:
             try:
@@ -5824,35 +5819,22 @@ class App:
                 self._execucao_atual["proximo_indice"] = indice
                 self._execucao_atual["interrompida_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                if str(self._execucao_atual.get("origem", "")) == "planilha_interna" and not self.caminho:
+                if str(self._execucao_atual.get("origem", "")) == "planilha_interna":
                     codigos = self._extrair_codigos_planilha()
                     if codigos:
                         salvar_checkpoint_interno(codigos, indice)
-                elif self.caminho:
-                    pagina = int(self._execucao_atual.get("pagina", 1)) - 1
-                    salvar_checkpoint(self.caminho, pagina, indice)
 
                 self._salvar_estado_persistente()
             except Exception:
-                # Mesmo que o histórico visual falhe, não impedir o fechamento
-                # nem mascarar o comportamento de saída do aplicativo.
-                try:
-                    pagina = max(0, int(self.pagina.get()) - 1)
-                    salvar_checkpoint(
-                        self.caminho,
-                        pagina,
-                        max(0, int(self._checkpoint_indice_seguro))
-                    )
-                except Exception:
-                    pass
+                # O fechamento nunca deve ser impedido por uma falha de persistência.
+                logging.getLogger(__name__).exception(
+                    "Falha ao salvar checkpoint durante o fechamento do aplicativo."
+                )
 
         # Consolida também o histórico quando o aplicativo é fechado sem uma
         # execução ativa, garantindo a migração do arquivo legado para o arquivo
         # canônico e evitando perda de dados após atualizações/reinicializações.
-        try:
-            self._salvar_estado_persistente()
-        except Exception:
-            pass
+        self._salvar_estado_persistente()
 
         # Fechar o navegador associado à execução antes de destruir a interface.
         auto = getattr(self, "_automacao_atual", None)
