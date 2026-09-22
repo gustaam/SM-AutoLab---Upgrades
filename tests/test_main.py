@@ -1,7 +1,5 @@
 # Testes de inicialização.
 
-# Testes de inicialização.
-
 import unittest
 from pathlib import Path
 
@@ -116,7 +114,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_validacao_pre_execucao_da_planilha_estah_integrada(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _validar_planilha_antes_execucao")
-        end = source.index("def _filtrar_arquivos_60_dias", start)
+        end = source.index("def _contar_codigos_mes", start)
         block = source[start:end]
         self.assertIn("rows = {}", block)
         self.assertIn("codigos_por_chave", block)

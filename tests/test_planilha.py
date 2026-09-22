@@ -1,6 +1,4 @@
-# Testes da planilha e grade.
-
-# Testes da planilha e grade.
+# Testes da planilha e grade virtualizada.
 
 import json
 import tempfile
@@ -26,7 +24,7 @@ from interface import (
     visible_row_range,
 )
 
-# tests/test_planilha_behavior.py
+# Testes de comportamento da planilha.
 
 class FakeTree:
     def __init__(self, rows):
@@ -232,7 +230,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         )
 
 
-# tests/test_planilha_core.py
+# Testes do núcleo da planilha.
 
 class PlanilhaCoreTests(unittest.TestCase):
     def test_retangulo_de_selecao_e_inclusivo_e_limitado(self):
@@ -344,7 +342,7 @@ class PlanilhaCoreTests(unittest.TestCase):
         self.assertIsNone(redo_state([], [], {"0,0": "A"}))
 
 
-# tests/test_planilha_deterministic_open.py
+# Testes de abertura determinística da planilha.
 
 class PlanilhaDeterministicOpenTests(unittest.TestCase):
     def setUp(self):
@@ -457,7 +455,7 @@ class PlanilhaEventOwnershipTests(unittest.TestCase):
         self.assertNotIn('bind("<Button-1>", on_click', source)
 
 
-# tests/test_native_backdrop.py
+# Testes do backdrop nativo do Windows.
 
 class NativeBackdropTests(unittest.TestCase):
     def test_native_backdrop_helpers_sao_diretos_e_nao_injetam_camadas(self):
@@ -478,7 +476,7 @@ class NativeBackdropTests(unittest.TestCase):
         self.assertNotIn("install_ui_windows11_native_29925", main)
         self.assertNotIn("from patch import", main)
 
-# tests/test_virtual_grid.py
+# Testes da grade virtualizada.
 
 class VirtualGridStage13Tests(unittest.TestCase):
     def test_marker(self):

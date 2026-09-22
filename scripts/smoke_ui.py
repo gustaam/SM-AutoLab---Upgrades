@@ -1,4 +1,4 @@
-"""Smoke test real da interface: instancia o App completo e encerra o Tk."""
+# Teste de inicialização real da interface.
 from __future__ import annotations
 
 import sys
