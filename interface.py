@@ -4780,6 +4780,8 @@ class App:
         payload = {
             "version": 1,
             "updated_at": datetime.now().isoformat(timespec="seconds"),
+            "processed_fingerprint": "",
+            "processed_at": "",
             "cells": snapshot,
         }
         atomic_write_json(self._planilha_arquivo, payload)
@@ -4804,6 +4806,7 @@ class App:
                 "não corresponde aos dados atuais.",
             )
     @staticmethod
+    @staticmethod
     def _planilha_fingerprint(cells):
         """Gera uma impressão estável do conteúdo relevante da planilha."""
         normalizados = {
@@ -4818,9 +4821,24 @@ class App:
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+
     def _planilha_foi_processada(self, cells):
-        """Retorna True somente quando esta planilha foi concluída anteriormente."""
+        """Retorna True quando a revisão salva já foi concluída pela automação."""
         fingerprint = self._planilha_fingerprint(cells)
+
+        # O marcador persistido continua válido mesmo depois de o histórico
+        # visual ser apagado pelo usuário.
+        try:
+            data = read_json_with_backup(self._planilha_arquivo, {})
+            if (
+                isinstance(data, dict)
+                and str(data.get("processed_fingerprint", "")).strip() == fingerprint
+            ):
+                return True
+        except Exception:
+            pass
+
+        # Fallback para execuções registradas antes do marcador persistido.
         for execucao in reversed(getattr(self, "_historico_execucoes", [])):
             if not isinstance(execucao, dict):
                 continue
@@ -4832,6 +4850,26 @@ class App:
             if str(execucao.get("planilha_fingerprint", "")).strip() == fingerprint:
                 return True
         return False
+
+    def _marcar_planilha_interna_processada(self, cells):
+        """Persiste que a revisão salva foi processada com sucesso."""
+        try:
+            self._garantir_pasta_planilha()
+            data = read_json_with_backup(self._planilha_arquivo, {})
+            if not isinstance(data, dict):
+                data = {}
+            data["version"] = 1
+            data["cells"] = {
+                str(chave): str(valor)
+                for chave, valor in (cells or {}).items()
+                if str(valor) != ""
+            }
+            data["processed_fingerprint"] = self._planilha_fingerprint(cells)
+            data["processed_at"] = datetime.now().isoformat(timespec="seconds")
+            atomic_write_json(self._planilha_arquivo, data)
+        except Exception:
+            LOGGER.exception("Falha ao registrar a planilha interna como processada.")
+
 
     def _planilha_tem_alteracoes(self):
         return self._planilha_data != self._planilha_salva_data
@@ -6871,6 +6909,10 @@ class App:
             self._aplicar_status("Parado pelo usuário")
         else:
             self._add_activity("Processo finalizado.", self.SUCCESS)
+            try:
+                self._marcar_planilha_interna_processada(self._planilha_data)
+            except Exception:
+                pass
             self._finalizar_historico_execucao(resultado, "Concluída")
             # Aplicar imediatamente: evita que a messagebox bloqueie a atualização
             # do cabeçalho deixando-o visualmente em "Processando".
