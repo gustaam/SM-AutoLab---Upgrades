@@ -477,6 +477,34 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _planilha_limpar_selecao", source)
         self.assertIn('tree.bind("<Escape>", self._planilha_limpar_selecao', source)
 
+    def test_menus_nao_sao_criados_visiveis_em_00(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _mostrar_menu_configuracoes")
+        end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
+        block = source[start:end]
+        self.assertIn("menu.place_forget()", block)
+        self.assertNotIn("menu.place(x=0, y=0)", block)
+
+        start = source.index("def _mostrar_menu_aparencia")
+        end = source.index("def _cancelar_fechar_menus", start)
+        block = source[start:end]
+        self.assertIn("sub.place_forget()", block)
+        self.assertNotIn("sub.place(x=0, y=0)", block)
+
+    def test_reposicionamento_dos_menus_so_fica_ligado_enquanto_aberto(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn('self.app.bind("<Configure>", self._reposicionar_menus, add="+")', source)
+        self.assertIn('self.app.bind(\n                "<Configure>", self._reposicionar_menus, add="+"', source)
+        self.assertIn("self.app.unbind(\"<Configure>\", binding)", source)
+
+    def test_resize_sem_mudanca_de_tamanho_nao_refaz_layout_do_acompanhamento(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _ajustar_altura_acompanhamento")
+        end = source.index("def _set_stat", start)
+        block = source[start:end]
+        self.assertIn("anterior_tamanho == tamanho", block)
+        self.assertIn("return", block)
+
     def test_menu_configuracoes_fecha_ao_sair_da_area(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("def _monitorar_menus", source)
