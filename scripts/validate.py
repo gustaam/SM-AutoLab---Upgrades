@@ -26,7 +26,7 @@ REQUIRED_PATHS = (
     "main.py", "interface.py", "app.py", "requirements.txt",
     "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate.py",
     "tests/test_patch.py", "tests/test_main.py", "tests/test_planilha.py",
-    "tests/test_app.py", "tests/test_validation.py",
+    "tests/test_app.py", "tests/test_validation.py", "scripts/smoke_ui.py",
 )
 
 OBSOLETE_PATHS = (
@@ -141,7 +141,7 @@ def validate_workflow_runtime(root: Path) -> None:
         fail("build_windows.bat deve exigir Python 3.14.7")
     if f"pip install pip=={REQUIRED_PIP_VERSION}" not in build:
         fail(f"build_windows.bat deve fixar pip em {REQUIRED_PIP_VERSION}")
-    if "python -m pip install pyinstaller==6.22.2" not in read_text(root, ".github/workflows/release.yml"):
+    if "python -m pip install pyinstaller==6.22.3" not in read_text(root, ".github/workflows/release.yml"):
         fail("release.yml deve instalar PyInstaller pelo módulo pip do Python configurado")
     if "%PYTHON% -m pip install pyinstaller==6.22.2" not in build:
         fail("build_windows.bat deve instalar PyInstaller pelo interpretador Python configurado")
