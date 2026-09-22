@@ -18,7 +18,7 @@ import urllib.request
 from ctypes import wintypes
 from datetime import datetime, timedelta
 from pathlib import Path
-from tkinter import Canvas, Entry, Frame, Menu, messagebox, ttk
+from tkinter import Canvas, Entry, Menu, messagebox, ttk
 
 import customtkinter as ctk
 
@@ -915,8 +915,7 @@ def redo_state(
     return new_undo, new_redo, new_current
 
 import math
-import tkinter as tk
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from typing import Any
 
 SM_AUTOLAB_GRADE_VIRTUAL = "SM-AUTOLAB-GRADE-VIRTUAL"
