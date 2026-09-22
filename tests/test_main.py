@@ -246,8 +246,12 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada', source)
         self.assertIn('self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")', source)
         self.assertIn("def _estabilizar_apos_retomada", source)
-        self.assertIn("self.app.after(30, self._estabilizar_apos_retomada)", source)
-        self.assertNotIn("self.app.update_idletasks()", source[source.index("def _estabilizar_apos_retomada"):source.index("def config_app", source.index("def _estabilizar_apos_retomada"))])
+        start = source.index("def _agendar_estabilizacao_apos_retomada")
+        end = source.index("def config_app", start)
+        block = source[start:end]
+        self.assertIn("desabilitar_transicoes_dwm(self.app)", block)
+        self.assertNotIn("self.app.update_idletasks()", block)
+        self.assertNotIn("_redraw_window_now(self.app)", block)
 
     def test_pronto_reinicia_pulso_verde(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
