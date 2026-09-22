@@ -1,4 +1,4 @@
-# Build e publicação da release.
+# Build e publicação das releases.
 name: Build and publish release
 
 on:
