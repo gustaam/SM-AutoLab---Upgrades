@@ -2939,6 +2939,7 @@ class App:
         )
         salvar_btn.pack(side="left")
         atualizar_estado_salvar()
+        _ui_scan_tooltips(popup)
 
     def _selecionar_aba(self, nome):
         for frame in (self.aba_atividade, self.aba_historico):
@@ -3478,7 +3479,12 @@ class App:
         self._execucao_atual["sucessos"] = int(getattr(resultado, "sucessos", 0) or 0)
         self._execucao_atual["erros"] = int(getattr(resultado, "erros", 0) or 0)
         self._execucao_atual["processados"] = int(getattr(resultado, "processados", 0) or 0)
-        self._execucao_atual["codigos_erros"] = [str(item.codigo) for item in resultado.itens if item.status == "Erro"]
+        self._execucao_atual["codigos_erros"] = [
+            str(item.codigo).strip()
+            for item in getattr(resultado, "itens", [])
+            if str(getattr(item, "status", "")).strip().casefold() == "erro"
+            and str(getattr(item, "codigo", "")).strip()
+        ]
         self._historico_execucoes.append(dict(self._execucao_atual))
         self._execucao_atual = None
         self._salvar_estado_persistente()
@@ -3522,8 +3528,25 @@ class App:
             ).pack(anchor="w", padx=8, pady=8)
             return
 
+        validos = {
+            self._id_historico_execucao(item)
+            for item in historico_visivel
+        }
+        self._historico_selecionados.intersection_update(validos)
+
         for execucao in reversed(historico_visivel):
             self._criar_pasta_historico(execucao)
+
+    def _id_historico_execucao(self, execucao):
+        if not isinstance(execucao, dict):
+            return str(id(execucao))
+        valor = str(execucao.get("id", "")).strip()
+        if valor:
+            return valor
+        return "|".join(
+            str(execucao.get(campo, "")).strip()
+            for campo in ("inicio", "fim", "planilha", "pagina")
+        )
 
     def _formatar_data_historico(self, valor):
         texto = str(valor or "").strip()
@@ -3539,6 +3562,7 @@ class App:
         parent = self.historico_lista
         tile_width = 144
         tile_height = 116
+        execucao_id = self._id_historico_execucao(execucao)
 
         if not hasattr(self, "_hist_grid") or self._hist_grid is None:
             self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
@@ -3570,29 +3594,30 @@ class App:
         erros = int(execucao.get("erros", 0) or 0)
         icone = "📁"
 
-        icone_widget = ctk.CTkLabel(
+        icon = ctk.CTkLabel(
             tile,
             text=icone,
             font=("Segoe UI Emoji", 20),
             text_color=self.ACCENT,
         )
-        icone_widget.pack(pady=(8, 2))
-        ctk.CTkLabel(
+        icon.pack(pady=(8, 2))
+        date_label = ctk.CTkLabel(
             tile,
             text=self._formatar_data_historico(inicio),
             text_color=self.TEXT,
             font=("Segoe UI", 9, "bold"),
             anchor="center",
-            justify="center",
-        ).pack(fill="x", padx=6)
-        ctk.CTkLabel(
+        )
+        date_label.pack(fill="x", padx=6)
+        time_label = ctk.CTkLabel(
             tile,
             text=horario,
             text_color=self.SUBTEXT,
             font=("Segoe UI", 8),
             anchor="center",
-        ).pack(fill="x", padx=6, pady=(1, 0))
-        ctk.CTkLabel(
+        )
+        time_label.pack(fill="x", padx=6, pady=(1, 0))
+        error_label = ctk.CTkLabel(
             tile,
             text=f"{erros} não executado(s)",
             text_color=self.ERROR if erros else self.SUBTEXT,
@@ -3600,48 +3625,61 @@ class App:
             anchor="center",
             justify="center",
             wraplength=tile_width - 20,
-        ).pack(fill="x", padx=8, pady=(8, 0))
+        )
+        error_label.pack(fill="x", padx=8, pady=(8, 0))
 
-        def selecionar(_e=None):
-            for sibling in self._hist_grid.winfo_children():
-                sibling.configure(
-                    border_color=self.BORDER,
-                    fg_color=("#FFFFFF", "#2D3338"),
+        widgets = (tile, icon, date_label, time_label, error_label)
+
+        def atualizar_visual(hover=False):
+            selecionado = execucao_id in self._historico_selecionados
+            if selecionado:
+                tile.configure(
+                    border_color=self.ACCENT,
+                    fg_color=("#EAF4FF", "#1B3C53"),
                 )
-            tile.configure(
-                border_color=self.ACCENT,
-                fg_color=("#EAF4FF", "#1B3C53"),
-            )
-
-        def abrir(_e=None):
-            selecionar()
-            self._abrir_detalhe_historico(execucao)
-
-        def enter(_e=None):
-            tile.configure(
-                border_color=self.ACCENT_HOVER,
-                fg_color=("#EAF4FC", "#263F50"),
-            )
-
-        def leave(_e=None):
-            if tile.cget("border_color") not in (self.ACCENT,):
+            elif hover:
+                tile.configure(
+                    border_color=self.ACCENT_HOVER,
+                    fg_color=("#EAF4FC", "#263F50"),
+                )
+            else:
                 tile.configure(
                     border_color=self.BORDER,
                     fg_color=("#FFFFFF", "#2D3338"),
                 )
 
-        for widget in (tile, icone_widget):
+        def clicar(event=None):
+            ctrl = bool(event is not None and (getattr(event, "state", 0) & 0x0004))
+            if ctrl:
+                if execucao_id in self._historico_selecionados:
+                    self._historico_selecionados.remove(execucao_id)
+                else:
+                    self._historico_selecionados.add(execucao_id)
+                self._restaurar_historico_na_tela()
+                return "break"
+
+            self._historico_selecionados = {execucao_id}
+            atualizar_visual()
+            self._abrir_detalhe_historico(execucao)
+            return "break"
+
+        def entrar(_event=None):
+            atualizar_visual(hover=True)
+
+        def sair(_event=None):
+            atualizar_visual()
+
+        for widget in widgets:
             try:
                 widget.configure(cursor="hand2")
             except Exception:
                 pass
-            widget.bind("<Enter>", enter)
-            widget.bind("<Leave>", leave)
-            widget.bind("<Button-1>", selecionar)
-            widget.bind("<Double-1>", abrir)
-        tile.bind("<Double-1>", abrir)
+            widget.bind("<Enter>", entrar)
+            widget.bind("<Leave>", sair)
+            widget.bind("<Button-1>", clicar)
+        return tile
 
-    def _abrir_detalhe_historico(self, execucao):
+    def _abrir_detalhe_historico    def _abrir_detalhe_historico(self, execucao):
         win = ctk.CTkToplevel(self.app)
         win.title("Execução — SM AutoLab")
         win.geometry("680x500")
@@ -3656,6 +3694,7 @@ class App:
         except Exception:
             pass
         self._preencher_detalhe_pasta(win, execucao)
+        _ui_scan_tooltips(win)
 
     def _preencher_detalhe_pasta(self, parent, execucao):
         for w in parent.winfo_children():
@@ -3669,7 +3708,15 @@ class App:
         total = execucao.get("total", 0)
         sucessos = execucao.get("sucessos", 0)
         erros = int(execucao.get("erros", 0) or 0)
-        codigos = [str(x) for x in execucao.get("codigos_erros", [])]
+        codigos_raw = (
+            execucao.get("codigos_erros")
+            or execucao.get("erros_codigos")
+            or execucao.get("codigos_erro")
+            or []
+        )
+        if isinstance(codigos_raw, str):
+            codigos_raw = [codigos_raw]
+        codigos = [str(x).strip() for x in codigos_raw if str(x).strip()]
 
         ctk.CTkLabel(
             parent,
@@ -5366,11 +5413,16 @@ class App:
                 valido = limite <= data <= hoje
                 tem_arquivo = data in por_dia
                 eh_hoje = data == hoje
+                selecionado = data in self._arquivos_datas_selecionadas
                 fill = bg
                 outline = border
                 fg = text if valido else disabled
                 width = 1
-                if tem_arquivo and valido:
+                if selecionado and valido:
+                    fill = "#DDEEFF" if not modo_escuro else "#214F70"
+                    outline = accent
+                    width = 2
+                elif tem_arquivo and valido:
                     fill = "#EAF4FF" if not modo_escuro else "#183B54"
                     outline = accent
                     width = 1
@@ -5401,24 +5453,41 @@ class App:
         if canvas is None:
             return
         try:
-            item_id = canvas.find_closest(event.x, event.y)[0]
+            item_ids = canvas.find_overlapping(event.x, event.y, event.x, event.y)
         except Exception:
             return
-        tags = canvas.gettags(item_id)
         data = None
-        for tag in tags:
-            if tag.startswith("dia:"):
-                try:
-                    data = datetime.fromisoformat(tag[4:]).date()
-                except Exception:
-                    data = None
+        for item_id in reversed(item_ids):
+            for tag in canvas.gettags(item_id):
+                if tag.startswith("dia:"):
+                    try:
+                        data = datetime.fromisoformat(tag[4:]).date()
+                    except Exception:
+                        data = None
+                    break
+            if data is not None:
                 break
         if data is None:
             return
+
         hoje = datetime.now().date()
         limite = hoje - timedelta(days=ARQUIVOS_DIAS)
-        if limite <= data <= hoje:
-            self._mostrar_planilhas_do_dia(data)
+        if not (limite <= data <= hoje):
+            return
+
+        ctrl = bool(getattr(event, "state", 0) & 0x0004)
+        if ctrl:
+            if data in self._arquivos_datas_selecionadas:
+                self._arquivos_datas_selecionadas.remove(data)
+            else:
+                self._arquivos_datas_selecionadas.add(data)
+            self._desenhar_calendario_arquivos()
+            return "break"
+
+        self._arquivos_datas_selecionadas = {data}
+        self._desenhar_calendario_arquivos()
+        self._mostrar_planilhas_do_dia(data)
+        return "break"
 
     def _mudar_mes_arquivos(self, direcao):
         atual = self._arquivos_mes or self._mes_atual_arquivos()
@@ -5426,6 +5495,7 @@ class App:
         if novo < self._mes_minimo_arquivos() or novo > self._mes_atual_arquivos():
             return
         self._arquivos_mes = novo
+        self._arquivos_datas_selecionadas.clear()
         self._atualizar_contador_arquivos(novo)
         self._desenhar_calendario_arquivos()
 
@@ -5550,6 +5620,7 @@ class App:
         self._atualizar_contador_arquivos()
         self._renderizar_calendario_arquivos()
         win.update_idletasks()
+        _ui_scan_tooltips(win)
 
     def _planilha_salvar_e_iniciar(self):
         self._planilha_fechar_edicao()
