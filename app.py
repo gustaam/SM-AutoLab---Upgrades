@@ -1,4 +1,4 @@
-# Automação e persistência.
+# Núcleo de automação e persistência.
 from __future__ import annotations
 
 import hashlib
