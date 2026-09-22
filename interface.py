@@ -782,8 +782,8 @@ def _ui_install_windows_scrollbar(scrollable):
             except Exception:
                 try:
                     old_scrollbar.grid_forget()
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
         colors = _ui_windows_scrollbar_colors()
         bar = _SMWindowsRoundedScrollbar(
