@@ -2,11 +2,11 @@
 name: Build and publish release
 
 on:
-  push:
-    tags:
-      - "v*.*"
-      - "v*.*.*"
-      - "v*.*.*.*"
+  workflow_run:
+    workflows:
+      - "Validate main for release"
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       release_tag:
@@ -17,25 +17,41 @@ on:
 permissions: {}
 
 concurrency:
-  group: sm-autolab-release-${{ github.event.inputs.release_tag || github.ref_name }}
+  group: sm-autolab-release-${{ github.event.inputs.release_tag || github.event.workflow_run.head_sha || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   release:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'workflow_run' &&
+           github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.event == 'push' &&
+           github.event.workflow_run.head_branch == 'main') }}
     permissions:
       contents: write
     runs-on: windows-latest
     timeout-minutes: 30
-    env:
-      RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
-    steps:
+        steps:
       - name: Checkout da tag exata
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ github.event.inputs.release_tag && format('refs/tags/{0}', github.event.inputs.release_tag) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || format('refs/tags/{0}', github.event.inputs.release_tag) }}
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Resolver contexto da release
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq "workflow_run") {
+            $version = (Get-Content VERSION -Raw).Trim()
+            if (-not $version) { throw "VERSION vazia." }
+            $tag = "v$version"
+          } else {
+            $tag = "${{ github.event.inputs.release_tag }}"
+          }
+          if (-not $tag) { throw "Não foi possível determinar a tag da release." }
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
