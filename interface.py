@@ -3558,6 +3558,9 @@ class App:
         historico_visivel = list(self._historico_execucoes)
 
         if not historico_visivel and not self._execucao_atual:
+            self._historico_selecionados.clear()
+            self._atualizar_visual_selecao_historico()
+            self._atualizar_botao_apagar_historico()
             ctk.CTkLabel(
                 self.historico_lista, text="Nenhuma execução registrada ainda.",
                 text_color=self.SUBTEXT, font=("Segoe UI", 10)
