@@ -410,7 +410,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn('sticky="nsew"', block)
         self.assertNotIn('text=titulo[:24]', block)
         self.assertNotIn('text="Concluída"', block)
-        self.assertIn("wraplength=tile_width - 10", block)
+        self.assertIn("wraplength=tile_width - 6", block)
 
     def test_data_do_historico_e_formatada_no_padrao_brasileiro(self):
         import interface
