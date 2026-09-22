@@ -9,7 +9,6 @@ import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 
-import customtkinter as ctk
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 
