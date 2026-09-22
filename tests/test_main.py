@@ -413,7 +413,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _planilha_fingerprint", source)
         self.assertIn("def _planilha_foi_processada", source)
         self.assertIn('status != "concluída"', source)
-        self.assertIn('text="A última planilha salva ainda não foi processada.', source)
+        self.assertIn('"A última planilha salva ainda não foi processada.', source)
 
     def test_planilha_processada_abre_nova_vazia_e_apaga_rascunho(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
