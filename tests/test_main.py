@@ -153,21 +153,20 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("Baixando atualização v", source)
         self.assertIn("def _atualizacao_atualizar_progresso", source)
 
-    def test_restore_bloqueia_redesenho_e_forca_repaint_unico(self):
+    def test_restore_desabilita_transicoes_dwm_por_janela(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("def _set_window_redraw", source)
-        self.assertIn("WM_SETREDRAW = 0x000B", source)
-        self.assertIn("def _redraw_window_now", source)
-        self.assertIn("RDW_ALLCHILDREN = 0x0080", source)
+        self.assertIn("DWMWA_TRANSITIONS_FORCEDISABLED = 3", source)
+        self.assertIn("def desabilitar_transicoes_dwm", source)
+        self.assertIn("ctypes.c_int(1)", source[source.index("def desabilitar_transicoes_dwm"):source.index("def _windows11_available")])
+        self.assertIn("desabilitar_transicoes_dwm(self.app)", source)
         self.assertIn('self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")', source)
-        start = source.index("def _estabilizar_apos_retomada")
+        start = source.index("def _agendar_estabilizacao_apos_retomada")
         end = source.index("def config_app", start)
         block = source[start:end]
-        self.assertIn("_set_window_redraw(self.app, True)", block)
-        self.assertIn("_redraw_window_now(self.app)", block)
-        self.assertNotIn("self.app.update_idletasks()", block)
-        self.assertIn("self._janela_redesenho_bloqueado = True", source)
-        self.assertIn('if getattr(self, "_janela_redesenho_bloqueado", False):', source)
+        self.assertIn("desabilitar_transicoes_dwm(self.app)", block)
+        self.assertIn("def _estabilizar_apos_retomada", block)
+        self.assertNotIn("_redraw_window_now", source)
+        self.assertNotIn("WM_SETREDRAW = 0x000B", source)
 
     def test_codigo_atual_usa_fonte_menor_sem_negrito(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -552,18 +551,20 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertLess(block.index('text="Aparência  ›"'), block.index('text="Ajustes do Feegow"'))
         self.assertLess(block.index('text="Ajustes do Feegow"'), block.index('text="Verificar atualizações"'))
 
-    def test_status_animation_tem_intervalo_reduzido_de_renderizacao(self):
+    def test_status_animation_tem_pisca_binario_leve(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _iniciar_pisca_status")
         end = source.index("def _interpolar_cor", start)
         block = source[start:end]
-        self.assertIn("self._status_anim_interval = 80", block)
-        self.assertIn("self._status_anim_frames = 18 if self._status_blink_fast else 20", block)
-        self.assertIn("self.status_indicator.itemconfigure(self._status_halo, fill=halo)", source)
-        self.assertIn("self.status_indicator.itemconfigure(self._status_dot, fill=dot)", source)
+        self.assertIn("self._status_anim_frames = 2", block)
+        self.assertIn("self._status_anim_interval = 250", block)
+        self.assertIn("self._status_blink_visible = False", block)
         exec_start = source.index("def _executar_pisca_status")
         exec_end = source.index("def _aplicar_status", exec_start)
-        self.assertIn('str(self.app.state()).lower() == "iconic"', source[exec_start:exec_end])
+        exec_block = source[exec_start:exec_end]
+        self.assertIn("self._status_blink_visible = not bool(self._status_blink_visible)", exec_block)
+        self.assertIn("self.status_indicator.itemconfigure(self._status_halo, fill=halo)", exec_block)
+        self.assertIn("self.status_indicator.itemconfigure(self._status_dot, fill=dot)", exec_block)
 
     def test_reposicionamento_de_menus_e_coalescido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
