@@ -53,7 +53,7 @@ jobs:
             $tag = "${{ github.event.inputs.release_tag }}"
           }
           if (-not $tag) { throw "Não foi possível determinar a tag da release." }
-          $expectedCommit = if ($env:GITHUB_EVENT_NAME -eq "workflow_run") { ${{ github.event.workflow_run.head_sha }} } else { (git rev-parse HEAD).Trim() }
+          $expectedCommit = if ($env:GITHUB_EVENT_NAME -eq "workflow_run") { "${{ github.event.workflow_run.head_sha }}" } else { (git rev-parse HEAD).Trim() }
           if (-not $expectedCommit) { throw "Não foi possível determinar o commit esperado da release." }
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "EXPECTED_COMMIT=$expectedCommit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
