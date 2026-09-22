@@ -23,6 +23,11 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("install_ui_windows11_native_29925(", source)
         self.assertLess(len(source.splitlines()), 500)
 
+    def test_interface_nao_mantem_helpers_legados_sem_referencia(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("def _localizar_planilha_pendente", source)
+        self.assertNotIn("def _filtrar_arquivos_60_dias", source)
+
     def test_main_build_keeps_single_bootstrap_entry(self):
         for filename in ("build_windows.bat", ".github/workflows/validate-main.yml", ".github/workflows/release.yml"):
             source = (self.root / filename).read_text(encoding="utf-8")
