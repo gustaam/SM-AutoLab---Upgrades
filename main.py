@@ -1,4 +1,4 @@
-# Inicialização e splash da aplicação.
+# Inicialização da aplicação e splash.
 from __future__ import annotations
 
 import ctypes
