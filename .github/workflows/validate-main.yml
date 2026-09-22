@@ -168,3 +168,14 @@ jobs:
             exit 1
           fi
           echo "Tag ${RELEASE_TAG} -> ${VALIDATED_SHA}"
+
+      - name: Disparar workflow da release
+        if: steps.release.outputs.published != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --repo "\${GITHUB_REPOSITORY}" --ref "\${RELEASE_TAG}" -f "release_tag=\${RELEASE_TAG}"
+          echo "Workflow de release disparado para \${RELEASE_TAG}."
