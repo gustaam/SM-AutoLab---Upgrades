@@ -49,11 +49,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("def _configurar_hover_menu", source)
         self.assertIn("command=self._mostrar_menu_aparencia", block)
-        self.assertIn('aparencia.bind("<Enter>", self._mostrar_menu_aparencia', block)
-        self.assertIn('aparencia.bind("<Leave>", self._agendar_fechar_menus', block)
-        self.assertIn("for widget in self._iterar_descendentes_ui(aparencia):", block)
-        self.assertIn('widget.bind("<Enter>", self._mostrar_menu_aparencia', block)
-        self.assertIn('widget.bind("<Leave>", self._agendar_fechar_menus', block)
+        self.assertIn("self._ativar_clique_fora_menus()", block)
+        self.assertIn("def _pointer_em_area_dos_menus", source)
+        self.assertIn("def _clique_fora_menus", source)
         self.assertNotIn('self.app.bind_all("<Button-1>"', source)
 
     def test_appearance_hover_compatibility_method_is_real(self):
@@ -390,9 +388,31 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn('child.bind("<ButtonPress>", self._on_press, add="+")', block)
         self.assertIn('child.bind("<FocusOut>", self._on_focus_out, add="+")', block)
+        self.assertIn("self._rendered_message = None", block)
+        self.assertIn("self._rendered_message != self.message", block)
         self.assertIn("self._destroy_window()", block)
         self.assertIn("def _destroy_window(self):", block)
-        self.assertNotIn('self._window.withdraw()', block)
+        self.assertNotIn('self._window.attributes("-topmost", True)', block)
+        self.assertNotIn("original_configure = cls.configure", block)
+
+    def test_tooltips_canonicos_cobrem_botoes_e_acoes_da_interface(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        for key in ("atividade", "histórico", "↶", "↷", "‹", "›"):
+            self.assertIn(f'"{key}":', source)
+
+    def test_menu_configuracoes_fecha_ao_clicar_fora(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('tag = "_SMAutoLabMenuEvents"', source)
+        self.assertIn('widget.bindtags(tags + (tag,))', source)
+        self.assertIn('self._fechar_menus()', source[source.index("def _clique_fora_menus"):source.index("def _fechar_menus_se_fora")])
+
+    def test_menu_aparencia_fecha_somente_fora_das_areas_validas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _agendar_fechar_menus")
+        end = source.index("def _fechar_menus", start)
+        block = source[start:end]
+        self.assertIn("self._fechar_menus_se_fora", block)
+        self.assertIn("not self._pointer_em_area_dos_menus()", source)
 
     def test_botao_abrir_continua_com_tooltip_canonico(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
