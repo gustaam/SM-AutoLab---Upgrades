@@ -242,11 +242,13 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertNotIn('aplicar_backdrop_sistema(self.app, "mica"', block)
 
-    def test_restore_da_janela_tem_handler_leve(self):
+    def test_restore_da_janela_tem_handler_sem_relayout(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada', source)
+        self.assertIn('self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")', source)
         self.assertIn("def _estabilizar_apos_retomada", source)
-        self.assertIn("self.app.after_idle(self._estabilizar_apos_retomada)", source)
+        self.assertIn("self.app.after(30, self._estabilizar_apos_retomada)", source)
+        self.assertNotIn("self.app.update_idletasks()", source[source.index("def _estabilizar_apos_retomada"):source.index("def config_app", source.index("def _estabilizar_apos_retomada"))])
 
     def test_pronto_reinicia_pulso_verde(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
