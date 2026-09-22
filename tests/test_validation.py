@@ -46,6 +46,11 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("workflow_run:", release)
         self.assertIn('- "Validate main for release"', release)
         self.assertIn("github.event.workflow_run.conclusion == 'success'", release)
+        self.assertIn("releases/tags/$tag", release)
+        self.assertIn("id: release_state", release)
+        self.assertIn("already_published != 'true'", release)
+        self.assertIn("EXPECTED_COMMIT", release)
+        self.assertIn("refs/tags/$($env:RELEASE_TAG)^{commit}", release)
         self.assertNotIn("push:\n    tags:", release)
 
     def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):

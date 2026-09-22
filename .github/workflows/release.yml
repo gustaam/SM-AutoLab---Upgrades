@@ -53,22 +53,64 @@ jobs:
             $tag = "${{ github.event.inputs.release_tag }}"
           }
           if (-not $tag) { throw "Não foi possível determinar a tag da release." }
+          $expectedCommit = if ($env:GITHUB_EVENT_NAME -eq "workflow_run") { ${{ github.event.workflow_run.head_sha }} } else { (git rev-parse HEAD).Trim() }
+          if (-not $expectedCommit) { throw "Não foi possível determinar o commit esperado da release." }
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "EXPECTED_COMMIT=$expectedCommit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Verificar se a release automática já foi publicada
+        id: release_state
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          $headers = @{ Accept = "application/vnd.github+json"; Authorization = "Bearer $env:GITHUB_TOKEN"; "X-GitHub-Api-Version" = "2022-11-28" }
+          $apiRoot = "https://api.github.com/repos/${{ github.repository }}"
+          try {
+            $release = Invoke-RestMethod -Uri "$apiRoot/releases/tags/$tag" -Headers $headers
+            if ($env:GITHUB_EVENT_NAME -eq "workflow_run") {
+              "already_published=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Host "A release $tag já está publicada. A execução automática será encerrada sem republicar a versão."
+            } else {
+              "already_published=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Host "A release $tag já existe, mas a execução foi manual; a reconstrução será permitida."
+            }
+          } catch {
+            $status = [int]$_.Exception.Response.StatusCode
+            if ($status -eq 404) {
+              "already_published=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Host "A release $tag ainda não está publicada."
+            } else {
+              throw
+            }
+          }
+
+      - name: Encerrar execução automática sem republicar
+        if: steps.release_state.outputs.already_published == 'true'
+        shell: pwsh
+        run: |
+          Write-Host "Release $env:RELEASE_TAG já publicada; nenhuma reconstrução ou alteração será realizada."
 
       - name: Setup Python
+        if: steps.release_state.outputs.already_published != 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.14.7"
 
-      - name: Confirmar que a tag corresponde à main atual
+      - name: Confirmar que a tag corresponde ao commit da release
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
-          git fetch origin main --depth=1
-          $mainCommit = (git rev-parse FETCH_HEAD).Trim()
-          $tagCommit = (git rev-parse HEAD).Trim()
-          if ($tagCommit -ne $mainCommit) { throw "A tag deve apontar exatamente para o commit atual da main. Tag: $tagCommit; main: $mainCommit" }
+          git fetch origin "refs/tags/$($env:RELEASE_TAG):refs/tags/$($env:RELEASE_TAG)" --force
+          $tagCommit = (git rev-parse "refs/tags/$($env:RELEASE_TAG)^{commit}").Trim()
+          $expectedCommit = $env:EXPECTED_COMMIT
+          $headCommit = (git rev-parse HEAD).Trim()
+          if ($tagCommit -ne $expectedCommit) { throw "A tag não aponta para o commit esperado da release. Tag: $tagCommit; esperado: $expectedCommit" }
+          if ($headCommit -ne $expectedCommit) { throw "O checkout não corresponde ao commit esperado da release. HEAD: $headCommit; esperado: $expectedCommit" }
 
       - name: Validar tag, versão e arquitetura consolidada
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
           $tag = $env:RELEASE_TAG
@@ -79,6 +121,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Falha na validação consolidada." }
 
       - name: Instalar dependências
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
           python -m pip install pip==26.2.1
@@ -87,6 +130,7 @@ jobs:
           python -m pip install pyinstaller==6.22.3
 
       - name: Validar sintaxe, testes e integração
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
           python -m compileall -q .
@@ -97,6 +141,7 @@ jobs:
           python scripts/smoke_ui.py
 
       - name: Validar build e preparar metadados
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
@@ -135,10 +180,12 @@ jobs:
           Set-Content -Path "version_info.txt" -Value $metadata -Encoding UTF8
 
       - name: Build SM AutoLab
+        if: steps.release_state.outputs.already_published != 'true'
         shell: cmd
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
       - name: Validar estrutura e metadados do executável
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
           python scripts/validate.py executable "dist\SM AutoLab.exe"
@@ -149,6 +196,7 @@ jobs:
           if ([string]$info.ProductVersion -ne $version) { throw "ProductVersion ($($info.ProductVersion)) não corresponde a VERSION ($version)." }
 
       - name: Verificar executável com Microsoft Defender
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
           $main = (Resolve-Path "dist\SM AutoLab.exe").Path
@@ -159,6 +207,7 @@ jobs:
           Write-Host "Microsoft Defender: nenhuma detecção associada ao executável."
 
       - name: Gerar manifesto da release
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
           $main = "dist\SM AutoLab.exe"
@@ -167,10 +216,11 @@ jobs:
           $version = (Get-Content VERSION -Raw).Trim()
           $tag = $env:RELEASE_TAG
           $mainSha256 = (Get-FileHash -Algorithm SHA256 $main).Hash.ToLower()
-          $manifest = @{ channel = "SM-AUTOLAB-RESET-2026-09"; version = $version; tag = $tag; commit = "${{ github.sha }}"; main_asset = "SM AutoLab.exe"; main_sha256 = $mainSha256 } | ConvertTo-Json -Compress
+          $manifest = @{ channel = "SM-AUTOLAB-RESET-2026-09"; version = $version; tag = $tag; commit = $env:EXPECTED_COMMIT; main_asset = "SM AutoLab.exe"; main_sha256 = $mainSha256 } | ConvertTo-Json -Compress
           Set-Content -Path "SM AutoLab Release Manifest.json" -Value $manifest -Encoding UTF8
 
       - name: Anexar arquivos à GitHub Release
+        if: steps.release_state.outputs.already_published != 'true'
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           tag_name: ${{ env.RELEASE_TAG }}
@@ -181,6 +231,7 @@ jobs:
             SM AutoLab Release Manifest.json
 
       - name: Verificar artefatos efetivamente publicados
+        if: steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -190,7 +241,7 @@ jobs:
           $apiRoot = "https://api.github.com/repos/${{ github.repository }}"
           $release = Invoke-RestMethod -Uri "$apiRoot/releases/tags/$tag" -Headers $headers
           $commit = (Invoke-RestMethod -Uri "$apiRoot/commits/$tag" -Headers $headers).sha
-          if ($commit -ne "${{ github.sha }}") { throw "A release publicada não aponta para o commit executado." }
+          if ($commit -ne $env:EXPECTED_COMMIT) { throw "A release publicada não aponta para o commit esperado da execução." }
           function Normalize-AssetName([string]$value) { return (($value ?? "").Trim().ToLower() -replace '[\s._-]+', '') }
           $assets = @($release.assets)
           $exe = $assets | Where-Object { (Normalize-AssetName $_.name) -eq (Normalize-AssetName 'SM AutoLab.exe') } | Select-Object -First 1
