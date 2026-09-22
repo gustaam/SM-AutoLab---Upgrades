@@ -1,4 +1,4 @@
-# Testes de validação e release.
+# Testes de validação estrutural e de release.
 
 import struct
 import tempfile
