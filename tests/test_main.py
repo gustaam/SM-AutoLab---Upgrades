@@ -408,6 +408,75 @@ class CanonicalRuntimeTests(unittest.TestCase):
         for key in ("atividade", "histórico", "↶", "↷", "‹", "›"):
             self.assertIn(f'"{key}":', source)
 
+    def test_historico_apagar_selecionados_tem_visibilidade_condicional(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('text="Apagar selecionados"', source)
+        self.assertIn("def _atualizar_botao_apagar_historico", source)
+        self.assertIn("btn.pack_forget()", source)
+        self.assertIn("def _apagar_historico_selecionados", source)
+        self.assertIn('self._historico_selecionados', source)
+
+    def test_planilha_ctrl_clique_tem_acao_apagar_selecionados(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _planilha_clicar_celula")
+        end = source.index("def _planilha_arrastar_selecao", start)
+        block = source[start:end]
+        self.assertIn('getattr(event, "state", 0)', block)
+        self.assertIn("0x0004", block)
+        self.assertIn("ctrl_multiselect=True", block)
+        self.assertIn("def _planilha_apagar_selecionados", source)
+        self.assertIn('text="Apagar selecionados"', source)
+
+    def test_historico_erros_aceita_ctrl_clique_e_apagar_selecionados(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _preencher_detalhe_pasta")
+        end = source.index("def _limpar_historico", start)
+        block = source[start:end]
+        self.assertIn('getattr(event, "state", 0)', block)
+        self.assertIn("0x0004", block)
+        self.assertIn("selecionados = set()", block)
+        self.assertIn('text="Apagar selecionados"', block)
+        self.assertIn("apagar_selecionados_erros", block)
+
+    def test_historico_pastas_ficam_mais_quadradas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_pasta_historico")
+        end = source.index("def _atualizar_visual_selecao_historico", start)
+        block = source[start:end]
+        self.assertIn("tile_width = 132", block)
+        self.assertIn("tile_height = 104", block)
+        self.assertIn("icon.pack(pady=(5, 1))", block)
+        self.assertIn("error_label.pack(fill=\"x\", padx=8, pady=(5, 0))", block)
+
+    def test_menus_configuracoes_trocam_ordem_aparencia_atualizacoes(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _mostrar_menu_configuracoes")
+        end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
+        block = source[start:end]
+        self.assertLess(block.index('text="Verificar atualizações"'), block.index('text="Ajustes do Feegow"'))
+        self.assertLess(block.index('text="Ajustes do Feegow"'), block.index('text="Aparência  ›"'))
+
+    def test_status_animation_tem_intervalo_reduzido_de_renderizacao(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _iniciar_pisca_status")
+        end = source.index("def _interpolar_cor", start)
+        block = source[start:end]
+        self.assertIn("self._status_anim_interval = 80 if self._status_blink_fast else 110", block)
+        self.assertIn("self._status_anim_frames = 18 if self._status_blink_fast else 20", block)
+
+    def test_reposicionamento_de_menus_e_coalescido(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _reposicionar_menus")
+        end = source.index("def _fixar_menu_configuracoes", start)
+        block = source[start:end]
+        self.assertIn("self.app.after_idle(self._reposicionar_menus)", block)
+        self.assertNotIn("self.app.update_idletasks()", block)
+
+    def test_selecao_planilha_tem_escape_para_limpar(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _planilha_limpar_selecao", source)
+        self.assertIn('tree.bind("<Escape>", self._planilha_limpar_selecao', source)
+
     def test_menu_configuracoes_fecha_ao_sair_da_area(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("def _monitorar_menus", source)
