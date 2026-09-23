@@ -19,7 +19,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, StaleElementReferenceException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, StaleElementReferenceException, ElementClickInterceptedException, NoAlertPresentException
 # O endereço pode permanecer como padrão público; credenciais nunca ficam no código.
 DEFAULT_SITE_URL = "https://franchising.feegow.com/pre-v8.1/extranet/?P=Login&Licenca=15003"
 DEFAULT_PORTAL_USUARIO = ""
@@ -224,8 +224,20 @@ class AutomacaoError(Exception):
 class Automacao:
     def __init__(self, status_callback=None):
         self.driver=None; self.status_callback=status_callback
+
     def _status(self,t):
         if self.status_callback: self.status_callback(t)
+
+    def _criar_driver(self):
+        options = webdriver.ChromeOptions()
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-notifications")
+        options.add_argument("--disable-default-apps")
+        options.add_argument("--no-first-run")
+        driver = webdriver.Chrome(options=options)
+        driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+        return driver
+
     def iniciar_navegador(self):
         dados = _recarregar_configuracao_runtime()
         if not dados["PORTAL_USUARIO"] or not dados["PORTAL_SENHA"]:
@@ -233,8 +245,7 @@ class Automacao:
             self._status("Configuração necessária")
             raise AutomacaoError(mensagem, "configuracao")
         self._status("Abrindo o Feegow...")
-        self.driver=webdriver.Chrome()
-        self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+        self.driver=self._criar_driver()
         self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao()
     def _fazer_login(self):
         try:
@@ -292,11 +303,26 @@ class Automacao:
             raise AutomacaoError("Configure o usuário e a senha do Feegow em Configurações antes de continuar.", "configuracao")
         self._status("Recuperando o navegador e entrando novamente...")
         self.fechar()
-        self.driver=webdriver.Chrome(); self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT); self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao(); self._status("Navegador recuperado. Continuando..."); return True
+        self.driver=self._criar_driver(); self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao(); self._status("Navegador recuperado. Continuando..."); return True
     def tentar_fechar_alerta(self):
+        if self.driver is None:
+            return False
         try:
-            WebDriverWait(self.driver,ALERT_TIMEOUT,poll_frequency=.1).until(EC.alert_is_present()); self.driver.switch_to.alert.accept(); return True
-        except Exception: return False
+            self.driver.switch_to.alert.accept()
+            return True
+        except NoAlertPresentException:
+            pass
+        except WebDriverException:
+            return False
+
+        try:
+            WebDriverWait(self.driver, 0.18, poll_frequency=0.05).until(
+                EC.alert_is_present()
+            )
+            self.driver.switch_to.alert.accept()
+            return True
+        except (TimeoutException, NoAlertPresentException, WebDriverException):
+            return False
     def fechar(self):
         if self.driver:
             try: self.driver.quit()

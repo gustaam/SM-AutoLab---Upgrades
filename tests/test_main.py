@@ -732,6 +732,53 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("CREATE_NEW_PROCESS_GROUP", block)
         self.assertNotIn("tasklist /FI", block)
 
+    def test_tema_system_reaplica_widgets_nativos_apos_resolucao(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _agendar_sincronizacao_tema",source)
+        self.assertIn("self.app.after(80, self._sincronizar_tema_ui)",source)
+        self.assertIn("self.app.after(220, self._sincronizar_tema_ui)",source)
+        self.assertIn("_ui_refresh_all_windows_scrollbars(win)",source)
+        self.assertIn("_atualizar_icones_cards_estatistica()",source)
+
+    def test_splash_verifica_atualizacao_em_paralelo(self):
+        source=(self.root/"main.py").read_text(encoding="utf-8")
+        self.assertIn("SM-AutoLab-Startup-Update",source)
+        self.assertIn("threading.Event()",source)
+        self.assertIn("run_splash(update_ready)",source)
+        self.assertIn("startup_update_checked=update_ready.is_set()",source)
+
+    def test_historico_usa_linhas_resumidas(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _criar_pasta_historico"); end=source.index("def _atualizar_visual_selecao_historico",start)
+        block=source[start:end]
+        self.assertIn("row.grid(",block)
+        self.assertIn('text="Detalhes"',block)
+        self.assertNotIn('icone = "📁"',block)
+
+    def test_atalhos_principais_estao_instalados_sem_bind_all(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        for marker in ("<Control-KeyPress-o>","<Control-Return>","<Escape>","<Control-KeyPress-h>"):
+            self.assertIn(marker,source)
+        self.assertIn("def _instalar_atalhos_teclado",source)
+        self.assertNotIn("bind_all",source)
+
+    def test_selenium_reutiliza_driver_com_opcoes_leves(self):
+        source=(self.root/"app.py").read_text(encoding="utf-8")
+        self.assertIn("def _criar_driver(self):",source)
+        self.assertIn("--disable-extensions",source)
+        self.assertIn("--disable-notifications",source)
+        self.assertIn("self.driver=self._criar_driver()",source)
+        self.assertIn("NoAlertPresentException",source)
+        self.assertIn("0.18",source)
+
+    def test_indicador_de_salvamento_sem_autosave_novo(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _planilha_atualizar_estado_salvamento",source)
+        self.assertIn('text="Salvo ✓"',source)
+        self.assertIn("Alterações não salvas",source)
+        self.assertIn("Salvando…",source)
+        self.assertIn("def _planilha_salvar_rascunho",source)
+
     def test_atualizador_sinaliza_inicio_saudavel_e_reseta_ambiente(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('set "PYINSTALLER_RESET_ENVIRONMENT=1"', source)

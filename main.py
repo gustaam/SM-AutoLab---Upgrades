@@ -4,6 +4,7 @@ from __future__ import annotations
 import ctypes
 import os
 import sys
+import threading
 import time
 import tkinter as tk
 from datetime import datetime
@@ -39,7 +40,7 @@ def _configurar_dpi_windows():
 
 _configurar_dpi_windows()
 
-from interface import App, SM_AUTOLAB_GRADE_VIRTUAL
+from interface import App, APP_VERSION, SM_AUTOLAB_GRADE_VIRTUAL, find_update
 
 
 class StartupSplash:
@@ -49,7 +50,9 @@ class StartupSplash:
     HEIGHT = 620
     FPS_MS = 16
 
-    def __init__(self):
+    def __init__(self, ready_event=None):
+        self._ready_event = ready_event
+        self._fadeout_started = None
         self.root = tk.Tk()
         self.root.overrideredirect(True)
         self.root.configure(bg="#FFFFFF")
@@ -131,13 +134,9 @@ class StartupSplash:
         return x * x * (3.0 - 2.0 * x)
 
     def _alpha_for_time(self, t: float) -> float:
-        if t < 1.00:
-            return self._smoothstep(t / 1.00)
-        if t < 1.82:
-            return 1.0
-        if t < 3.00:
-            return 1.0 - self._smoothstep((t - 1.82) / 1.18)
-        return 0.0
+        if t < 0.55:
+            return self._smoothstep(t / 0.55)
+        return 1.0
 
     def _render_frame(self, alpha: float):
         frame = self.bg.copy()
@@ -197,13 +196,28 @@ class StartupSplash:
         if not self._running:
             return
         elapsed = time.perf_counter() - self._start
-        alpha = self._alpha_for_time(elapsed)
+        ready = self._ready_event is None or self._ready_event.is_set()
+        if ready and elapsed >= 0.90 and self._fadeout_started is None:
+            self._fadeout_started = time.perf_counter()
+
+        if self._fadeout_started is not None:
+            fade_elapsed = time.perf_counter() - self._fadeout_started
+            alpha = 1.0 - self._smoothstep(min(1.0, fade_elapsed / 0.28))
+        else:
+            fade_elapsed = 0.0
+            alpha = self._alpha_for_time(elapsed)
+
         if self._window_alpha_enabled:
             self._set_window_alpha(alpha)
         else:
             self._render_frame(alpha)
 
-        if elapsed >= 3.0:
+        if self._fadeout_started is not None and fade_elapsed >= 0.28:
+            self._running = False
+            self.root.after(10, self.close)
+            return
+
+        if elapsed >= 2.80:
             self._running = False
             self.root.after(10, self.close)
             return
@@ -258,8 +272,8 @@ def _sinalizar_inicializacao_atualizacao_sucesso():
         pass
 
 
-def run_splash():
-    StartupSplash().run()
+def run_splash(ready_event=None):
+    StartupSplash(ready_event=ready_event).run()
 
 
 
@@ -309,10 +323,28 @@ def install_ui(App):
 if __name__ == "__main__":
     install_ui(App)
     _validar_base_aplicacao()
-    # O health-check da atualização precisa ocorrer antes do splash/UI:
-    # o atualizador só deve fazer rollback se o novo executável realmente
-    # não conseguir iniciar o bootstrap.
     _sinalizar_inicializacao_atualizacao_sucesso()
-    run_splash()
-    app = App()
+
+    startup_update = {"info": None}
+    update_ready = threading.Event()
+
+    def _preverificar_atualizacao():
+        try:
+            startup_update["info"] = find_update(current_override=APP_VERSION)
+        except Exception:
+            startup_update["info"] = None
+        finally:
+            update_ready.set()
+
+    threading.Thread(
+        target=_preverificar_atualizacao,
+        name="SM-AutoLab-Startup-Update",
+        daemon=True,
+    ).start()
+
+    run_splash(update_ready)
+    app = App(
+        startup_update_info=startup_update["info"],
+        startup_update_checked=update_ready.is_set(),
+    )
     app.app.mainloop()

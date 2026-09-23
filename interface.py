@@ -2380,8 +2380,10 @@ class App:
         "compact": "Compacta",
     }
 
-    def __init__(self):
+    def __init__(self, startup_update_info=None, startup_update_checked=False):
         self.app = ctk.CTk()
+        self._startup_update_info = startup_update_info
+        self._startup_update_checked = bool(startup_update_checked)
         self._configurar_icone_janela()
         self._parar = False
         self._closing = False
@@ -2466,6 +2468,7 @@ class App:
         ctk.set_appearance_mode(self._tema)
         ctk.set_default_color_theme("blue")
         self.config_app()
+        self._instalar_atalhos_teclado()
         self._sinalizar_inicio_atualizacao()
 
     def _sinalizar_inicio_atualizacao(self):
@@ -2881,7 +2884,7 @@ class App:
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
         self._aplicar_status("Pronto")
         self.app.after(350, self._verificar_retomada_pendente)
-        self.app.after(1200, self._verificar_atualizacao_automatica)
+        self._agendar_verificacao_atualizacao()
 
 
     def _configurar_dashboard_compacto(self):
@@ -3075,75 +3078,54 @@ class App:
         self.app.after(1200, self._verificar_atualizacao_automatica)
 
     def _abrir_historico_compacto(self):
-        """Exibe o histórico de execuções em uma janela auxiliar."""
-        win = getattr(self, "_historico_compacto_window", None)
+        win=getattr(self,"_historico_compacto_window",None)
         if win is not None:
             try:
-                if win.winfo_exists():
-                    win.lift()
-                    return
-            except Exception:
-                pass
-
-        win = ctk.CTkToplevel(self.app)
-        self._historico_compacto_window = win
+                if win.winfo_exists(): win.lift(); return
+            except Exception: pass
+        win=ctk.CTkToplevel(self.app)
+        self._historico_compacto_window=win
         self._configurar_icone_janela(win)
-        win.title("Histórico")
-        win.geometry("440x360")
-        win.resizable(False, False)
-        win.transient(self.app)
-
-        header = ctk.CTkFrame(win, fg_color=self.CARD, corner_radius=0, height=48)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        ctk.CTkLabel(
-            header, text="Histórico", text_color=self.TEXT,
-            font=("Segoe UI", 15, "bold")
-        ).pack(side="left", padx=14, pady=10)
-
-        lista = ctk.CTkScrollableFrame(
-            win, fg_color=self.BG, corner_radius=0,
-            scrollbar_button_color=("#C8C8C8", "#626262"),
-            scrollbar_button_hover_color=("#AFAFAF", "#777777")
-        )
-        lista.pack(fill="both", expand=True, padx=10, pady=10)
-
-        itens = [
-            item for item in reversed(self._historico_execucoes)
-            if self._historico_execucao_tem_erros(item)
-        ]
+        win.title("Histórico"); win.geometry("760x430"); win.minsize(680,360); win.resizable(True,True); win.transient(self.app)
+        header=ctk.CTkFrame(win,fg_color=self.CARD,corner_radius=0,height=52)
+        header.pack(fill="x"); header.pack_propagate(False)
+        ctk.CTkLabel(header,text="Histórico",text_color=self.TEXT,font=("Segoe UI",15,"bold")).pack(side="left",padx=14,pady=10)
+        lista=ctk.CTkScrollableFrame(win,fg_color=self.BG,corner_radius=0,scrollbar_button_color=("#C8C8C8","#626262"),scrollbar_button_hover_color=("#AFAFAF","#777777"))
+        lista.pack(fill="both",expand=True,padx=10,pady=10)
+        itens=[item for item in reversed(self._historico_execucoes) if self._historico_execucao_tem_erros(item)]
         if not itens:
-            ctk.CTkLabel(
-                lista, text="Nenhuma execução com erros registrada ainda.",
-                text_color=self.SUBTEXT, font=("Segoe UI", 10)
-            ).pack(anchor="w", padx=8, pady=8)
+            ctk.CTkLabel(lista,text="Nenhuma execução com erros registrada ainda.",text_color=self.SUBTEXT,font=("Segoe UI",10)).pack(anchor="w",padx=8,pady=10)
         else:
             for item in itens:
-                inicio = str(item.get("inicio", "") or "")
-                data = self._formatar_data_historico(inicio)
-                horario = inicio.split(" ", 1)[1] if " " in inicio else ""
+                inicio=str(item.get("inicio","") or ""); fim=str(item.get("fim","") or "")
+                data=self._formatar_data_historico(inicio); horario=inicio.split(" ",1)[1] if " " in inicio else ""
+                planilha=str(item.get("planilha","") or "Planilha interna"); pagina=str(item.get("pagina","") or "")
+                try: total=int(item.get("total",0) or 0)
+                except (TypeError,ValueError): total=0
+                try: executados=int(item.get("sucessos",0) or 0)
+                except (TypeError,ValueError): executados=0
+                try: erros=int(item.get("erros",0) or 0)
+                except (TypeError,ValueError): erros=0
+                duracao="—"
                 try:
-                    erros = int(item.get("erros", 0) or 0)
-                except (TypeError, ValueError):
-                    erros = 0
-                ctk.CTkButton(
-                    lista,
-                    text=f"{data}  {horario}  •  {erros} não executado(s)",
-                    anchor="w", height=38, corner_radius=8,
-                    fg_color=self.CARD, hover_color=("#EAF4FC", "#263F50"),
-                    border_width=1, border_color=self.BORDER,
-                    text_color=self.TEXT, font=("Segoe UI", 10, "bold"),
-                    command=lambda execucao=item: self._abrir_detalhe_historico(execucao),
-                ).pack(fill="x", padx=2, pady=2)
-
+                    a=datetime.strptime(inicio,"%Y-%m-%d %H:%M:%S"); b=datetime.strptime(fim,"%Y-%m-%d %H:%M:%S") if fim else None
+                    if b: duracao=self._formatar_duracao((b-a).total_seconds())
+                except (TypeError,ValueError): pass
+                row=ctk.CTkFrame(lista,fg_color=self.CARD,corner_radius=7,border_width=1,border_color=self.BORDER,height=44)
+                row.pack(fill="x",pady=2); row.pack_propagate(False)
+                ctk.CTkLabel(row,text=data,text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=7,y=10,width=78)
+                ctk.CTkLabel(row,text=horario,text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=90,y=10,width=62)
+                ctk.CTkLabel(row,text=(planilha+(f" • Pág. {pagina}" if pagina else "")),text_color=self.TEXT,font=("Segoe UI",9),anchor="w").place(x=160,y=10,width=255)
+                ctk.CTkLabel(row,text=str(total),text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=422,y=10,width=48)
+                ctk.CTkLabel(row,text=str(executados),text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=474,y=10,width=58)
+                ctk.CTkLabel(row,text=str(erros),text_color=self.ERROR,font=("Segoe UI",9,"bold"),anchor="center").place(x=536,y=10,width=45)
+                ctk.CTkLabel(row,text=duracao,text_color=self.SUBTEXT,font=("Segoe UI",9),anchor="center").place(x=585,y=10,width=70)
+                ctk.CTkButton(row,text="Detalhes",command=lambda execucao=item:self._abrir_detalhe_historico(execucao),width=76,height=30,corner_radius=7,fg_color=("#F5F5F5","#353C42"),hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,text_color=self.TEXT,font=("Segoe UI",9,"bold")).place(x=660,y=7)
         def fechar():
-            self._historico_compacto_window = None
-            try:
-                win.destroy()
-            except Exception:
-                pass
-
-        win.protocol("WM_DELETE_WINDOW", fechar)
+            self._historico_compacto_window=None
+            try: win.destroy()
+            except Exception: pass
+        win.protocol("WM_DELETE_WINDOW",fechar)
         _ui_scan_tooltips(win)
 
     def _reposicionar_menus(self, _event=None):
@@ -3264,6 +3246,75 @@ class App:
 
     def _fixar_menu_configuracoes(self):
         self._mostrar_menu_configuracoes()
+
+    def _agendar_verificacao_atualizacao(self):
+        if self._startup_update_checked:
+            info = self._startup_update_info
+            self._startup_update_checked = False
+            self._startup_update_info = None
+            if info:
+                self.app.after(250, lambda data=info: self._mostrar_resultado_atualizacao(data))
+            return
+        self.app.after(700, self._verificar_atualizacao_automatica)
+
+    def _instalar_atalhos_teclado(self):
+        try:
+            self.app.bind("<Control-KeyPress-o>", self._atalho_abrir_planilha, add="+")
+            self.app.bind("<Control-KeyPress-O>", self._atalho_abrir_planilha, add="+")
+            self.app.bind("<Control-Return>", self._atalho_iniciar, add="+")
+            self.app.bind("<Control-KP_Enter>", self._atalho_iniciar, add="+")
+            self.app.bind("<Escape>", self._atalho_escape, add="+")
+            self.app.bind("<Control-KeyPress-h>", self._atalho_historico, add="+")
+            self.app.bind("<Control-KeyPress-H>", self._atalho_historico, add="+")
+        except Exception:
+            LOGGER.debug("Não foi possível instalar atalhos de teclado.", exc_info=True)
+
+    def _atalho_abrir_planilha(self, _event=None):
+        if self._closing:
+            return "break"
+        self.abrir_planilha()
+        return "break"
+
+    def _atalho_iniciar(self, _event=None):
+        if self._closing or self._atualizacao_em_andamento:
+            return "break"
+        if getattr(self, "_planilha_window", None) is not None:
+            try:
+                if self._planilha_window.winfo_exists():
+                    self._planilha_salvar_e_iniciar()
+                    return "break"
+            except Exception:
+                pass
+        self.iniciar_thread()
+        return "break"
+
+    def _atalho_escape(self, _event=None):
+        if getattr(self, "_planilha_tem_entry_em_foco", lambda: False)():
+            return
+        if getattr(self, "_planilha_window", None) is not None:
+            try:
+                if self._planilha_window.winfo_exists():
+                    return
+            except Exception:
+                pass
+        if self._atualizacao_em_andamento:
+            return "break"
+        self._fechar_menus()
+        if getattr(self, "_automacao_atual", None) is not None and not self._parar:
+            self.parar()
+        return "break"
+
+    def _atalho_historico(self, _event=None):
+        if self._closing:
+            return "break"
+        if getattr(self, "_visualizacao", "complete") == "compact":
+            self._abrir_historico_compacto()
+        else:
+            try:
+                self._selecionar_aba("Histórico")
+            except Exception:
+                pass
+        return "break"
 
     def _verificar_atualizacao_automatica(self):
         """Verifica silenciosamente se há uma Release mais nova.
@@ -3486,19 +3537,34 @@ class App:
 
         def finalizar_download(ok, msg):
             self._atualizacao_em_andamento = False
-            self._fechar_progresso_atualizacao()
             if not ok:
+                self._fechar_progresso_atualizacao()
                 messagebox.showerror(
                     "Atualização",
                     f"Não foi possível baixar a atualização.\n\n{msg}",
                     parent=self.app
                 )
                 return
-            self._add_activity(
-                f"Atualização para v{version} iniciada.",
-                self.INFO
-            )
-            self._fechar_aplicativo()
+            try:
+                if self._atualizacao_label is not None:
+                    self._atualizacao_label.configure(
+                        text=f"Download concluído • verificando v{version}..."
+                    )
+                if self._atualizacao_barra is not None:
+                    self._atualizacao_barra.set(1)
+                self.app.update_idletasks()
+            except Exception:
+                pass
+
+            def concluir():
+                self._fechar_progresso_atualizacao()
+                self._add_activity(
+                    f"Atualização para v{version} verificada e pronta para reiniciar.",
+                    self.INFO
+                )
+                self._fechar_aplicativo()
+
+            self.app.after(180, concluir)
 
         def worker():
             ok, msg = launch_updater(info, progress_callback=progresso)
@@ -4139,22 +4205,43 @@ class App:
                     pass
                 setattr(self, attr, None)
 
+    def _sincronizar_tema_ui(self):
+        if self._closing:
+            return
+        try:
+            dark = str(ctk.get_appearance_mode()).lower() == "dark"
+            janelas = (
+                getattr(self, "app", None),
+                getattr(self, "_planilha_window", None),
+                getattr(self, "_planilha_historico_window", None),
+                getattr(self, "_historico_compacto_window", None),
+                getattr(self, "_visualizacao_reinicio_dialog", None),
+            )
+            for win in janelas:
+                if win is None:
+                    continue
+                _ui_refresh_all_windows_scrollbars(win)
+                atualizar_backdrop_tema(win, dark)
+            self._atualizar_icones_cards_estatistica()
+            self._planilha_desenhar_cabecalho_linhas()
+            self._planilha_desenhar_borda()
+        except Exception:
+            LOGGER.debug("Falha ao sincronizar widgets após mudança de tema.", exc_info=True)
+
+    def _agendar_sincronizacao_tema(self):
+        try:
+            self.app.after_idle(self._sincronizar_tema_ui)
+            self.app.after(80, self._sincronizar_tema_ui)
+            self.app.after(220, self._sincronizar_tema_ui)
+        except Exception:
+            pass
+
     def _selecionar_tema(self, tema):
         if tema not in ("light", "dark", "system"):
             return
         self._tema = tema
         ctk.set_appearance_mode(tema)
-        _ui_refresh_all_windows_scrollbars(self.app)
-        self._atualizar_icones_cards_estatistica()
-        try:
-            dark = ctk.get_appearance_mode().lower() == "dark"
-            atualizar_backdrop_tema(self.app, dark)
-            for attr in ("_planilha_window", "_planilha_historico_window"):
-                win = getattr(self, attr, None)
-                if win is not None:
-                    atualizar_backdrop_tema(win, dark)
-        except Exception:
-            pass
+        self._agendar_sincronizacao_tema()
         self._salvar_estado_persistente()
         self._fechar_menus()
         self._add_activity(
@@ -5222,15 +5309,11 @@ class App:
             w.destroy()
         self._hist_grid = None
 
-        # Limpa imediatamente qualquer registro sem erro que tenha vindo de
-        # uma versão anterior e grava o estado canônico.
-        filtrado = [
-            item for item in self._historico_execucoes
-            if self._historico_execucao_tem_erros(item)
-        ]
+        filtrado = [item for item in self._historico_execucoes if self._historico_execucao_tem_erros(item)]
         if len(filtrado) != len(self._historico_execucoes):
             self._historico_execucoes = filtrado
             self._salvar_estado_persistente()
+
         self._historico_tiles = {}
         self._historico_reflow_job = None
         try:
@@ -5238,30 +5321,42 @@ class App:
         except Exception:
             self._historico_layout_width = 0
 
-        if self._execucao_atual and self._historico_execucao_tem_erros(self._execucao_atual):
-            self._criar_pasta_historico(self._execucao_atual, atual=True)
-
-        historico_visivel = [
-            item for item in self._historico_execucoes
-            if self._historico_execucao_tem_erros(item)
-        ]
+        historico_visivel = list(filtrado)
+        if (
+            self._execucao_atual
+            and self._historico_execucao_tem_erros(self._execucao_atual)
+            and self._id_historico_execucao(self._execucao_atual)
+            not in {self._id_historico_execucao(item) for item in historico_visivel}
+        ):
+            historico_visivel.append(self._execucao_atual)
 
         if not historico_visivel:
             self._historico_selecionados.clear()
             self._atualizar_visual_selecao_historico()
             self._atualizar_botao_apagar_historico()
             ctk.CTkLabel(
-                self.historico_lista, text="Nenhuma execução com erros registrada ainda.",
-                text_color=self.SUBTEXT, font=("Segoe UI", 10)
-            ).pack(anchor="w", padx=8, pady=8)
+                self.historico_lista,
+                text="Nenhuma execução com erros registrada ainda.",
+                text_color=self.SUBTEXT,
+                font=("Segoe UI",10),
+            ).pack(anchor="w",padx=8,pady=12)
             return
 
-        validos = {
-            self._id_historico_execucao(item)
-            for item in historico_visivel
-        }
+        validos={self._id_historico_execucao(item) for item in historico_visivel}
         self._historico_selecionados.intersection_update(validos)
 
+        self._hist_grid=ctk.CTkFrame(self.historico_lista,fg_color="transparent")
+        self._hist_grid.pack(fill="x",padx=8,pady=5)
+        headers=("Data","Hora","Planilha","Processados","Executados","Erros","Duração","Status","")
+        widths=(92,68,245,78,78,56,78,105,82)
+        for col,(texto,largura) in enumerate(zip(headers,widths)):
+            self._hist_grid.grid_columnconfigure(col,minsize=largura,weight=0)
+            if texto:
+                ctk.CTkLabel(
+                    self._hist_grid,text=texto,text_color=self.SUBTEXT,
+                    font=("Segoe UI",9,"bold"),
+                    anchor="w" if col==2 else "center",
+                ).grid(row=0,column=col,sticky="ew",padx=5,pady=(2,4))
         for execucao in reversed(historico_visivel):
             self._criar_pasta_historico(execucao)
         self._atualizar_visual_selecao_historico()
@@ -5300,141 +5395,96 @@ class App:
             return data
 
     def _criar_pasta_historico(self, execucao, atual=False):
-        parent = self.historico_lista
-        tile_width = 112
-        tile_height = 84
-        execucao_id = self._id_historico_execucao(execucao)
+        """Renderiza uma execução em linha resumida."""
+        parent=self._hist_grid
+        if parent is None:
+            parent=self.historico_lista
+            self._hist_grid=ctk.CTkFrame(parent,fg_color="transparent")
+            self._hist_grid.pack(fill="x",padx=8,pady=5)
+            for col,largura in enumerate((92,68,245,78,78,56,78,105,82)):
+                self._hist_grid.grid_columnconfigure(col,minsize=largura,weight=0)
+            parent=self._hist_grid
 
-        if not hasattr(self, "_hist_grid") or self._hist_grid is None:
-            self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
-            self._hist_grid.pack(fill="x", padx=8, pady=5)
-
+        execucao_id=self._id_historico_execucao(execucao)
+        inicio=str(execucao.get("inicio","") or "")
+        fim=str(execucao.get("fim","") or "")
+        data=self._formatar_data_historico(inicio)
+        horario=inicio.split(" ",1)[1] if " " in inicio else ""
+        planilha=str(execucao.get("planilha","") or "Planilha interna")
+        pagina=str(execucao.get("pagina","") or "")
+        if pagina: planilha += f"  •  Página {pagina}"
+        try: total=int(execucao.get("total",0) or 0)
+        except (TypeError,ValueError): total=0
+        try: sucessos=int(execucao.get("sucessos",0) or 0)
+        except (TypeError,ValueError): sucessos=0
+        try: erros=int(execucao.get("erros",0) or 0)
+        except (TypeError,ValueError): erros=0
+        duracao="—"
         try:
-            largura_parent = int(parent.winfo_width())
-            largura_app = int(self.app.winfo_width())
-        except Exception:
-            largura_parent = largura_app = 0
-        largura = max(largura_parent, largura_app - 80, tile_width + 2)
-        colunas = max(1, min(8, int(largura // (tile_width + 2))))
-        for col in range(colunas):
-            # O tamanho real do tile já é determinado pelo próprio widget.
-            # Não usar minsize baseado em tile_width evita espaçamento excessivo
-            # quando o Tk aplica escalonamento de DPI diferente ao conteúdo.
-            self._hist_grid.grid_columnconfigure(
-                col, weight=0, minsize=0
+            inicio_dt=datetime.strptime(inicio,"%Y-%m-%d %H:%M:%S")
+            fim_dt=datetime.strptime(fim,"%Y-%m-%d %H:%M:%S") if fim else None
+            if fim_dt: duracao=self._formatar_duracao((fim_dt-inicio_dt).total_seconds())
+        except (TypeError,ValueError): pass
+        status=str(execucao.get("status","") or "Erro")
+        if len(status)>18: status=status[:17]+"…"
+
+        row_index=len(parent.winfo_children())
+        row=ctk.CTkFrame(parent,fg_color=self.CARD,corner_radius=7,border_width=1,border_color=self.BORDER,height=42)
+        row.grid(row=row_index,column=0,columnspan=9,sticky="ew",pady=2)
+        row.grid_propagate(False)
+
+        valores=((data,"center"),(horario,"center"),(planilha,"w"),(str(total),"center"),
+                 (str(sucessos),"center"),(str(erros),"center"),(duracao,"center"),(status,"w"))
+        labels=[]
+        for col,(valor,anchor) in enumerate(valores):
+            label=ctk.CTkLabel(
+                row,text=valor,text_color=self.ERROR if col in (5,7) else self.TEXT,
+                font=("Segoe UI",9,"bold" if col in (5,7) else "normal"),
+                anchor=anchor
             )
+            label.grid(row=0,column=col,sticky="ew",padx=5,pady=2)
+            labels.append(label)
 
-        count = len(self._hist_grid.winfo_children())
-        row, col = divmod(count, colunas)
-        tile = ctk.CTkFrame(
-            self._hist_grid,
-            fg_color=("#FFFFFF", "#2D3338"),
-            corner_radius=8,
-            border_width=1,
-            border_color=self.BORDER,
-            width=tile_width,
-            height=tile_height,
+        detalhe=ctk.CTkButton(
+            row,text="Detalhes",command=lambda e=execucao:self._abrir_detalhe_historico(e),
+            width=70,height=30,corner_radius=7,fg_color=("#F5F5F5","#353C42"),
+            hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,
+            text_color=self.TEXT,font=("Segoe UI",9,"bold")
         )
-        tile.grid(row=row, column=col, padx=1, pady=1)
-        tile.grid_propagate(False)
-
-        inicio = str(execucao.get("inicio", "") or "")
-        horario = inicio.split(" ", 1)[1] if " " in inicio else ""
-        erros = int(execucao.get("erros", 0) or 0)
-        icone = "📁"
-
-        icon = ctk.CTkLabel(
-            tile,
-            text=icone,
-            font=("Segoe UI Emoji", 18),
-            text_color=self.ACCENT,
-        )
-        icon.pack(pady=(2, 0))
-        date_label = ctk.CTkLabel(
-            tile,
-            text=self._formatar_data_historico(inicio),
-            text_color=self.TEXT,
-            font=("Segoe UI", 9, "bold"),
-            anchor="center",
-        )
-        date_label.pack(fill="x", padx=2)
-        time_label = ctk.CTkLabel(
-            tile,
-            text=horario,
-            text_color=self.SUBTEXT,
-            font=("Segoe UI", 8),
-            anchor="center",
-        )
-        time_label.pack(fill="x", padx=2, pady=(0, 0))
-        error_label = ctk.CTkLabel(
-            tile,
-            text=f"{erros} não executado(s)",
-            text_color=self.ERROR if erros else self.SUBTEXT,
-            font=("Segoe UI", 8),
-            anchor="center",
-            justify="center",
-            wraplength=tile_width - 6,
-        )
-        error_label.pack(fill="x", padx=2, pady=(2, 0))
-
-        widgets = (tile, icon, date_label, time_label, error_label)
-        self._historico_tiles[execucao_id] = tile
+        detalhe.grid(row=0,column=8,padx=6,pady=5)
+        self._historico_tiles[execucao_id]=row
 
         def atualizar_visual(hover=False):
-            selecionado = execucao_id in self._historico_selecionados
+            selecionado=execucao_id in self._historico_selecionados
             if selecionado:
-                tile.configure(
-                    border_color=self.ACCENT,
-                    fg_color=("#EAF4FF", "#1B3C53"),
-                )
+                row.configure(border_color=self.ACCENT,fg_color=("#EAF4FF","#1B3C53"))
             elif hover:
-                tile.configure(
-                    border_color=self.ACCENT_HOVER,
-                    fg_color=("#EAF4FC", "#263F50"),
-                )
+                row.configure(border_color=self.ACCENT_HOVER,fg_color=("#EAF4FC","#263F50"))
             else:
-                tile.configure(
-                    border_color=self.BORDER,
-                    fg_color=("#FFFFFF", "#2D3338"),
-                )
+                row.configure(border_color=self.BORDER,fg_color=self.CARD)
 
         def clicar(event=None):
-            ctrl = bool(event is not None and (getattr(event, "state", 0) & 0x0004))
+            ctrl=bool(event is not None and (getattr(event,"state",0) & 0x0004))
             if ctrl:
-                if execucao_id in self._historico_selecionados:
-                    self._historico_selecionados.remove(execucao_id)
-                else:
-                    self._historico_selecionados.add(execucao_id)
+                if execucao_id in self._historico_selecionados: self._historico_selecionados.remove(execucao_id)
+                else: self._historico_selecionados.add(execucao_id)
                 self._atualizar_visual_selecao_historico()
                 self._atualizar_botao_apagar_historico()
-                try:
-                    self.historico_lista.focus_set()
-                except Exception:
-                    pass
                 return "break"
-
             self._historico_selecionados.clear()
             self._atualizar_visual_selecao_historico()
             self._atualizar_botao_apagar_historico()
             self._abrir_detalhe_historico(execucao)
             return "break"
 
-        def entrar(_event=None):
-            atualizar_visual(hover=True)
-
-        def sair(_event=None):
-            atualizar_visual()
-
-        for widget in widgets:
-            try:
-                widget.configure(cursor="hand2")
-            except Exception:
-                pass
-            widget.bind("<Enter>", entrar)
-            widget.bind("<Leave>", sair)
-            widget.bind("<Button-1>", clicar)
-            widget.bind("<Escape>", self._limpar_selecao_historico, add="+")
-        return tile
+        for widget in (row,*labels):
+            try: widget.configure(cursor="hand2")
+            except Exception: pass
+            widget.bind("<Enter>",lambda _e:atualizar_visual(True))
+            widget.bind("<Leave>",lambda _e:atualizar_visual(False))
+            widget.bind("<Button-1>",clicar)
+            widget.bind("<Escape>",self._limpar_selecao_historico,add="+")
+        return row
 
     def _atualizar_visual_selecao_historico(self):
         for execucao_id, tile in getattr(self, "_historico_tiles", {}).items():
@@ -5969,6 +6019,22 @@ class App:
             LOGGER.exception("Falha ao registrar a planilha interna como processada.")
 
 
+    def _planilha_atualizar_estado_salvamento(self, estado):
+        label = getattr(self, "_planilha_estado_salvamento_label", None)
+        if label is None:
+            return
+        estados = {
+            "salvo": ("Salvo ✓", self.SUCCESS),
+            "alterado": ("Alterações não salvas", self.WARNING),
+            "salvando": ("Salvando…", self.INFO),
+            "erro": ("Falha ao salvar", self.ERROR),
+        }
+        texto, cor = estados.get(str(estado), ("", self.SUBTEXT))
+        try:
+            label.configure(text=texto, text_color=cor)
+        except Exception:
+            pass
+
     def _planilha_tem_alteracoes(self):
         return self._planilha_data != self._planilha_salva_data
 
@@ -6007,6 +6073,7 @@ class App:
     def _planilha_marcar_alteracao(self):
         self._planilha_efetuou_alteracao=True
         self._planilha_salvar_rascunho()
+        self._planilha_atualizar_estado_salvamento("alterado")
         self._planilha_atualizar_contador()
         try:
             if self._planilha_window is not None:
@@ -6051,6 +6118,7 @@ class App:
         self._planilha_undo=[]
         self._planilha_redo=[]
         self._planilha_efetuou_alteracao=False
+        self._planilha_estado_salvamento_label=None
         self._planilha_contador_label=None
         win=ctk.CTkToplevel(self.app)
         self._planilha_window=win
@@ -6094,6 +6162,11 @@ class App:
             b.configure(cursor="hand2")
         self._planilha_contador_label=ctk.CTkLabel(title_bar,text="0 preenchidas",text_color=self.SUBTEXT,font=("Segoe UI",10))
         self._planilha_contador_label.pack(side="left", padx=(10,0))
+        self._planilha_estado_salvamento_label = ctk.CTkLabel(
+            title_bar, text="Salvo ✓", text_color=self.SUCCESS,
+            font=("Segoe UI",10,"bold")
+        )
+        self._planilha_estado_salvamento_label.pack(side="left", padx=(14,0))
         actions=ctk.CTkFrame(toolbar,fg_color="transparent"); actions.pack(side="right",padx=16,pady=9)
         ctk.CTkButton(actions,text="Limpar",command=self._planilha_limpar,width=80,height=36,corner_radius=8,fg_color=self.CARD,hover_color=("#FDECEC","#3A2424"),border_width=1,border_color=self.ERROR,text_color=self.ERROR,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
         ctk.CTkButton(actions,text="Salvar e Sair",command=self._planilha_salvar_e_sair,width=115,height=36,corner_radius=8,fg_color=self.CARD,hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,text_color=self.TEXT,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
@@ -7001,6 +7074,7 @@ class App:
 
     def _planilha_salvar_e_sair(self):
         self._planilha_fechar_edicao()
+        self._planilha_atualizar_estado_salvamento("salvando")
         try:
             self._salvar_planilha_interna_data()
             self._registrar_historico_planilha(self._planilha_data)
@@ -7008,6 +7082,7 @@ class App:
             self._planilha_apagar_rascunho()
             self._planilha_efetuou_alteracao=False
             self._planilha_atualizar_contador()
+            self._planilha_atualizar_estado_salvamento("salvo")
             self._add_activity("Planilha interna salva.",self.SUCCESS)
         except Exception as exc:
             messagebox.showerror(
@@ -7816,6 +7891,7 @@ class App:
 
     def _planilha_salvar_e_iniciar(self):
         self._planilha_fechar_edicao()
+        self._planilha_atualizar_estado_salvamento("salvando")
         if not self._validar_planilha_antes_execucao():
             return
         codigos=self._extrair_codigos_planilha()
@@ -7834,6 +7910,7 @@ class App:
             self._planilha_apagar_rascunho()
             self._planilha_efetuou_alteracao=False
             self._planilha_atualizar_contador()
+            self._planilha_atualizar_estado_salvamento("salvo")
         except Exception as exc:
             messagebox.showerror(
                 "Não foi possível salvar",
