@@ -1029,8 +1029,10 @@ def _load_release_manifest(release: dict, timeout: int = 8) -> dict | None:
         return None
     return manifest
 
-def find_update(timeout: int = 8) -> dict | None:
-    current = current_version()
+def find_update(timeout: int = 8, current_override: str | None = None) -> dict | None:
+    current = str(current_override or "").strip()
+    if not current:
+        current = current_version()
     current_tuple = _version_tuple(current)
     if not current_tuple:
         return None
@@ -2930,26 +2932,47 @@ class App:
         )
         self.botao_configuracoes.pack(side="right", padx=12, pady=11)
 
+        progress_area = ctk.CTkFrame(self.app, fg_color="transparent")
+        progress_area.pack(fill="x", padx=18, pady=(7, 0))
+
+        progress_header = ctk.CTkFrame(progress_area, fg_color="transparent", height=28)
+        progress_header.pack(fill="x")
+        progress_header.pack_propagate(False)
+
+        ctk.CTkLabel(
+            progress_header,
+            text="Progresso",
+            text_color=self.TEXT,
+            font=("Segoe UI", 14, "bold"),
+        ).pack(side="left")
+
         self.percentual_label = ctk.CTkLabel(
-            self.app, text="0%", text_color=self.TEXT,
-            font=("Segoe UI", 22, "bold")
+            progress_header,
+            text="0%",
+            text_color=self.TEXT,
+            font=("Segoe UI", 20, "bold"),
         )
-        self.percentual_label.pack(pady=(6, 1))
+        self.percentual_label.pack(side="right")
 
-        class _CompactProgressProxy:
-            def __init__(self):
-                self.value = 0.0
-            def get(self):
-                return self.value
-            def set(self, value):
-                try:
-                    self.value = max(0.0, min(1.0, float(value)))
-                except (TypeError, ValueError):
-                    self.value = 0.0
+        # Mesma barra do modo completo.
+        self.progresso = ctk.CTkProgressBar(
+            progress_area,
+            height=10,
+            corner_radius=5,
+            fg_color=self.BORDER,
+            progress_color=self.ACCENT,
+        )
+        self.progresso.set(0)
+        self.progresso.pack(fill="x", pady=(0, 2))
 
-        self.progresso = _CompactProgressProxy()
-        self.progresso_label = ctk.CTkLabel(self.app, text="")
-        self.progresso_label.pack_forget()
+        self.progresso_label = ctk.CTkLabel(
+            progress_area,
+            text="0 / 0",
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 12),
+        )
+        self.progresso_label.pack(anchor="w")
+
         self._execucao_progresso_card = None
 
         # Elementos opcionais do dashboard completo não existem no modo compacto.
@@ -2963,19 +2986,22 @@ class App:
         self.status_indicator = None
 
         actions = ctk.CTkFrame(self.app, fg_color="transparent")
-        actions.pack(fill="both", expand=True, padx=14, pady=(0, 10))
+        actions.pack(fill="x", padx=18, pady=(27, 10))
+
         top_row = ctk.CTkFrame(actions, fg_color="transparent")
         top_row.pack(fill="x")
+
+        top_buttons = []
         for text_value, command in (
             ("Abrir", self.abrir_planilha),
             ("Arquivos", self.abrir_historico_planilha),
             ("Histórico", self._abrir_historico_compacto),
         ):
-            ctk.CTkButton(
+            button = ctk.CTkButton(
                 top_row,
                 text=text_value,
                 command=command,
-                width=140,
+                width=130,
                 height=38,
                 corner_radius=8,
                 fg_color=self.ACCENT if text_value == "Abrir" else self.CARD,
@@ -2984,7 +3010,9 @@ class App:
                 border_color=self.BORDER,
                 text_color="#FFFFFF" if text_value == "Abrir" else self.TEXT,
                 font=("Segoe UI", 11, "bold"),
-            ).pack(side="left", padx=3, pady=3)
+            )
+            button.pack(side="left", padx=3, pady=3)
+            top_buttons.append(button)
 
         bottom_row = ctk.CTkFrame(actions, fg_color="transparent")
         bottom_row.pack(anchor="center", pady=(8, 0))
@@ -3021,9 +3049,9 @@ class App:
         )
         self.botao_iniciar.pack(side="left", padx=3, pady=3)
 
-        self.botao_planilha = top_row.winfo_children()[0]
-        self.botao_historico_planilha = top_row.winfo_children()[1]
-        self.botao_historico_compacto = top_row.winfo_children()[2]
+        self.botao_planilha = top_buttons[0]
+        self.botao_historico_planilha = top_buttons[1]
+        self.botao_historico_compacto = top_buttons[2]
 
         _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
@@ -3231,7 +3259,7 @@ class App:
 
         def worker():
             try:
-                info = find_update()
+                info = find_update(current_override=APP_VERSION)
             except Exception:
                 return
 
@@ -3255,7 +3283,7 @@ class App:
 
         def worker():
             try:
-                info=find_update()
+                info=find_update(current_override=APP_VERSION)
                 self.app.after(0,lambda:self._mostrar_resultado_atualizacao(info))
             except Exception as exc:
                 self.app.after(0,lambda:self._mostrar_resultado_atualizacao({
@@ -3934,15 +3962,36 @@ class App:
         _ui_scan_tooltips(dialog)
 
     def _reiniciar_aplicativo(self):
-        """Inicia uma nova instância e encerra esta para aplicar a preferência."""
+        """Reinicia a mesma instalação do aplicativo sem sobrepor instâncias."""
         try:
             self._salvar_estado_persistente()
             executable = Path(sys.executable).resolve()
-            if executable.suffix.lower() == ".exe" and getattr(sys, "frozen", False):
-                args = [str(executable), *sys.argv[1:]]
-            else:
-                args = [sys.executable, *sys.argv]
             env = _prepare_independent_restart_environment()
+            pid = os.getpid()
+
+            restart_dir = Path(tempfile.mkdtemp(prefix="sm_autolab_restart_"))
+            script = restart_dir / "restart_after_exit.cmd"
+            executable_cmd = _escape_cmd_path(str(executable))
+            script_cmd = _escape_cmd_path(str(script))
+
+            script_text = f"""@echo off
+setlocal EnableExtensions DisableDelayedExpansion
+set "SM_PID={pid}"
+set "SM_EXE={executable_cmd}"
+
+:wait_old
+tasklist /FI "PID eq %SM_PID%" /FO CSV /NH 2>nul | findstr /R /C:""%SM_PID%"" >nul
+if not errorlevel 1 (
+    >nul choice /n /t 1 /d y
+    goto wait_old
+)
+
+start "" /b "%SM_EXE%"
+cd /d "%TEMP%" >nul 2>&1
+rmdir /s /q "{_escape_cmd_path(str(restart_dir))}" >nul 2>&1
+exit /b 0
+"""
+            script.write_text(script_text, encoding="utf-8", newline="\r\n")
 
             flags = 0
             if os.name == "nt":
@@ -3951,9 +4000,10 @@ class App:
                     | subprocess.DETACHED_PROCESS
                     | subprocess.CREATE_NO_WINDOW
                 )
+
             subprocess.Popen(
-                args,
-                cwd=str(executable.parent),
+                ["cmd.exe", "/d", "/c", script_cmd],
+                cwd=str(restart_dir),
                 close_fds=True,
                 creationflags=flags,
                 env=env,

@@ -699,7 +699,30 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("text=self.INICIAR_LABEL", block)
         self.assertIn('bottom_row.pack(anchor="center"', block)
         self.assertIn('largura, altura = 500, 280', block)
+        self.assertIn('self.progresso = ctk.CTkProgressBar(', block)
+        self.assertIn('height=10,', block)
+        self.assertIn('fg_color=self.BORDER', block)
+        self.assertIn('progress_color=self.ACCENT', block)
+        self.assertIn("actions.pack(fill="x", padx=18, pady=(27, 10))", block)
         self.assertIn("menu_y = 58", source)
+
+    def test_atualizacao_usa_mesma_versao_da_interface(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def find_update")
+        end = source.index("def download_file", start)
+        block = source[start:end]
+        self.assertIn("current_override: str | None = None", block)
+        self.assertIn("current = str(current_override or \"\").strip()", block)
+        self.assertIn("find_update(current_override=APP_VERSION)", source)
+
+    def test_reinicio_espera_instancia_anterior_terminar(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _reiniciar_aplicativo")
+        end = source.index("def _mostrar_menu_aparencia", start)
+        block = source[start:end]
+        self.assertIn("SM_PID", block)
+        self.assertIn("goto wait_old", block)
+        self.assertIn("PYINSTALLER_RESET_ENVIRONMENT", block)
 
     def test_troca_visualizacao_oferece_reinicio_agora_ou_depois(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
