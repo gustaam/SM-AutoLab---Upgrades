@@ -191,6 +191,39 @@ class HistoryPersistenceTests(unittest.TestCase):
             self.assertFalse(historico_backup.exists())
             self.assertFalse(erros_backup.exists())
 
+    def test_finalizacao_consolida_codigos_de_erro_de_todas_as_fontes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self._app_without_ui(Path(temp))
+            app._execucao_atual = {
+                "id": "consolidada",
+                "inicio": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "Em andamento",
+                "erros": 2,
+                "codigos_erros": ["AAA"],
+            }
+            app._codigos_erros_execucao = ["BBB"]
+            resultado = SimpleNamespace(
+                total_planejado=2,
+                sucessos=0,
+                erros=2,
+                processados=2,
+                codigos_erros=["CCC"],
+                itens=[
+                    SimpleNamespace(status="Erro", codigo="DDD"),
+                    {"status": "Erro", "codigo": "EEE"},
+                ],
+            )
+
+            app._finalizar_historico_execucao(resultado)
+
+            dados = json.loads(app._historico_arquivo.read_text(encoding="utf-8"))
+            registro = dados["historico_execucoes"][0]
+            self.assertEqual(
+                registro["codigos_erros"],
+                ["BBB", "AAA", "CCC", "DDD", "EEE"],
+            )
+            self.assertEqual(registro["erros"], 5)
+
     def test_execucao_atual_recente_e_codigos_com_erro_sao_persistidos(self):
         with tempfile.TemporaryDirectory() as temp:
             app = self._app_without_ui(Path(temp))
