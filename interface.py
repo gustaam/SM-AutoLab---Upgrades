@@ -2973,6 +2973,19 @@ class App:
         janela.geometry("430x165")
         janela.resizable(False, False)
         janela.transient(self.app)
+        try:
+            janela.update_idletasks()
+            largura = janela.winfo_width()
+            altura = janela.winfo_height()
+            app_x = self.app.winfo_rootx()
+            app_y = self.app.winfo_rooty()
+            app_largura = self.app.winfo_width()
+            app_altura = self.app.winfo_height()
+            x = app_x + max(0, (app_largura - largura) // 2)
+            y = app_y + max(0, (app_altura - altura) // 2)
+            janela.geometry(f"{largura}x{altura}+{x}+{y}")
+        except Exception:
+            pass
         janela.grab_set()
         try:
             janela.attributes("-topmost", True)
