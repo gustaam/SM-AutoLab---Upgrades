@@ -71,7 +71,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_iniciar_has_one_canonical_text_owner(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertEqual(source.count('text="Iniciar"'), 1)
+        self.assertIn('INICIAR_LABEL = "Iniciar"', source)
+        self.assertEqual(source.count("text=self.INICIAR_LABEL"), 2)
         self.assertIn('text_color="#FFFFFF"', source)
 
     def test_interface_importa_escrita_atomica_usada_pelo_salvamento(self):

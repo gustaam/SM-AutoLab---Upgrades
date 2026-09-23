@@ -2350,6 +2350,8 @@ HISTORICO_DIAS = 60
 ARQUIVOS_DIAS = 60
 
 class App:
+    INICIAR_LABEL = "Iniciar"
+
     # Fluent 2 palettes. Dark mode usa um grafite próximo ao chrome moderno
     # do Windows/Edge, evitando preto puro.
     BG = ("#F5F5F5", "#24292E")
@@ -2851,7 +2853,7 @@ class App:
         self.botao_parar.pack(side="left", padx=(0, 7))
         self.botao_iniciar = ctk.CTkButton(
             buttons,
-            text="Iniciar",
+            text=self.INICIAR_LABEL,
             command=self.iniciar_thread,
             width=150,
             height=46,
@@ -3021,7 +3023,7 @@ class App:
 
         self.botao_iniciar = ctk.CTkButton(
             bottom_row,
-            text="Iniciar",
+            text=self.INICIAR_LABEL,
             command=self.iniciar_thread,
             width=100,
             height=38,
