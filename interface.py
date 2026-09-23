@@ -3004,8 +3004,17 @@ class App:
         actions = ctk.CTkFrame(self.app, fg_color="transparent")
         actions.pack(fill="x", padx=18, pady=(27, 10))
 
-        top_row = ctk.CTkFrame(actions, fg_color="transparent")
-        top_row.pack(fill="x")
+        # Mantém os três botões como um único grupo centralizado.
+        # 3 x 130 px + 2 x 6 px de espaçamento interno + 6 px de margem
+        # em cada botão = 408 px, deixando margens externas idênticas.
+        top_row = ctk.CTkFrame(
+            actions,
+            fg_color="transparent",
+            width=408,
+            height=44,
+        )
+        top_row.pack(anchor="center")
+        top_row.pack_propagate(False)
 
         top_buttons = []
         for text_value, command in (

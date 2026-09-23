@@ -703,6 +703,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('height=10,', block)
         self.assertIn('fg_color=self.BORDER', block)
         self.assertIn('progress_color=self.ACCENT', block)
+        self.assertIn('width=408,', block)
+        self.assertIn('height=44,', block)
+        self.assertIn('top_row.pack(anchor="center")', block)
         self.assertIn('actions.pack(fill="x", padx=18, pady=(27, 10))', block)
         self.assertIn("menu_y = 58", source)
 
