@@ -3707,7 +3707,7 @@ class App:
     def _mostrar_menu_visualizacao(self, _event=None):
         """Abre o submenu de visualização no mesmo padrão de Aparências."""
         self._cancelar_fechar_menus()
-        self._cancelar_fechar_aparencia()
+        self._fechar_menu_aparencia()
         self._cancelar_fechar_visualizacao()
 
         if self._menu_config is None or not self._menu_config.winfo_exists():
@@ -3788,6 +3788,7 @@ class App:
     def _mostrar_menu_aparencia(self, _event=None):
         """Abre o submenu de aparência; um segundo clique não o fecha acidentalmente."""
         self._cancelar_fechar_menus()
+        self._fechar_menu_visualizacao()
         self._cancelar_fechar_aparencia()
 
         if self._menu_config is None or not self._menu_config.winfo_exists():
@@ -8037,6 +8038,8 @@ class App:
         self._set_stat(self.erro_card, erros)
         self._set_stat(self.codigo_card, codigo)
         self._atualizar_metricas_execucao()
+        if getattr(self, "_visualizacao", "complete") == "compact":
+            return
         self.status_label.configure(
             text=f"Processando código {processados} de {total}",
             text_color=self.INFO,

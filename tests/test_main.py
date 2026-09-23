@@ -612,8 +612,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_botoes_de_exclusao_mostram_contagem_da_selecao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
 
-        start = source.index("def _limpar_historico")
-        end = source.index("    def _add_historico", start)
+        start = source.index("def _atualizar_botao_apagar_historico")
+        end = source.index("def _limpar_selecao_historico", start)
         history_block = source[start:end]
         self.assertIn('f"Apagar {quantidade} selecionado"', history_block)
         self.assertIn('f"Apagar {quantidade} selecionados"', history_block)
@@ -672,7 +672,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _mostrar_menu_configuracoes")
         end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
         block = source[start:end]
-        self.assertLess(block.index('text="Aparência  ›"'), block.index('text="Ajustes do Feegow"'))
+        self.assertLess(block.index('text="Aparências  ›"'), block.index('text="Visualização  ›"'))
+        self.assertLess(block.index('text="Visualização  ›"'), block.index('text="Ajustes do Feegow"'))
         self.assertLess(block.index('text="Ajustes do Feegow"'), block.index('text="Verificar atualizações"'))
 
     def test_status_animation_reproduz_configuracao_da_v2_99_35(self):
