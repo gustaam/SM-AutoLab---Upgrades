@@ -173,12 +173,12 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("WM_SETREDRAW = 0x000B", source)
 
     def test_codigo_atual_usa_fonte_menor_sem_negrito(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _stat_card")
-        end = source.index("def _set_stat", start)
-        block = source[start:end]
-        self.assertIn('value_font = ("Segoe UI", 15) if str(title) == "Código atual" else ("Segoe UI", 19, "bold")', block)
-        self.assertIn("font=value_font", block)
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _stat_card")
+        end=source.index("def _set_stat",start)
+        block=source[start:end]
+        self.assertIn('value_font = ("Segoe UI", 15) if str(title) == "Código atual" else ("Segoe UI", 19, "bold")',block)
+        self.assertIn("font=value_font",block)
 
     def test_bootstrap_sinaliza_inicio_bem_sucedido_para_atualizacao(self):
         source = (self.root / "main.py").read_text(encoding="utf-8")
@@ -220,16 +220,17 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("self._salvar_erros_persistentes()", source)
 
     def test_linhas_do_historico_usam_layout_resumido(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _criar_pasta_historico")
-        end = source.index("def _atualizar_visual_selecao_historico", start)
-        block = source[start:end]
-        self.assertIn("self._hist_grid.grid_columnconfigure", block)
-        self.assertIn("row.grid(", block)
-        self.assertIn('columnspan=9', block)
-        self.assertIn('sticky="ew"', block)
-        self.assertNotIn('text="Detalhes"', block)
-        self.assertNotIn('icone = "📁"', block)
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _criar_pasta_historico")
+        end=source.index("def _atualizar_visual_selecao_historico",start)
+        block=source[start:end]
+        self.assertIn("row = ctk.CTkFrame(",block)
+        self.assertIn("HISTORICO_COL_PESOS",block)
+        self.assertIn("HISTORICO_COL_MINS",block)
+        self.assertIn('columnspan=9',block)
+        self.assertIn('sticky="ew"',block)
+        self.assertNotIn('text="Detalhes"',block)
+
     def test_icones_de_estatistica_problematicos_sao_vetoriais(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _criar_imagem_icone_estatistica")
@@ -288,16 +289,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("ultimo.get(\"cells\") == cells", block)
 
     def test_linhas_do_historico_tem_dimensoes_responsivas(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _criar_pasta_historico")
-        end = source.index("def _abrir_detalhe_historico", start)
-        block = source[start:end]
-        self.assertIn("height=42", block)
-        self.assertIn('sticky="ew"', block)
-        self.assertIn("grid_columnconfigure", block)
-        self.assertIn('strftime("%d/%m/%Y")', source)
-        self.assertIn('text="Detalhes"', block)
-        self.assertNotIn('icone = "📁"', block)
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _criar_pasta_historico")
+        end=source.index("def _atualizar_visual_selecao_historico",start)
+        block=source[start:end]
+        self.assertIn("height=42",block)
+        self.assertIn("uniform="historico"",block)
+        self.assertIn("grid_columnconfigure",block)
+        self.assertNotIn('text="Detalhes"',block)
+
     def test_interface_remove_titulo_historico_de_execucoes(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertNotIn('text="Histórico de execuções"', source)
@@ -392,16 +392,16 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("validos = [item for item in itens if isinstance(item, dict)]", sheet_block)
         self.assertNotIn("_salvar_historico_planilhas(filtrados)", sheet_block)
 
-    def test_historico_usa_linha_resumida_com_detalhes(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _criar_pasta_historico")
-        end = source.index("def _atualizar_visual_selecao_historico", start)
-        block = source[start:end]
-        self.assertIn("row=ctk.CTkFrame(", block)
-        self.assertIn('text="Detalhes"', block)
-        self.assertIn('widget.bind("<Button-1>",clicar)', block)
-        self.assertNotIn('icone = "📁"', block)
-        self.assertNotIn('widget.bind("<Double-1>"', block)
+    def test_historico_usa_linha_resumida_sem_botao_detalhes(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _criar_pasta_historico")
+        end=source.index("def _atualizar_visual_selecao_historico",start)
+        block=source[start:end]
+        self.assertIn("row = ctk.CTkFrame(",block)
+        self.assertIn('text="!" if pendente else ""',block)
+        self.assertNotIn('text="Detalhes"',block)
+        self.assertIn('widget.bind("<Button-1>", clicar)',block)
+
     def test_tempo_estimado_usa_mesma_fonte_do_tempo_decorrido(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("elapsed_box = ctk.CTkFrame(")
@@ -749,12 +749,12 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_historico_usa_linhas_resumidas(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
-        start=source.index("def _criar_pasta_historico"); end=source.index("def _atualizar_visual_selecao_historico",start)
+        start=source.index("def _criar_pasta_historico")
+        end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
-        self.assertIn("row.grid(",block)
-        self.assertNotIn('text="Detalhes"',block)
-        self.assertNotIn('icone = "📁"',block)
+        self.assertIn("row = ctk.CTkFrame(",block)
         self.assertIn('text="!" if pendente else ""',block)
+        self.assertNotIn('text="Detalhes"',block)
 
     def test_atalhos_principais_estao_instalados_sem_bind_all(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
@@ -930,15 +930,16 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("ImageTk.PhotoImage", block)
 
     def test_history_linha_aceita_clique_unico_e_ctrl_multiseleciona(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _criar_pasta_historico")
-        end = source.index("def _abrir_detalhe_historico", start)
-        block = source[start:end]
-        self.assertIn('getattr(event,"state",0)', block)
-        self.assertIn("0x0004", block)
-        self.assertIn("self._historico_selecionados.add(execucao_id)", block)
-        self.assertIn("<Button-1>", block)
-        self.assertNotIn("<Double-1>", block)
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _criar_pasta_historico")
+        end=source.index("def _abrir_detalhe_historico",start)
+        block=source[start:end]
+        self.assertIn('getattr(event, "state", 0)',block)
+        self.assertIn("0x0004",block)
+        self.assertIn("self._historico_selecionados.add(execucao_id)",block)
+        self.assertIn('widget.bind("<Button-1>", clicar)',block)
+        self.assertNotIn('widget.bind("<Double-1>"',block)
+
     def test_history_detalhes_recuperam_codigos_de_erro(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _preencher_detalhe_pasta")
