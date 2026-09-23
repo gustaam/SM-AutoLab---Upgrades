@@ -1,4 +1,4 @@
-# Testes de validação estrutural e de release.
+# Testes de qualidade do projeto: arquitetura, workflows, versão, release e executável.
 
 import struct
 import tempfile
