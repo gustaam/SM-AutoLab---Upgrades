@@ -67,6 +67,9 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("def _configurar_icone_janela(self, janela=None):", interface)
         self.assertIn("janela.iconbitmap(str(icone))", interface)
         self.assertIn("self._configurar_icone_janela(popup)", interface)
+        self.assertIn('text="Ajustes do Feegow"', interface)
+        self.assertNotIn("image=self._obter_icone_menu_aplicativo()", interface)
+        self.assertNotIn('compound="left"', interface)
 
     def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):
         self.assertTrue(callable(validate_dependencies))
