@@ -698,7 +698,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("text=self.INICIAR_LABEL", block)
         self.assertIn('bottom_row.pack(anchor="center"', block)
         self.assertIn('largura, altura = 500, 280', block)
-        self.assertIn('menu_y = max(6, self.app.winfo_rooty() * 0 + 58)', source)
+        self.assertIn("menu_y = 58", source)
         self.assertIn('self.botao_configuracoes.pack(side="right"', block)
         self.assertIn('menu_y = max(6, app_height - menu_height - 6)', source)
 

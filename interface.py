@@ -3023,6 +3023,7 @@ class App:
 
         self.botao_planilha = top_row.winfo_children()[0]
         self.botao_historico_planilha = top_row.winfo_children()[1]
+        self.botao_historico_compacto = top_row.winfo_children()[2]
 
         _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
@@ -3129,7 +3130,7 @@ class App:
                     # A janela compacta tem altura suficiente para exibir o
                     # menu inteiro abaixo do cabeçalho, sem cobrir o botão.
                     menu_x = max(6, app_width - menu_width - 6)
-                    menu_y = max(6, self.app.winfo_rooty() * 0 + 58)
+                    menu_y = 58
                     menu_y = min(menu_y, max(6, app_height - menu_height - 6))
                 else:
                     # O menu nasce no mesmo eixo X do botão Configurações.
