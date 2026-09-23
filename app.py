@@ -234,8 +234,16 @@ class Automacao:
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-default-apps")
         options.add_argument("--no-first-run")
+        # Toda execução/reexecução abre o navegador minimizado.
+        options.add_argument("--start-minimized")
         driver = webdriver.Chrome(options=options)
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+        try:
+            driver.minimize_window()
+        except WebDriverException:
+            # O argumento --start-minimized já cobre o Chromium quando o comando
+            # de minimizar pela API não estiver disponível no ambiente.
+            pass
         return driver
 
     def iniciar_navegador(self):
