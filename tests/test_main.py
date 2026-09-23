@@ -672,9 +672,17 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _mostrar_menu_configuracoes")
         end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
         block = source[start:end]
-        self.assertLess(block.index('text="Aparências  ›"'), block.index('text="Visualização  ›"'))
+        self.assertLess(block.index('text="Aparência  ›"'), block.index('text="Visualização  ›"'))
         self.assertLess(block.index('text="Visualização  ›"'), block.index('text="Ajustes do Feegow"'))
         self.assertLess(block.index('text="Ajustes do Feegow"'), block.index('text="Verificar atualizações"'))
+
+    def test_labels_de_aparencia_e_visualizacao(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('text="Aparência  ›"', source)
+        self.assertNotIn('text="Aparências  ›"', source)
+        self.assertIn('text="Visualização  ›"', source)
+        self.assertIn('"light": "Clara"', source)
+        self.assertIn('"dark": "Escura"', source)
 
     def test_status_animation_reproduz_configuracao_da_v2_99_35(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")

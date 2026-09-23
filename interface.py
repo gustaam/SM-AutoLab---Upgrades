@@ -2766,7 +2766,7 @@ class App:
             btn = ctk.CTkButton(
                 tabs, text=name, command=lambda n=name: self._selecionar_aba(n),
                 width={"Atividade": 92, "Histórico": 92}[name],
-                height=30, corner_radius=8,
+                height=26, corner_radius=8,
                 fg_color=("#E5F1FB", "#183B54") if name == "Atividade" else "transparent",
                 hover_color=("#E8F2FC", "#204965"),
                 text_color=self.TEXT, font=("Segoe UI", 11, "bold")
@@ -3601,7 +3601,7 @@ class App:
 
         aparencia = ctk.CTkButton(
             menu,
-            text="Aparências  ›",
+            text="Aparência  ›",
             command=self._mostrar_menu_aparencia,
             width=202,
             height=40,
@@ -3705,7 +3705,7 @@ class App:
 
 
     def _mostrar_menu_visualizacao(self, _event=None):
-        """Abre o submenu de visualização no mesmo padrão de Aparências."""
+        """Abre o submenu de visualização no mesmo padrão de Aparência."""
         self._cancelar_fechar_menus()
         self._fechar_menu_aparencia()
         self._cancelar_fechar_visualizacao()
@@ -3820,7 +3820,7 @@ class App:
 
         ctk.CTkLabel(
             sub,
-            text="Aparências",
+            text="Aparência",
             text_color=self.TEXT,
             font=("Segoe UI", 12, "bold"),
             anchor="w",
@@ -4668,7 +4668,7 @@ class App:
                     else None
                 ),
                 "tema": self._tema,
-                "visualizacao": self._visualizacao,
+                "visualizacao": getattr(self, "_visualizacao", "complete"),
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
             self._historico_arquivo.parent.mkdir(parents=True, exist_ok=True)
