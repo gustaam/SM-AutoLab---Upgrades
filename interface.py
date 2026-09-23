@@ -2279,8 +2279,10 @@ def _ler_versao_aplicativo():
 
 APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
-HISTORICO_COL_PESOS = (8, 7, 30, 10, 10, 7, 8, 12, 4)
-HISTORICO_COL_MINS = (62, 54, 140, 70, 70, 48, 62, 80, 28)
+# Histórico: Data, Hora, Processados, Executados, Erros, Status e indicador.
+# Não exibe mais o nome da planilha nem a duração na listagem.
+HISTORICO_COL_PESOS = (9, 8, 12, 12, 8, 13, 3)
+HISTORICO_COL_MINS = (68, 58, 72, 72, 50, 84, 18)
 
 class App:
     INICIAR_LABEL = "Iniciar"
@@ -2365,6 +2367,7 @@ class App:
         self._historico_compacto_window = None
         self._historico_notificacao_badge = None
         self._historico_notificacao_reposition_job = None
+        self._historico_compacto_notificacao_badge = None
         self._visualizacao_reinicio_dialog = None
         self._arquivos_body = None
         self._arquivos_calendar_canvas = None
@@ -2380,8 +2383,12 @@ class App:
         self._execucao_timer_job = None
         self._execucao_inicio_indice = 0
         self._execucao_total = 0
+        self._ultimo_tempo_decorrido_segundos = 0.0
+        self._ultimo_codigos_medidos = 0
         self._tempo_decorrido_label = None
         self._tempo_estimado_label = None
+        self._arquivos_tempo_decorrido_label = None
+        self._arquivos_media_codigo_label = None
         self._atualizacao_janela = None
         self._atualizacao_barra = None
         self._atualizacao_label = None
@@ -2722,15 +2729,14 @@ class App:
             btn._fluent_no_focus_ring = True
             self.tab_buttons[name] = btn
 
+        # Ponto vermelho discreto, alinhado ao canto direito da aba.
         self._historico_notificacao_badge = ctk.CTkLabel(
             tabs,
-            text="!",
-            width=16,
-            height=16,
-            corner_radius=8,
+            text="",
+            width=7,
+            height=7,
+            corner_radius=4,
             fg_color=self.ERROR,
-            text_color="#FFFFFF",
-            font=("Segoe UI", 8, "bold"),
         )
         self._historico_notificacao_badge.place_forget()
         self._historico_notificacao_badge.bind(
@@ -3022,71 +3028,244 @@ class App:
         self.botao_historico_planilha = top_buttons[1]
         self.botao_historico_compacto = top_buttons[2]
 
+        # Mesmo indicador do modo normal: um ponto vermelho pequeno.
+        self._historico_compacto_notificacao_badge = ctk.CTkLabel(
+            top_row,
+            text="",
+            width=7,
+            height=7,
+            corner_radius=4,
+            fg_color=self.ERROR,
+        )
+        self._historico_compacto_notificacao_badge.place_forget()
+        self.botao_historico_compacto.bind(
+            "<Configure>", self._reposicionar_badge_historico_compacto, add="+"
+        )
+        top_row.bind(
+            "<Configure>", self._reposicionar_badge_historico_compacto, add="+"
+        )
+        self.app.after_idle(self._reposicionar_badge_historico_compacto)
+        self._atualizar_badge_historico()
+
         _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
         self.app.after(350, self._verificar_retomada_pendente)
         self.app.after(1200, self._verificar_atualizacao_automatica)
 
     def _abrir_historico_compacto(self):
-        win=getattr(self,"_historico_compacto_window",None)
+        win = getattr(self, "_historico_compacto_window", None)
         if win is not None:
             try:
-                if win.winfo_exists(): win.lift(); return
-            except Exception: pass
-        win=ctk.CTkToplevel(self.app)
-        self._historico_compacto_window=win
+                if win.winfo_exists():
+                    win.lift()
+                    self._atualizar_badge_historico()
+                    return
+            except Exception:
+                pass
+
+        win = ctk.CTkToplevel(self.app)
+        self._historico_compacto_window = win
         self._configurar_icone_janela(win)
-        win.title("Histórico"); win.geometry("760x430"); win.minsize(680,360); win.resizable(True,True); win.transient(self.app)
-        header=ctk.CTkFrame(win,fg_color=self.CARD,corner_radius=0,height=52)
-        header.pack(fill="x"); header.pack_propagate(False)
-        ctk.CTkLabel(header,text="Histórico",text_color=self.TEXT,font=("Segoe UI",15,"bold")).pack(side="left",padx=14,pady=10)
-        lista=ctk.CTkScrollableFrame(win,fg_color=self.BG,corner_radius=0,scrollbar_button_color=("#C8C8C8","#626262"),scrollbar_button_hover_color=("#AFAFAF","#777777"))
-        lista.pack(fill="both",expand=True,padx=10,pady=10)
-        itens=[item for item in reversed(self._historico_execucoes) if self._historico_execucao_tem_erros(item)]
+        win.title("Histórico")
+        win.geometry("700x390")
+        win.minsize(620, 330)
+        win.resizable(True, True)
+        win.transient(self.app)
+
+        header = ctk.CTkFrame(
+            win, fg_color=self.CARD, corner_radius=0, height=52
+        )
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        ctk.CTkLabel(
+            header,
+            text="Histórico",
+            text_color=self.TEXT,
+            font=("Segoe UI", 15, "bold"),
+        ).pack(side="left", padx=14, pady=10)
+
+        lista = ctk.CTkScrollableFrame(
+            win,
+            fg_color=self.BG,
+            corner_radius=0,
+            scrollbar_button_color=("#C8C8C8", "#626262"),
+            scrollbar_button_hover_color=("#AFAFAF", "#777777"),
+        )
+        lista.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Usa exatamente a mesma fonte de dados do histórico normal, incluindo
+        # uma execução atual que já possua códigos não executados.
+        itens = self._historico_execucoes_visiveis()
+
         if not itens:
-            ctk.CTkLabel(lista,text="Nenhuma execução com erros registrada ainda.",text_color=self.SUBTEXT,font=("Segoe UI",10)).pack(anchor="w",padx=8,pady=10)
+            ctk.CTkLabel(
+                lista,
+                text="Nenhuma execução com códigos não executados registrada ainda.",
+                text_color=self.SUBTEXT,
+                font=("Segoe UI", 10),
+            ).pack(anchor="w", padx=8, pady=10)
         else:
-            for item in itens:
-                inicio=str(item.get("inicio","") or ""); fim=str(item.get("fim","") or "")
-                data=self._formatar_data_historico(inicio); horario=inicio.split(" ",1)[1] if " " in inicio else ""
-                planilha=str(item.get("planilha","") or "Planilha interna"); pagina=str(item.get("pagina","") or "")
-                try: total=int(item.get("total",0) or 0)
-                except (TypeError,ValueError): total=0
-                try: executados=int(item.get("sucessos",0) or 0)
-                except (TypeError,ValueError): executados=0
-                try: erros=int(item.get("erros",0) or 0)
-                except (TypeError,ValueError): erros=0
-                duracao="—"
-                try:
-                    a=datetime.strptime(inicio,"%Y-%m-%d %H:%M:%S"); b=datetime.strptime(fim,"%Y-%m-%d %H:%M:%S") if fim else None
-                    if b: duracao=self._formatar_duracao((b-a).total_seconds())
-                except (TypeError,ValueError): pass
-                row=ctk.CTkFrame(lista,fg_color=self.CARD,corner_radius=7,border_width=1,border_color=self.BORDER,height=44)
-                row.pack(fill="x",pady=2); row.pack_propagate(False)
-                abrir_detalhe = lambda _e, execucao=item: self._abrir_detalhe_historico(execucao)
-                row.bind("<Button-1>", abrir_detalhe, add="+")
-                ctk.CTkLabel(row,text=data,text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=7,y=10,width=78)
-                ctk.CTkLabel(row,text=horario,text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=90,y=10,width=62)
-                ctk.CTkLabel(row,text=(planilha+(f" • Pág. {pagina}" if pagina else "")),text_color=self.TEXT,font=("Segoe UI",9),anchor="w").place(x=160,y=10,width=255)
-                ctk.CTkLabel(row,text=str(total),text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=422,y=10,width=48)
-                ctk.CTkLabel(row,text=str(executados),text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=474,y=10,width=58)
-                ctk.CTkLabel(row,text=str(erros),text_color=self.ERROR,font=("Segoe UI",9,"bold"),anchor="center").place(x=536,y=10,width=45)
-                ctk.CTkLabel(row,text=duracao,text_color=self.SUBTEXT,font=("Segoe UI",9),anchor="center").place(x=585,y=10,width=70)
-                pendente = self._historico_tem_erros_pendentes_reexecucao(item)
-                indicador = ctk.CTkLabel(
-                    row,text="!" if pendente else "",width=22,height=22,
-                    corner_radius=11,
-                    fg_color=self.ERROR if pendente else "transparent",
-                    text_color="#FFFFFF",font=("Segoe UI",10,"bold")
+            grid = ctk.CTkFrame(lista, fg_color="transparent")
+            grid.pack(fill="x", padx=2, pady=2)
+
+            headers = (
+                "Data",
+                "Hora",
+                "Processados",
+                "Executados",
+                "Erros",
+                "Status",
+                "",
+            )
+            widths = (72, 62, 82, 82, 58, 98, 24)
+            weights = (9, 8, 12, 12, 8, 13, 3)
+
+            for col, (label_text, width, weight) in enumerate(
+                zip(headers, widths, weights)
+            ):
+                grid.grid_columnconfigure(
+                    col,
+                    minsize=width,
+                    weight=weight,
+                    uniform="historico_compacto",
                 )
-                indicador.place(x=662,y=8)
-                for child in row.winfo_children():
+                if label_text:
+                    ctk.CTkLabel(
+                        grid,
+                        text=label_text,
+                        text_color=self.SUBTEXT,
+                        font=("Segoe UI", 9, "bold"),
+                        anchor="center",
+                    ).grid(
+                        row=0,
+                        column=col,
+                        sticky="ew",
+                        padx=4,
+                        pady=(2, 4),
+                    )
+
+            for row_index, item in enumerate(reversed(itens), start=1):
+                inicio = str(item.get("inicio", "") or "")
+                data = self._formatar_data_historico(inicio)
+                horario = inicio.split(" ", 1)[1] if " " in inicio else ""
+
+                try:
+                    total = int(
+                        item.get("total", 0)
+                        or item.get("processados", 0)
+                        or 0
+                    )
+                except (TypeError, ValueError):
+                    total = 0
+
+                try:
+                    executados = int(item.get("sucessos", 0) or 0)
+                except (TypeError, ValueError):
+                    executados = 0
+
+                try:
+                    erros = max(
+                        int(item.get("erros", 0) or 0),
+                        len(item.get("codigos_erros", []) or []),
+                        len(item.get("erros_detalhes", []) or []),
+                    )
+                except (TypeError, ValueError):
+                    erros = 0
+
+                status = str(item.get("status", "") or "Erro").strip() or "Erro"
+                if len(status) > 18:
+                    status = status[:17] + "…"
+                pendente = self._historico_tem_erros_pendentes_reexecucao(item)
+
+                row = ctk.CTkFrame(
+                    grid,
+                    fg_color=self.CARD,
+                    corner_radius=7,
+                    border_width=1,
+                    border_color=self.BORDER,
+                    height=42,
+                )
+                row.grid(
+                    row=row_index,
+                    column=0,
+                    columnspan=7,
+                    sticky="ew",
+                    pady=2,
+                )
+                row.grid_propagate(False)
+
+                for col, (width, weight) in enumerate(zip(widths, weights)):
+                    row.grid_columnconfigure(
+                        col,
+                        minsize=width,
+                        weight=weight,
+                        uniform="historico_compacto_row",
+                    )
+
+                valores = (
+                    (data, "center"),
+                    (horario, "center"),
+                    (str(total), "center"),
+                    (str(executados), "center"),
+                    (str(erros), "center"),
+                    (status, "center"),
+                )
+                labels = []
+                for col, (valor, anchor) in enumerate(valores):
+                    label = ctk.CTkLabel(
+                        row,
+                        text=valor,
+                        text_color=self.ERROR if col in (4, 5) else self.TEXT,
+                        font=(
+                            "Segoe UI",
+                            9,
+                            "bold" if col in (4, 5) else "normal",
+                        ),
+                        anchor=anchor,
+                    )
+                    label.grid(
+                        row=0,
+                        column=col,
+                        sticky="ew",
+                        padx=5,
+                        pady=2,
+                    )
+                    labels.append(label)
+
+                indicador = ctk.CTkLabel(
+                    row,
+                    text="",
+                    width=7,
+                    height=7,
+                    corner_radius=4,
+                    fg_color=self.ERROR if pendente else "transparent",
+                )
+                indicador.grid(row=0, column=6, padx=7, pady=7)
+
+                abrir_detalhe = (
+                    lambda _e, execucao=item:
+                    self._abrir_detalhe_historico(execucao)
+                )
+                for child in (row, *labels):
                     child.bind("<Button-1>", abrir_detalhe, add="+")
+                    try:
+                        child.configure(cursor="hand2")
+                    except Exception:
+                        pass
+                indicador.bind("<Button-1>", abrir_detalhe, add="+")
+                try:
+                    indicador.configure(cursor="hand2")
+                except Exception:
+                    pass
+
         def fechar():
-            self._historico_compacto_window=None
-            try: win.destroy()
-            except Exception: pass
-        win.protocol("WM_DELETE_WINDOW",fechar)
+            self._historico_compacto_window = None
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        win.protocol("WM_DELETE_WINDOW", fechar)
         _ui_scan_tooltips(win)
 
     def _reposicionar_menus(self, _event=None):
@@ -4466,14 +4645,26 @@ class App:
         return any(codigo not in reexecutados for codigo in codigos)
 
     def _historico_tem_erros_pendentes(self):
-        execucoes = list(getattr(self, "_historico_execucoes", []))
-        atual = getattr(self, "_execucao_atual", None)
-        if isinstance(atual, dict):
-            execucoes.append(atual)
         return any(
             self._historico_tem_erros_pendentes_reexecucao(item)
-            for item in execucoes
+            for item in self._historico_execucoes_visiveis()
         )
+
+    def _historico_execucoes_visiveis(self):
+        """Retorna as execuções com não executados para as duas interfaces."""
+        fontes = list(getattr(self, "_historico_execucoes", []))
+        atual = getattr(self, "_execucao_atual", None)
+        if isinstance(atual, dict):
+            fontes.append(atual)
+
+        unicos = {}
+        for item in fontes:
+            if not isinstance(item, dict):
+                continue
+            if not self._historico_execucao_tem_erros(item):
+                continue
+            unicos[self._id_historico_execucao(item)] = item
+        return list(unicos.values())
 
     def _reposicionar_badge_historico(self, _event=None):
         badge = getattr(self, "_historico_notificacao_badge", None)
@@ -4483,33 +4674,54 @@ class App:
         try:
             if not badge.winfo_exists() or not btn.winfo_exists():
                 return
-            if not badge.winfo_ismapped():
+            badge.place(
+                x=max(0, btn.winfo_x() + btn.winfo_width() - 3),
+                y=max(0, btn.winfo_y() + 2),
+            )
+            badge.lift()
+        except Exception:
+            pass
+
+    def _reposicionar_badge_historico_compacto(self, _event=None):
+        badge = getattr(self, "_historico_compacto_notificacao_badge", None)
+        btn = getattr(self, "botao_historico_compacto", None)
+        if badge is None or btn is None:
+            return
+        try:
+            if not badge.winfo_exists() or not btn.winfo_exists():
                 return
             badge.place(
-                x=max(0, btn.winfo_x() + btn.winfo_width() - 9),
-                y=max(0, btn.winfo_y() + 1),
+                x=max(0, btn.winfo_x() + btn.winfo_width() - 3),
+                y=max(0, btn.winfo_y() + 2),
             )
             badge.lift()
         except Exception:
             pass
 
     def _atualizar_badge_historico(self):
+        pendente = self._historico_tem_erros_pendentes()
+
         badge = getattr(self, "_historico_notificacao_badge", None)
         btn = getattr(self, "tab_buttons", {}).get("Histórico")
-        if badge is None or btn is None:
-            return
-        try:
-            if self._historico_tem_erros_pendentes():
-                badge.configure(text="!")
-                badge.place(
-                    x=max(0, btn.winfo_x() + btn.winfo_width() - 9),
-                    y=max(0, btn.winfo_y() + 1),
-                )
-                badge.lift()
-            else:
-                badge.place_forget()
-        except Exception:
-            pass
+        if badge is not None and btn is not None:
+            try:
+                if pendente:
+                    self._reposicionar_badge_historico()
+                else:
+                    badge.place_forget()
+            except Exception:
+                pass
+
+        badge_compacto = getattr(self, "_historico_compacto_notificacao_badge", None)
+        btn_compacto = getattr(self, "botao_historico_compacto", None)
+        if badge_compacto is not None and btn_compacto is not None:
+            try:
+                if pendente:
+                    self._reposicionar_badge_historico_compacto()
+                else:
+                    badge_compacto.place_forget()
+            except Exception:
+                pass
 
     def _selecionar_aba(self, nome):
         for frame in (self.aba_atividade, self.aba_historico):
@@ -4741,9 +4953,19 @@ class App:
         self._execucao_inicio_monotonic = time.monotonic()
         self._execucao_inicio_indice = int(start)
         self._execucao_total = int(total)
+        self._ultimo_tempo_decorrido_segundos = 0.0
+        self._ultimo_codigos_medidos = 0
         self._atualizar_metricas_execucao()
 
     def _parar_metricas_execucao(self):
+        # Atualiza uma última vez antes de encerrar o cronômetro para preservar
+        # os números exibidos na tela de Arquivos após a execução.
+        if getattr(self, "_execucao_inicio_monotonic", None) is not None:
+            try:
+                self._atualizar_metricas_execucao()
+            except Exception:
+                pass
+
         job = getattr(self, "_execucao_timer_job", None)
         if job is not None:
             try:
@@ -4765,12 +4987,28 @@ class App:
         except Exception:
             decorrido = 0.0
 
+        processados = int(getattr(self, "_checkpoint_indice_seguro", 0))
+        concluidos = max(0, processados - int(self._execucao_inicio_indice))
+        self._ultimo_tempo_decorrido_segundos = decorrido
+        self._ultimo_codigos_medidos = concluidos
+
         if self._tempo_decorrido_label is not None:
             self._tempo_decorrido_label.configure(text=self._formatar_duracao(decorrido))
 
+        if self._arquivos_tempo_decorrido_label is not None:
+            self._arquivos_tempo_decorrido_label.configure(
+                text=self._formatar_duracao(decorrido)
+            )
+        if self._arquivos_media_codigo_label is not None:
+            if concluidos > 0 and decorrido > 0:
+                media = concluidos / (decorrido / 60.0)
+                self._arquivos_media_codigo_label.configure(
+                    text=f"{media:.1f} cód/min"
+                )
+            else:
+                self._arquivos_media_codigo_label.configure(text="—")
+
         if self._tempo_estimado_label is not None:
-            processados = int(getattr(self, "_checkpoint_indice_seguro", 0))
-            concluidos = max(0, processados - int(self._execucao_inicio_indice))
             restantes = max(0, int(self._execucao_total) - processados)
             if concluidos > 0 and decorrido > 0 and restantes > 0:
                 por_item = decorrido / concluidos
@@ -5395,7 +5633,7 @@ class App:
 
         self._hist_grid=ctk.CTkFrame(self.historico_lista,fg_color="transparent")
         self._hist_grid.pack(fill="x",padx=8,pady=5)
-        headers=("Data","Hora","Planilha","Processados","Executados","Erros","Duração","Status","")
+        headers=("Data","Hora","Processados","Executados","Erros","Status","")
         for col, (texto, peso, minimo) in enumerate(
             zip(headers, HISTORICO_COL_PESOS, HISTORICO_COL_MINS)
         ):
@@ -5426,7 +5664,33 @@ class App:
                 return True
         except (TypeError, ValueError):
             pass
-        return str(execucao.get("status", "")).strip().casefold() == "erro geral"
+
+        if any(
+            str(codigo).strip()
+            for codigo in (execucao.get("codigos_erros", []) or [])
+        ):
+            return True
+
+        detalhes = execucao.get("erros_detalhes", []) or []
+        if isinstance(detalhes, list) and any(
+            isinstance(item, dict)
+            and (
+                str(item.get("codigo", "")).strip()
+                or str(item.get("status", "")).strip().casefold()
+                in {"erro", "não executado", "nao executado"}
+            )
+            for item in detalhes
+        ):
+            return True
+
+        status = str(execucao.get("status", "")).strip().casefold()
+        return status in {
+            "erro geral",
+            "não executado",
+            "nao executado",
+            "não executada",
+            "nao executada",
+        }
 
     def _id_historico_execucao(self, execucao):
         if not isinstance(execucao, dict):
@@ -5470,37 +5734,33 @@ class App:
 
         execucao_id = self._id_historico_execucao(execucao)
         inicio = str(execucao.get("inicio", "") or "")
-        fim = str(execucao.get("fim", "") or "")
         data = self._formatar_data_historico(inicio)
         horario = inicio.split(" ", 1)[1] if " " in inicio else ""
-        planilha = str(execucao.get("planilha", "") or "Planilha interna")
-        pagina = str(execucao.get("pagina", "") or "")
-        if pagina:
-            planilha += f"  •  Página {pagina}"
 
         try:
-            total = int(execucao.get("total", 0) or 0)
+            total = int(
+                execucao.get("total", 0)
+                or execucao.get("processados", 0)
+                or 0
+            )
         except (TypeError, ValueError):
             total = 0
+
         try:
             sucessos = int(execucao.get("sucessos", 0) or 0)
         except (TypeError, ValueError):
             sucessos = 0
+
         try:
-            erros = int(execucao.get("erros", 0) or 0)
+            erros = max(
+                int(execucao.get("erros", 0) or 0),
+                len(execucao.get("codigos_erros", []) or []),
+                len(execucao.get("erros_detalhes", []) or []),
+            )
         except (TypeError, ValueError):
             erros = 0
 
-        duracao = "—"
-        try:
-            inicio_dt = datetime.strptime(inicio, "%Y-%m-%d %H:%M:%S")
-            fim_dt = datetime.strptime(fim, "%Y-%m-%d %H:%M:%S") if fim else None
-            if fim_dt:
-                duracao = self._formatar_duracao((fim_dt - inicio_dt).total_seconds())
-        except (TypeError, ValueError):
-            pass
-
-        status = str(execucao.get("status", "") or "Erro")
+        status = str(execucao.get("status", "") or "Erro").strip() or "Erro"
         if len(status) > 18:
             status = status[:17] + "…"
 
@@ -5516,7 +5776,7 @@ class App:
         row.grid(
             row=row_index,
             column=0,
-            columnspan=9,
+            columnspan=7,
             sticky="ew",
             pady=2,
         )
@@ -5535,20 +5795,18 @@ class App:
         valores = (
             (data, "center"),
             (horario, "center"),
-            (planilha, "w"),
             (str(total), "center"),
             (str(sucessos), "center"),
             (str(erros), "center"),
-            (duracao, "center"),
-            (status, "w"),
+            (status, "center"),
         )
         labels = []
         for col, (valor, anchor) in enumerate(valores):
             label = ctk.CTkLabel(
                 row,
                 text=valor,
-                text_color=self.ERROR if col in (5, 7) else self.TEXT,
-                font=("Segoe UI", 9, "bold" if col in (5, 7) else "normal"),
+                text_color=self.ERROR if col in (4, 5) else self.TEXT,
+                font=("Segoe UI", 9, "bold" if col in (4, 5) else "normal"),
                 anchor=anchor,
             )
             label.grid(row=0, column=col, sticky="ew", padx=5, pady=2)
@@ -5557,15 +5815,13 @@ class App:
         pendente = self._historico_tem_erros_pendentes_reexecucao(execucao)
         indicador = ctk.CTkLabel(
             row,
-            text="!" if pendente else "",
-            width=22,
-            height=22,
-            corner_radius=11,
+            text="",
+            width=7,
+            height=7,
+            corner_radius=4,
             fg_color=self.ERROR if pendente else "transparent",
-            text_color="#FFFFFF",
-            font=("Segoe UI", 10, "bold"),
         )
-        indicador.grid(row=0, column=8, padx=4, pady=7)
+        indicador.grid(row=0, column=6, padx=7, pady=7)
 
         self._historico_tiles[execucao_id] = row
 
@@ -7930,6 +8186,50 @@ class App:
             self._arquivos_body, text=f"{len(itens)} planilha(s) salva(s) nesta data",
             text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold")
         ).pack(anchor="w", pady=(0, 6))
+
+        metricas = ctk.CTkFrame(self._arquivos_body, fg_color="transparent")
+        metricas.pack(fill="x", pady=(0, 8))
+        metricas.grid_columnconfigure((0, 1), weight=1)
+
+        tempo_box = ctk.CTkFrame(
+            metricas, fg_color=("#F3F7FA", "#24343D"), corner_radius=8, height=42
+        )
+        tempo_box.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        tempo_box.grid_propagate(False)
+        ctk.CTkLabel(
+            tempo_box, text="Tempo decorrido", text_color=self.SUBTEXT,
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left", padx=(9, 6))
+        self._arquivos_tempo_decorrido_label = ctk.CTkLabel(
+            tempo_box,
+            text=self._formatar_duracao(getattr(self, "_ultimo_tempo_decorrido_segundos", 0)),
+            text_color=self.TEXT,
+            font=("Segoe UI", 13, "bold")
+        )
+        self._arquivos_tempo_decorrido_label.pack(side="right", padx=(2, 9))
+
+        media_box = ctk.CTkFrame(
+            metricas, fg_color=("#F3F7FA", "#24343D"), corner_radius=8, height=42
+        )
+        media_box.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+        media_box.grid_propagate(False)
+        ultimo_tempo = float(getattr(self, "_ultimo_tempo_decorrido_segundos", 0) or 0)
+        ultimo_codigos = int(getattr(self, "_ultimo_codigos_medidos", 0) or 0)
+        media_inicial = (
+            f"{ultimo_codigos / (ultimo_tempo / 60.0):.1f} cód/min"
+            if ultimo_codigos > 0 and ultimo_tempo > 0
+            else "—"
+        )
+        ctk.CTkLabel(
+            media_box, text="Média por código (cód/min)", text_color=self.SUBTEXT,
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left", padx=(9, 6))
+        self._arquivos_media_codigo_label = ctk.CTkLabel(
+            media_box, text=media_inicial, text_color=self.TEXT,
+            font=("Segoe UI", 13, "bold")
+        )
+        self._arquivos_media_codigo_label.pack(side="right", padx=(2, 9))
+        self._atualizar_metricas_execucao()
 
         lista = ctk.CTkScrollableFrame(self._arquivos_body, fg_color="transparent")
         lista.pack(fill="both", expand=True)

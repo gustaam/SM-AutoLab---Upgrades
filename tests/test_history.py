@@ -205,6 +205,35 @@ class HistoryPersistenceTests(unittest.TestCase):
         self.assertIn("erros_area = ctk.CTkFrame(", block)
         self.assertNotIn("erros_area = ctk.CTkScrollableFrame(", block)
 
+    def test_historico_reconhece_detalhes_de_nao_executados(self):
+        execucao = {
+            "status": "Concluída",
+            "erros": 0,
+            "codigos_erros": [],
+            "erros_detalhes": [
+                {"codigo": "ABC123", "erro": "Falha de teste"}
+            ],
+        }
+        self.assertTrue(App._historico_execucao_tem_erros(execucao))
+
+    def test_historico_visivel_inclui_execucao_atual_com_erro(self):
+        app = App.__new__(App)
+        app._historico_execucoes = [
+            {
+                "id": "anterior",
+                "erros": 1,
+                "codigos_erros": ["OLD"],
+            }
+        ]
+        app._execucao_atual = {
+            "id": "atual",
+            "erros": 1,
+            "codigos_erros": ["NEW"],
+        }
+
+        ids = [item["id"] for item in app._historico_execucoes_visiveis()]
+        self.assertEqual(ids, ["anterior", "atual"])
+
     def test_finalizacao_nao_arquiva_execucao_sem_erros(self):
         with tempfile.TemporaryDirectory() as temp:
             app = self._app_without_ui(Path(temp))

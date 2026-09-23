@@ -92,6 +92,11 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Execução em andamento"', source)
         self.assertIn('text="Tempo decorrido"', source)
         self.assertIn('text="Tempo estimado restante"', source)
+        self.assertIn('text="Média por código (cód/min)"', source)
+        self.assertIn('self._arquivos_tempo_decorrido_label', source)
+        self.assertIn('self._arquivos_media_codigo_label', source)
+        self.assertIn('media = concluidos / (decorrido / 60.0)', source)
+        self.assertIn('text=f"{media:.1f} cód/min"', source)
         self.assertIn('self.erro_card = self._stat_card(stats, "!", "Não executados"', source)
         self.assertNotIn('self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso"', source)
 
@@ -225,7 +230,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("row = ctk.CTkFrame(",block)
         self.assertIn("HISTORICO_COL_PESOS",block)
         self.assertIn("HISTORICO_COL_MINS",block)
-        self.assertIn('columnspan=9',block)
+        self.assertIn('columnspan=7',block)
         self.assertIn('sticky="ew"',block)
         self.assertNotIn('text="Detalhes"',block)
 
@@ -396,7 +401,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
         self.assertIn("row = ctk.CTkFrame(",block)
-        self.assertIn('text="!" if pendente else ""',block)
+        self.assertIn('text=""',block)
+        self.assertIn('width=7',block)
+        self.assertIn('height=7',block)
         self.assertNotIn('text="Detalhes"',block)
         self.assertIn('widget.bind("<Button-1>", clicar)',block)
 
@@ -516,14 +523,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _restaurar_historico_na_tela")
         end = source.index("def _historico_execucao_tem_erros", start)
         block = source[start:end]
-        for label in ("Data","Hora","Planilha","Processados","Executados","Erros","Duração","Status"):
+        for label in ("Data","Hora","Processados","Executados","Erros","Status"):
             self.assertIn(label, block)
         self.assertIn('def _formatar_data_historico', source)
         self.assertIn('strftime("%d/%m/%Y")', source)
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _atualizar_visual_selecao_historico", start)
         row_block = source[start:end]
-        for marker in ("str(total)","str(sucessos)","str(erros)","duracao"):
+        for marker in ("str(total)","str(sucessos)","str(erros)","status"):
             self.assertIn(marker, row_block)
         self.assertNotIn("tile_width", row_block)
         self.assertNotIn("tile_height", row_block)
@@ -751,7 +758,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
         self.assertIn("row = ctk.CTkFrame(",block)
-        self.assertIn('text="!" if pendente else ""',block)
+        self.assertIn('text=""',block)
+        self.assertIn('width=7',block)
+        self.assertIn('height=7',block)
         self.assertNotIn('text="Detalhes"',block)
 
     def test_atalhos_principais_estao_instalados_sem_bind_all(self):
@@ -783,9 +792,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start=source.index("def _abrir_historico_compacto")
         end=source.index("def _reposicionar_menus",start)
         block=source[start:end]
-        self.assertIn('if self._historico_execucao_tem_erros(item)',block)
-        self.assertIn('row.bind("<Button-1>", abrir_detalhe, add="+")',block)
-        self.assertIn('for child in row.winfo_children()',block)
+        self.assertIn('itens = self._historico_execucoes_visiveis()',block)
+        self.assertIn('indicador.bind("<Button-1>", abrir_detalhe, add="+")',block)
+        self.assertIn('for child in (row, *labels)',block)
 
     def test_badge_historico_indica_erros_pendentes(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
@@ -800,7 +809,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start=source.index("def _criar_pasta_historico")
         end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
-        self.assertIn('text="!" if pendente else ""',block)
+        self.assertIn('text=""',block)
+        self.assertIn("width=7",block)
+        self.assertIn("height=7",block)
         self.assertIn("fg_color=self.ERROR if pendente else",block)
 
     def test_arquivos_nao_tem_limite_de_idade(self):

@@ -56,6 +56,15 @@ class ExecucaoPerformanceStage10Tests(unittest.TestCase):
 
 # tests/test_storage_safe.py
 
+class SeleniumWindowBehaviorTests(unittest.TestCase):
+    def test_driver_e_executa_com_janela_minimizada(self):
+        source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('options.add_argument("--start-minimized")', source)
+        self.assertIn("driver.minimize_window()", source)
+
+
 class StorageSafeTests(unittest.TestCase):
     def test_escrita_atomica_cria_arquivo_e_backup_na_segunda_gravacao(self):
         with tempfile.TemporaryDirectory() as temp:
