@@ -4409,35 +4409,84 @@ class App:
         self._execucao_atual["erros"] = int(getattr(resultado, "erros", 0) or 0)
         self._execucao_atual["processados"] = int(getattr(resultado, "processados", 0) or 0)
 
-        # Consolida todas as fontes disponíveis para que a quantidade de
-        # erros nunca exista sem os respectivos códigos.
+        # Consolida os detalhes estruturados e todos os códigos conhecidos.
+        # O histórico passa a ter uma fonte explícita para renderização dos erros.
+        detalhes_erros = []
+        detalhes_fonte = getattr(resultado, "erros_detalhes", []) or []
+        if isinstance(detalhes_fonte, list):
+            for detalhe in detalhes_fonte:
+                if not isinstance(detalhe, dict):
+                    continue
+                codigo = str(detalhe.get("codigo", "") or "").strip()
+                if not codigo:
+                    continue
+                detalhes_erros.append({
+                    "numero": (
+                        int(detalhe.get("numero"))
+                        if str(detalhe.get("numero", "")).isdigit()
+                        else None
+                    ),
+                    "codigo": codigo,
+                    "erro": str(detalhe.get("erro", "") or ""),
+                    "horario": str(detalhe.get("horario", "") or ""),
+                })
+
+        for item in getattr(resultado, "itens", []) or []:
+            if isinstance(item, dict):
+                item_status = str(item.get("status", "")).strip().casefold()
+                codigo = str(item.get("codigo") or item.get("code") or "").strip()
+                erro = str(item.get("erro") or item.get("error") or "").strip()
+                numero = item.get("numero")
+                horario = str(item.get("horario", "") or "")
+            else:
+                item_status = str(getattr(item, "status", "")).strip().casefold()
+                codigo = str(getattr(item, "codigo", "")).strip()
+                erro = str(getattr(item, "erro", "") or "").strip()
+                numero = getattr(item, "numero", None)
+                horario = str(getattr(item, "horario", "") or "")
+            if item_status in {"erro", "não executado", "nao executado"} and codigo:
+                if not any(
+                    str(d.get("codigo", "")).strip() == codigo
+                    for d in detalhes_erros
+                ):
+                    detalhes_erros.append({
+                        "numero": int(numero) if str(numero).isdigit() else None,
+                        "codigo": codigo,
+                        "erro": erro,
+                        "horario": horario,
+                    })
+
         codigos_erros = []
-        fontes_codigos = [
+        for fonte in (
             getattr(self, "_codigos_erros_execucao", []),
             self._execucao_atual.get("codigos_erros", []) or [],
             getattr(resultado, "codigos_erros", []) or [],
-        ]
-        for fonte in fontes_codigos:
-            for codigo in fonte:
+            [detalhe.get("codigo") for detalhe in detalhes_erros],
+        ):
+            for codigo in fonte or []:
                 texto = str(codigo).strip()
                 if texto and texto not in codigos_erros:
                     codigos_erros.append(texto)
 
-        for item in getattr(resultado, "itens", []) or []:
-            if isinstance(item, dict):
-                status = str(item.get("status", "")).strip().casefold()
-                texto = str(item.get("codigo") or item.get("code") or "").strip()
-            else:
-                status = str(getattr(item, "status", "")).strip().casefold()
-                texto = str(getattr(item, "codigo", "")).strip()
-            if status in {"erro", "não executado", "nao executado"}:
-                if texto and texto not in codigos_erros:
-                    codigos_erros.append(texto)
+        for codigo in codigos_erros:
+            if not any(
+                str(detalhe.get("codigo", "")).strip() == codigo
+                for detalhe in detalhes_erros
+            ):
+                detalhes_erros.append({
+                    "numero": None,
+                    "codigo": codigo,
+                    "erro": "",
+                    "horario": "",
+                })
+
         self._execucao_atual["codigos_erros"] = codigos_erros
+        self._execucao_atual["erros_detalhes"] = detalhes_erros
         self._execucao_atual["erros"] = max(
             int(self._execucao_atual.get("erros", 0) or 0),
             int(getattr(resultado, "erros", 0) or 0),
             len(codigos_erros),
+            len(detalhes_erros),
         )
 
         self._historico_execucoes.append(dict(self._execucao_atual))
