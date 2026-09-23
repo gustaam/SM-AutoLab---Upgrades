@@ -4951,6 +4951,74 @@ class App:
                 anchor="w",
             ).pack(side="left")
 
+            # Cada execução histórica pode ser reexecutada uma única vez por
+            # código. Se a reexecução falhar novamente, ela gera uma nova
+            # execução no histórico, onde os códigos voltam a ser elegíveis.
+            codigos_reexecutados = {
+                str(c).strip()
+                for c in (execucao.get("codigos_erros_reexecutados") or [])
+                if str(c).strip()
+            }
+            codigos_reexecutaveis = [
+                codigo for codigo in codigos
+                if codigo not in codigos_reexecutados
+            ]
+
+            def reexecutar_erros():
+                if not codigos_reexecutaveis:
+                    return "break"
+
+                # Marca a execução original antes de iniciar a nova tentativa,
+                # evitando que o botão volte a aparecer após o fechamento/
+                # reabertura da janela.
+                atuais = set(
+                    str(c).strip()
+                    for c in (execucao.get("codigos_erros_reexecutados") or [])
+                    if str(c).strip()
+                )
+                atuais.update(codigos_reexecutaveis)
+                execucao["codigos_erros_reexecutados"] = sorted(atuais)
+
+                for item in self._historico_execucoes:
+                    if self._id_historico_execucao(item) == self._id_historico_execucao(execucao):
+                        item["codigos_erros_reexecutados"] = list(execucao["codigos_erros_reexecutados"])
+                        break
+
+                self._salvar_estado_persistente()
+                self._restaurar_historico_na_tela()
+                try:
+                    parent.destroy()
+                except Exception:
+                    pass
+
+                self._add_activity(
+                    f"Reexecutando {len(codigos_reexecutaveis)} código(s) que apresentaram erro.",
+                    self.WARNING,
+                )
+                self._iniciar_automacao_interna(list(codigos_reexecutaveis))
+                return "break"
+
+            reexecutar_btn = ctk.CTkButton(
+                header,
+                text=(
+                    f"Reexecutar {len(codigos_reexecutaveis)} erro"
+                    if len(codigos_reexecutaveis) == 1
+                    else f"Reexecutar {len(codigos_reexecutaveis)} erros"
+                ),
+                command=reexecutar_erros,
+                width=150,
+                height=26,
+                corner_radius=8,
+                fg_color=self.CARD,
+                hover_color=("#E8F4FF", "#203B4D"),
+                border_width=1,
+                border_color=self.ACCENT,
+                text_color=self.ACCENT,
+                font=("Segoe UI", 10, "bold"),
+            )
+            if codigos_reexecutaveis:
+                reexecutar_btn.pack(side="right", padx=(6, 0))
+
             selecionados = set()
             botoes = {}
 
@@ -7173,7 +7241,11 @@ class App:
                 )
 
         self._iniciar_historico_execucao("Planilha interna",0,start)
-        self._execucao_atual["origem"] = "planilha_interna"
+        self._execucao_atual["origem"] = getattr(self, "_origem_reexecucao", "planilha_interna")
+        if getattr(self, "_reexecucao_origem_id", None):
+            self._execucao_atual["reexecucao_de"] = self._reexecucao_origem_id
+            self._reexecucao_origem_id = None
+        self._origem_reexecucao = "planilha_interna"
         self._execucao_atual["planilha_fingerprint"] = self._planilha_fingerprint(self._planilha_data)
         self._execucao_atual["total"] = len(codigos)
         self._execucao_atual["checkpoint"] = int(start)
