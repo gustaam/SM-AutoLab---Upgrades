@@ -323,6 +323,7 @@ class Resultados:
     def __init__(self, total=0):
         self.total_planejado = total
         self.itens = []
+        self.codigos_erros = []
         self._sucessos = 0
         self._erros = 0
 
@@ -338,15 +339,18 @@ class Resultados:
         self._sucessos += 1
 
     def registrar_erro(self, numero, codigo, erro):
+        codigo = str(codigo)
         self.itens.append(
             ResultadoCodigo(
                 numero,
-                str(codigo),
+                codigo,
                 "Erro",
                 erro=str(erro),
                 horario=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
         )
+        if codigo not in self.codigos_erros:
+            self.codigos_erros.append(codigo)
         self._erros += 1
 
     @property
