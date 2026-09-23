@@ -224,6 +224,37 @@ class HistoryPersistenceTests(unittest.TestCase):
             )
             self.assertEqual(registro["erros"], 5)
 
+    def test_finalizacao_persiste_detalhes_dos_codigos_com_erro(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self._app_without_ui(Path(temp))
+            app._execucao_atual = {
+                "id": "erros-detalhados",
+                "inicio": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "Em andamento",
+                "erros": 2,
+                "codigos_erros": [],
+            }
+            resultado = SimpleNamespace(
+                total_planejado=2,
+                sucessos=0,
+                erros=2,
+                processados=2,
+                codigos_erros=["12345", "67890"],
+                erros_detalhes=[
+                    {"numero": 1, "codigo": "12345", "erro": "falha", "horario": "10:00:00"},
+                    {"numero": 2, "codigo": "67890", "erro": "falha", "horario": "10:01:00"},
+                ],
+                itens=[],
+            )
+
+            app._finalizar_historico_execucao(resultado)
+
+            dados = json.loads(app._historico_arquivo.read_text(encoding="utf-8"))
+            registro = dados["historico_execucoes"][0]
+            self.assertEqual(registro["codigos_erros"], ["12345", "67890"])
+            self.assertEqual(registro["erros_detalhes"][0]["codigo"], "12345")
+            self.assertEqual(registro["erros_detalhes"][1]["codigo"], "67890")
+
     def test_execucao_atual_recente_e_codigos_com_erro_sao_persistidos(self):
         with tempfile.TemporaryDirectory() as temp:
             app = self._app_without_ui(Path(temp))
