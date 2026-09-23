@@ -3846,7 +3846,15 @@ class App:
         }
         card._sm_autolab_tooltip_message = card_tooltips.get(title, "")
         _ui_bind_card_hover(card, accent)
-        _ui_attach_tooltip(card)
+        if card._sm_autolab_tooltip_message:
+            try:
+                card._sm_autolab_tooltip = _SMAutoLabTooltip(
+                    card,
+                    card._sm_autolab_tooltip_message,
+                    bind_children=True,
+                )
+            except Exception:
+                card._sm_autolab_tooltip = None
         return card
 
     def _fonte_icone_estatistica(self, size):
