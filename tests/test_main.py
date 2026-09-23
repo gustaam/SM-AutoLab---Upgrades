@@ -32,6 +32,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         ):
             self.assertNotIn(marker, source)
 
+    def test_update_health_file_usa_linhas_reais(self):
+        source = (self.root / "main.py").read_text(encoding="utf-8")
+        start = source.index("def _sinalizar_inicializacao_atualizacao_sucesso")
+        end = source.index("def run_splash", start)
+        block = source[start:end]
+        self.assertIn('"
+".join(lines)', block)
+        self.assertNotIn('"\\\\n".join(lines)', block)
+
     def test_main_build_keeps_single_bootstrap_entry(self):
         for filename in ("build_windows.bat", ".github/workflows/validate-main.yml", ".github/workflows/release.yml"):
             source = (self.root / filename).read_text(encoding="utf-8")
