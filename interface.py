@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import shutil
 import sys
 import tempfile
 import threading
@@ -1168,99 +1169,29 @@ def _schedule_replace_after_exit(
     downloaded: Path,
     expected_version: str = "",
 ) -> tuple[bool, str]:
-    """Prepara a troca do executável com handshake de versão antes do rollback."""
-    script_dir = downloaded.parent
-    script = script_dir / "apply_update.cmd"
-    backup = script_dir / f"{target.name}.sm_autolab_backup"
-    failed = script_dir / f"{target.name}.sm_autolab_failed"
-    health = script_dir / "startup.ok"
-
-    target_cmd = _escape_cmd_path(str(target))
-    downloaded_cmd = _escape_cmd_path(str(downloaded))
-    backup_cmd = _escape_cmd_path(str(backup))
-    failed_cmd = _escape_cmd_path(str(failed))
-    health_cmd = _escape_cmd_path(str(health))
-    expected_version_cmd = _escape_cmd_path(str(expected_version or ""))
-
-    script_text = f"""@echo off
-setlocal EnableExtensions DisableDelayedExpansion
-set "SM_TARGET={target_cmd}"
-set "SM_DOWNLOADED={downloaded_cmd}"
-set "SM_BACKUP={backup_cmd}"
-set "SM_FAILED={failed_cmd}"
-set "SM_HEALTH={health_cmd}"
-set "SM_EXPECTED_VERSION={expected_version_cmd}"
-set /a SM_REPLACE_WAIT=0
-
-:wait_replace
-move /Y "%SM_TARGET%" "%SM_BACKUP%" >nul 2>&1
-if not exist "%SM_TARGET%" goto install_new
-set /a SM_REPLACE_WAIT+=1
-if %SM_REPLACE_WAIT% GEQ 60 goto abort_update
->nul choice /n /t 1 /d y
-goto wait_replace
-
-:install_new
-move /Y "%SM_DOWNLOADED%" "%SM_TARGET%" >nul 2>&1
-if not exist "%SM_TARGET%" goto rollback
-
-del /Q "%SM_HEALTH%" >nul 2>&1
-set "PYINSTALLER_RESET_ENVIRONMENT=1"
-set "SM_AUTOLAB_UPDATE_HEALTH=%SM_HEALTH%"
-set "SM_AUTOLAB_UPDATE_EXPECTED_VERSION=%SM_EXPECTED_VERSION%"
-start "" /b "%SM_TARGET%"
-
-set /a SM_HEALTH_WAIT=0
-:wait_health
-if exist "%SM_HEALTH%" (
-    if not defined SM_EXPECTED_VERSION goto success_without_version_check
-    findstr /b /c:"version=%SM_EXPECTED_VERSION%" "%SM_HEALTH%" >nul 2>&1
-    if not errorlevel 1 goto success
-)
-if not exist "%SM_TARGET%" goto rollback
-set /a SM_HEALTH_WAIT+=1
-if %SM_HEALTH_WAIT% GEQ 90 goto rollback
->nul choice /n /t 1 /d y
-goto wait_health
-
-:success_without_version_check
-del /Q "%SM_BACKUP%" >nul 2>&1
-del /Q "%SM_HEALTH%" >nul 2>&1
-cd /d "%TEMP%" >nul 2>&1
-rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
-exit /b 0
-
-:success
-del /Q "%SM_BACKUP%" >nul 2>&1
-del /Q "%SM_HEALTH%" >nul 2>&1
-cd /d "%TEMP%" >nul 2>&1
-rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
-exit /b 0
-
-:rollback
-move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
-if exist "%SM_TARGET%" (
-    >nul choice /n /t 1 /d y
-    move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
-)
-move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
-if exist "%SM_FAILED%" del /Q "%SM_FAILED%" >nul 2>&1
-del /Q "%SM_DOWNLOADED%" >nul 2>&1
-del /Q "%SM_HEALTH%" >nul 2>&1
-cd /d "%TEMP%" >nul 2>&1
-rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
-exit /b 1
-
-:abort_update
-del /Q "%SM_DOWNLOADED%" >nul 2>&1
-del /Q "%SM_HEALTH%" >nul 2>&1
-if exist "%SM_BACKUP%" move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
-cd /d "%TEMP%" >nul 2>&1
-rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
-exit /b 1
-"""
+    """Abre o instalador visual em uma cópia temporária do executável atualizado."""
     try:
-        script.write_text(script_text, encoding="utf-8", newline="\r\n")
+        installer = downloaded.parent / f"{target.stem}.installer.exe"
+        installer.unlink(missing_ok=True)
+        shutil.copy2(downloaded, installer)
+
+        backup = downloaded.parent / f"{target.name}.sm_autolab_backup"
+        failed = downloaded.parent / f"{target.name}.sm_autolab_failed"
+        health = downloaded.parent / "startup.ok"
+        for path in (backup, failed, health):
+            path.unlink(missing_ok=True)
+
+        env = _prepare_independent_restart_environment()
+        env.update({
+            "SM_AUTOLAB_INSTALLER": "1",
+            "SM_AUTOLAB_INSTALLER_TARGET": str(target),
+            "SM_AUTOLAB_INSTALLER_PAYLOAD": str(downloaded),
+            "SM_AUTOLAB_INSTALLER_INSTALLER": str(installer),
+            "SM_AUTOLAB_INSTALLER_EXPECTED": str(expected_version or ""),
+            "SM_AUTOLAB_INSTALLER_BACKUP": str(backup),
+            "SM_AUTOLAB_INSTALLER_FAILED": str(failed),
+            "SM_AUTOLAB_INSTALLER_HEALTH": str(health),
+        })
         flags = 0
         if os.name == "nt":
             flags = (
@@ -1268,18 +1199,15 @@ exit /b 1
                 | subprocess.DETACHED_PROCESS
                 | subprocess.CREATE_NO_WINDOW
             )
-        restart_env = _prepare_independent_restart_environment()
-        restart_env["SM_AUTOLAB_UPDATE_HEALTH"] = str(health)
-        restart_env["SM_AUTOLAB_UPDATE_EXPECTED_VERSION"] = str(expected_version or "")
         subprocess.Popen(
-            ["cmd.exe", "/d", "/c", str(script)],
-            cwd=str(script_dir),
+            [str(installer)],
+            cwd=str(downloaded.parent),
             close_fds=True,
             creationflags=flags,
-            env=restart_env,
+            env=env,
         )
         return True, ""
-    except OSError as exc:
+    except (OSError, shutil.Error) as exc:
         return False, str(exc)
 
 def launch_updater(update: dict, progress_callback=None) -> tuple[bool, str]:
@@ -3144,6 +3072,14 @@ class App:
                 ctk.CTkLabel(row,text=str(executados),text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=474,y=10,width=58)
                 ctk.CTkLabel(row,text=str(erros),text_color=self.ERROR,font=("Segoe UI",9,"bold"),anchor="center").place(x=536,y=10,width=45)
                 ctk.CTkLabel(row,text=duracao,text_color=self.SUBTEXT,font=("Segoe UI",9),anchor="center").place(x=585,y=10,width=70)
+                pendente = self._historico_tem_erros_pendentes_reexecucao(item)
+                indicador = ctk.CTkLabel(
+                    row,text="!" if pendente else "",width=22,height=22,
+                    corner_radius=11,
+                    fg_color=self.ERROR if pendente else "transparent",
+                    text_color="#FFFFFF",font=("Segoe UI",10,"bold")
+                )
+                indicador.place(x=662,y=8)
                 for child in row.winfo_children():
                     child.bind("<Button-1>", abrir_detalhe, add="+")
         def fechar():
@@ -5460,7 +5396,9 @@ class App:
         self._hist_grid=ctk.CTkFrame(self.historico_lista,fg_color="transparent")
         self._hist_grid.pack(fill="x",padx=8,pady=5)
         headers=("Data","Hora","Planilha","Processados","Executados","Erros","Duração","Status","")
-        for col, (peso, minimo) in enumerate(zip(HISTORICO_COL_PESOS, HISTORICO_COL_MINS)):
+        for col, (texto, peso, minimo) in enumerate(
+            zip(headers, HISTORICO_COL_PESOS, HISTORICO_COL_MINS)
+        ):
             self._hist_grid.grid_columnconfigure(
                 col,
                 weight=peso,

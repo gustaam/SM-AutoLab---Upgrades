@@ -312,6 +312,156 @@ def _validar_base_aplicacao():
         raise RuntimeError("A UI não está usando o runtime canônico.")
 
 
+def _update_installer_mode():
+    """Executa a atualização em uma janela gráfica, sem abrir prompt de comando."""
+    if os.environ.get("SM_AUTOLAB_INSTALLER") != "1":
+        return False
+
+    import shutil
+    import subprocess
+    from tkinter import ttk
+
+    target = Path(os.environ["SM_AUTOLAB_INSTALLER_TARGET"]).resolve()
+    payload = Path(os.environ["SM_AUTOLAB_INSTALLER_PAYLOAD"]).resolve()
+    installer = Path(os.environ.get("SM_AUTOLAB_INSTALLER_INSTALLER", sys.executable)).resolve()
+    expected = os.environ.get("SM_AUTOLAB_INSTALLER_EXPECTED", "").strip()
+    backup = Path(os.environ["SM_AUTOLAB_INSTALLER_BACKUP"]).resolve()
+    failed = Path(os.environ["SM_AUTOLAB_INSTALLER_FAILED"]).resolve()
+    health = Path(os.environ["SM_AUTOLAB_INSTALLER_HEALTH"]).resolve()
+
+    root = tk.Tk()
+    root.title("SM AutoLab — Atualização")
+    root.resizable(False, False)
+    root.configure(bg="#F5F5F5")
+    root.attributes("-topmost", True)
+    width, height = 470, 210
+    root.update_idletasks()
+    root.geometry(
+        f"{width}x{height}+"
+        f"{max((root.winfo_screenwidth()-width)//2,0)}+"
+        f"{max((root.winfo_screenheight()-height)//2,0)}"
+    )
+
+    title_var = tk.StringVar(value="Atualização do SM AutoLab")
+    status_var = tk.StringVar(value=f"Preparando a instalação da v{expected or 'nova versão'}…")
+    tk.Label(root,textvariable=title_var,bg="#F5F5F5",fg="#242424",
+             font=("Segoe UI",14,"bold")).pack(anchor="w",padx=24,pady=(24,4))
+    tk.Label(root,textvariable=status_var,bg="#F5F5F5",fg="#616161",
+             font=("Segoe UI",10),wraplength=420,justify="left").pack(anchor="w",padx=24,pady=(0,16))
+    progress=ttk.Progressbar(root,mode="indeterminate",length=422)
+    progress.pack(padx=24,pady=(0,16))
+    progress.start(10)
+
+    def clean_env(env):
+        for key in (
+            "SM_AUTOLAB_INSTALLER","SM_AUTOLAB_INSTALLER_TARGET",
+            "SM_AUTOLAB_INSTALLER_PAYLOAD","SM_AUTOLAB_INSTALLER_INSTALLER",
+            "SM_AUTOLAB_INSTALLER_EXPECTED","SM_AUTOLAB_INSTALLER_BACKUP",
+            "SM_AUTOLAB_INSTALLER_FAILED","SM_AUTOLAB_INSTALLER_HEALTH",
+            "SM_AUTOLAB_UPDATE_HEALTH","SM_AUTOLAB_UPDATE_EXPECTED_VERSION",
+            "PYINSTALLER_RESET_ENVIRONMENT",
+        ):
+            env.pop(key, None)
+        return env
+
+    def launch(path, env):
+        flags=0
+        if os.name=="nt":
+            flags=subprocess.CREATE_NEW_PROCESS_GROUP|subprocess.DETACHED_PROCESS|subprocess.CREATE_NO_WINDOW
+        return subprocess.Popen([str(path)],cwd=str(path.parent),close_fds=True,creationflags=flags,env=env)
+
+    def health_ok():
+        try:
+            lines=health.read_text(encoding="utf-8",errors="ignore").splitlines()
+        except (OSError,UnicodeError):
+            return False
+        return (not expected) or f"version={expected}" in lines
+
+    def cleanup_later():
+        try: progress.stop()
+        except Exception: pass
+        if os.name=="nt":
+            try:
+                cmd=f'ping 127.0.0.1 -n 3 >nul & rmdir /s /q "{payload.parent}"'
+                subprocess.Popen(["cmd.exe","/d","/c",cmd],cwd=str(Path.home()),
+                    close_fds=True,creationflags=subprocess.CREATE_NO_WINDOW,
+                    env=clean_env(os.environ.copy()))
+            except OSError:
+                pass
+        root.destroy()
+
+    def set_ui(title,status):
+        root.after(0,lambda:(title_var.set(title),status_var.set(status)))
+
+    def worker():
+        try:
+            set_ui("Atualização do SM AutoLab","Aguardando o encerramento da versão atual…")
+            deadline=time.time()+35
+            while time.time()<deadline:
+                try:
+                    backup.unlink(missing_ok=True)
+                    os.replace(str(target),str(backup))
+                    break
+                except OSError:
+                    time.sleep(0.25)
+            else:
+                raise RuntimeError("A versão atual não pôde ser encerrada para a substituição.")
+
+            set_ui("Atualização do SM AutoLab",f"Instalando a v{expected or 'nova versão'}…")
+            os.replace(str(payload),str(target))
+            health.unlink(missing_ok=True)
+
+            env=clean_env(os.environ.copy())
+            env["PYINSTALLER_RESET_ENVIRONMENT"]="1"
+            env["SM_AUTOLAB_UPDATE_HEALTH"]=str(health)
+            env["SM_AUTOLAB_UPDATE_EXPECTED_VERSION"]=expected
+            set_ui("Atualização do SM AutoLab","Iniciando e verificando a nova versão…")
+            launch(target,env)
+
+            deadline=time.time()+28
+            while time.time()<deadline:
+                if health_ok():
+                    set_ui("Atualização concluída","Nova versão iniciada com sucesso.")
+                    root.after(0,lambda:root.after(700,cleanup_later))
+                    return
+                time.sleep(0.25)
+            raise RuntimeError("A nova versão não confirmou uma inicialização válida.")
+
+        except Exception as exc:
+            set_ui("Falha na atualização","A atualização falhou. Restaurando a versão anterior…")
+            try:
+                failed.unlink(missing_ok=True)
+                if target.exists():
+                    os.replace(str(target),str(failed))
+            except OSError:
+                pass
+            restored=False
+            try:
+                os.replace(str(backup),str(target))
+                restored=True
+            except OSError:
+                pass
+            try:
+                payload.unlink(missing_ok=True)
+                health.unlink(missing_ok=True)
+                failed.unlink(missing_ok=True)
+            except OSError:
+                pass
+            if restored:
+                try:
+                    launch(target,clean_env(os.environ.copy()))
+                except OSError:
+                    pass
+                set_ui("Atualização revertida","A versão anterior foi restaurada. A atualização não foi aplicada.")
+            else:
+                set_ui("Falha na atualização",f"Não foi possível restaurar a versão anterior.\n{exc}")
+            root.after(0,lambda:root.after(3200,cleanup_later))
+
+    threading.Thread(target=worker,name="SM-AutoLab-Updater",daemon=True).start()
+    root.mainloop()
+    return True
+
+
 def install_ui(App):
     """Inicializa somente o runtime canônico; não injeta wrappers ou eventos globais."""
     if getattr(App, "_ui_runtime_instalado", False):
@@ -322,10 +472,11 @@ def install_ui(App):
 
 
 if __name__ == "__main__":
+    if _update_installer_mode():
+        raise SystemExit(0)
+
     install_ui(App)
     _validar_base_aplicacao()
-    _sinalizar_inicializacao_atualizacao_sucesso()
-
     startup_update = {"info": None}
     update_ready = threading.Event()
 
@@ -348,4 +499,5 @@ if __name__ == "__main__":
         startup_update_info=startup_update["info"],
         startup_update_checked=update_ready.is_set(),
     )
+    _sinalizar_inicializacao_atualizacao_sucesso()
     app.app.mainloop()
