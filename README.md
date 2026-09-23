@@ -152,8 +152,6 @@ O CI verifica continuamente:
 O CI utiliza **Python 3.14.7** e **pip 26.2.1**. O build oficial utiliza **PyInstaller 6.22.3**.
 
 ## Release
-O executável Windows é publicado com assinatura Authenticode via Azure Artifact Signing quando os secrets de assinatura estão configurados no GitHub Actions; o pipeline valida a assinatura antes de publicar o artefato.
-
 
 A versão oficial do código neste `main` é **2.99.56**.
 
