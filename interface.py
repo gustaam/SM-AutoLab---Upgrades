@@ -2404,25 +2404,6 @@ class App:
             # Ícone é somente visual; falha aqui não deve impedir a abertura.
             pass
 
-    def _obter_icone_menu_aplicativo(self):
-        cached = getattr(self, "_menu_app_icon", None)
-        if cached is not None:
-            return cached
-        try:
-            base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-            caminho = base / "SM AutoLab.ico"
-            with Image.open(caminho) as origem:
-                imagem = origem.convert("RGBA").copy()
-            self._menu_app_icon_image = imagem
-            self._menu_app_icon = ctk.CTkImage(
-                light_image=imagem,
-                dark_image=imagem,
-                size=(22, 22),
-            )
-            return self._menu_app_icon
-        except Exception:
-            return None
-
     def _agendar_estabilizacao_apos_retomada(self, _event=None):
         if self._closing:
             return
