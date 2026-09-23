@@ -61,7 +61,9 @@ class ConsolidatedValidationTests(unittest.TestCase):
         interface = (root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("ARROW_SCROLL_UNITS = 4", interface)
         self.assertIn("_sm_autolab_tooltip_message", interface)
-        self.assertIn("border_width=0 if dark_mode else 1", interface)
+        self.assertNotIn("border_width=0 if dark_mode else 1", interface)
+        self.assertIn('"border": ("#D4E6D9", "#132219")', interface)
+        self.assertIn("border_width=1", interface)
         self.assertNotIn("image=self._obter_icone_menu_aplicativo()", interface)
         self.assertIn('fg_color=("#FFFFFF", "#2D3338")', interface)
         self.assertIn("def _configurar_icone_janela(self, janela=None):", interface)
@@ -70,6 +72,12 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn('text="Ajustes do Feegow"', interface)
         self.assertNotIn("image=self._obter_icone_menu_aplicativo()", interface)
         self.assertNotIn('compound="left"', interface)
+        self.assertIn("DWMWA_CAPTION_COLOR = 35", interface)
+        self.assertIn("DWMWA_TEXT_COLOR = 36", interface)
+        self.assertIn("_configurar_titulo_dwm(hwnd, bool(dark))", interface)
+        self.assertIn('"border": ("#D4E6D9", "#132219")', interface)
+        self.assertIn('border_width=1,', interface)
+        self.assertIn('detalhes_erros = execucao.get("erros_detalhes") or []', interface)
 
     def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):
         self.assertTrue(callable(validate_dependencies))

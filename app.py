@@ -324,6 +324,7 @@ class Resultados:
         self.total_planejado = total
         self.itens = []
         self.codigos_erros = []
+        self.erros_detalhes = []
         self._sucessos = 0
         self._erros = 0
 
@@ -351,6 +352,14 @@ class Resultados:
         )
         if codigo not in self.codigos_erros:
             self.codigos_erros.append(codigo)
+        self.erros_detalhes.append(
+            {
+                "numero": int(numero),
+                "codigo": codigo,
+                "erro": str(erro),
+                "horario": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
         self._erros += 1
 
     @property

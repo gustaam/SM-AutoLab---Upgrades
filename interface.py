@@ -390,7 +390,11 @@ def _ui_bind_card_hover(card, accent):
                 if card.winfo_exists():
                     card.configure(
                         border_width=max(1, card._sm_card_base_width),
-                        border_color=accent,
+                        border_color=(
+                            card._sm_card_base_border
+                            if ctk.get_appearance_mode().lower() == "dark"
+                            else accent
+                        ),
                     )
             except Exception:
                 pass
@@ -2178,6 +2182,8 @@ __all__ = [
 
 DWMWA_TRANSITIONS_FORCEDISABLED = 3
 DWMWA_SYSTEMBACKDROP_TYPE = 38
+DWMWA_CAPTION_COLOR = 35
+DWMWA_TEXT_COLOR = 36
 DWMWCP_ROUND = 2
 DWMSBT_AUTO = 0
 DWMSBT_NONE = 1
@@ -2237,6 +2243,30 @@ def _set_dwm_attribute(hwnd, attribute, value):
     except (AttributeError, OSError, TypeError, ValueError):
         return False
 
+def _windows_colorref(hex_color):
+    valor = str(hex_color or "").strip().lstrip("#")
+    if len(valor) != 6:
+        return ctypes.c_uint32(0)
+    try:
+        vermelho = int(valor[0:2], 16)
+        verde = int(valor[2:4], 16)
+        azul = int(valor[4:6], 16)
+    except ValueError:
+        return ctypes.c_uint32(0)
+    return ctypes.c_uint32((azul << 16) | (verde << 8) | vermelho)
+
+
+def _configurar_titulo_dwm(hwnd, dark: bool):
+    """Define explicitamente a cor da barra de título e do texto no Windows 11."""
+    if not _windows11_available():
+        return False
+    cor_fundo = _windows_colorref("#252A2E" if dark else "#F5F5F5")
+    cor_texto = _windows_colorref("#FFFFFF" if dark else "#1F1F1F")
+    ok_fundo = _set_dwm_attribute(hwnd, DWMWA_CAPTION_COLOR, cor_fundo)
+    ok_texto = _set_dwm_attribute(hwnd, DWMWA_TEXT_COLOR, cor_texto)
+    return ok_fundo and ok_texto
+
+
 def aplicar_backdrop_sistema(window, material="mica", dark=None):
     """Aplica Mica/Mica Alt/Acrylic via DWM; retorna False quando indisponível."""
     if window is None or not _windows11_backdrops_available():
@@ -2260,6 +2290,7 @@ def aplicar_backdrop_sistema(window, material="mica", dark=None):
         ctypes.c_int(backdrop),
     )
     _set_dwm_attribute(hwnd, 20, ctypes.c_int(1 if bool(dark) else 0))
+    _configurar_titulo_dwm(hwnd, bool(dark))
     _set_dwm_attribute(hwnd, 33, ctypes.c_int(DWMWCP_ROUND))
     return ok
 
@@ -2272,7 +2303,8 @@ def atualizar_backdrop_tema(window, dark: bool):
         hwnd = int(window.winfo_id())
     except Exception:
         return False
-    return _set_dwm_attribute(hwnd, 20, ctypes.c_int(1 if dark else 0))
+    _set_dwm_attribute(hwnd, 20, ctypes.c_int(1 if dark else 0))
+    return _configurar_titulo_dwm(hwnd, bool(dark))
 
 def _ler_versao_aplicativo():
     """Lê a versão embutida no executável/projeto."""
@@ -3737,18 +3769,21 @@ class App:
         palettes = {
             "Executados": {
                 "card": ("#EEF9F1", "#1E3325"),
+                "border": ("#D4E6D9", "#132219"),
                 "icon": ("#27AE60", "#2FAE63"),
                 "title": ("#167A43", "#70D995"),
                 "value": ("#123B27", "#ECFFF1"),
             },
             "Não executados": {
                 "card": ("#FFF1F2", "#3A2528"),
+                "border": ("#F0D7DA", "#241619"),
                 "icon": ("#E53935", "#F15B5B"),
                 "title": ("#C62828", "#FF8A8A"),
                 "value": ("#541A1D", "#FFF0F0"),
             },
             "Código atual": {
                 "card": ("#EEF6FF", "#1C2D3D"),
+                "border": ("#D8E7F5", "#15222E"),
                 "icon": ("#1976D2", "#3F9BEF"),
                 "title": ("#125AA3", "#73B8FF"),
                 "value": ("#102E4A", "#EDF7FF"),
@@ -3758,6 +3793,7 @@ class App:
             str(title),
             {
                 "card": self.CARD,
+                "border": self.BORDER,
                 "icon": self.CARD,
                 "title": self.SUBTEXT,
                 "value": self.TEXT,
@@ -3769,14 +3805,8 @@ class App:
             parent,
             fg_color=palette["card"],
             corner_radius=10,
-            border_width=0 if dark_mode else 1,
-            border_color=(
-                palette["card"][1]
-                if dark_mode and isinstance(palette["card"], tuple)
-                else palette["card"][0]
-                if isinstance(palette["card"], tuple)
-                else self.BORDER
-            ),
+            border_width=1,
+            border_color=palette.get("border", self.BORDER),
             height=80,
         )
         row = ctk.CTkFrame(card, fg_color="transparent")
@@ -4363,6 +4393,7 @@ class App:
             "sucessos": 0,
             "erros": 0,
             "codigos_erros": [],
+            "erros_detalhes": [],
         }
         self._codigos_erros_execucao = []
         self._salvar_estado_persistente()
@@ -4378,35 +4409,84 @@ class App:
         self._execucao_atual["erros"] = int(getattr(resultado, "erros", 0) or 0)
         self._execucao_atual["processados"] = int(getattr(resultado, "processados", 0) or 0)
 
-        # Consolida todas as fontes disponíveis para que a quantidade de
-        # erros nunca exista sem os respectivos códigos.
+        # Consolida os detalhes estruturados e todos os códigos conhecidos.
+        # O histórico passa a ter uma fonte explícita para renderização dos erros.
+        detalhes_erros = []
+        detalhes_fonte = getattr(resultado, "erros_detalhes", []) or []
+        if isinstance(detalhes_fonte, list):
+            for detalhe in detalhes_fonte:
+                if not isinstance(detalhe, dict):
+                    continue
+                codigo = str(detalhe.get("codigo", "") or "").strip()
+                if not codigo:
+                    continue
+                detalhes_erros.append({
+                    "numero": (
+                        int(detalhe.get("numero"))
+                        if str(detalhe.get("numero", "")).isdigit()
+                        else None
+                    ),
+                    "codigo": codigo,
+                    "erro": str(detalhe.get("erro", "") or ""),
+                    "horario": str(detalhe.get("horario", "") or ""),
+                })
+
+        for item in getattr(resultado, "itens", []) or []:
+            if isinstance(item, dict):
+                item_status = str(item.get("status", "")).strip().casefold()
+                codigo = str(item.get("codigo") or item.get("code") or "").strip()
+                erro = str(item.get("erro") or item.get("error") or "").strip()
+                numero = item.get("numero")
+                horario = str(item.get("horario", "") or "")
+            else:
+                item_status = str(getattr(item, "status", "")).strip().casefold()
+                codigo = str(getattr(item, "codigo", "")).strip()
+                erro = str(getattr(item, "erro", "") or "").strip()
+                numero = getattr(item, "numero", None)
+                horario = str(getattr(item, "horario", "") or "")
+            if item_status in {"erro", "não executado", "nao executado"} and codigo:
+                if not any(
+                    str(d.get("codigo", "")).strip() == codigo
+                    for d in detalhes_erros
+                ):
+                    detalhes_erros.append({
+                        "numero": int(numero) if str(numero).isdigit() else None,
+                        "codigo": codigo,
+                        "erro": erro,
+                        "horario": horario,
+                    })
+
         codigos_erros = []
-        fontes_codigos = [
+        for fonte in (
             getattr(self, "_codigos_erros_execucao", []),
             self._execucao_atual.get("codigos_erros", []) or [],
             getattr(resultado, "codigos_erros", []) or [],
-        ]
-        for fonte in fontes_codigos:
-            for codigo in fonte:
+            [detalhe.get("codigo") for detalhe in detalhes_erros],
+        ):
+            for codigo in fonte or []:
                 texto = str(codigo).strip()
                 if texto and texto not in codigos_erros:
                     codigos_erros.append(texto)
 
-        for item in getattr(resultado, "itens", []) or []:
-            if isinstance(item, dict):
-                status = str(item.get("status", "")).strip().casefold()
-                texto = str(item.get("codigo") or item.get("code") or "").strip()
-            else:
-                status = str(getattr(item, "status", "")).strip().casefold()
-                texto = str(getattr(item, "codigo", "")).strip()
-            if status in {"erro", "não executado", "nao executado"}:
-                if texto and texto not in codigos_erros:
-                    codigos_erros.append(texto)
+        for codigo in codigos_erros:
+            if not any(
+                str(detalhe.get("codigo", "")).strip() == codigo
+                for detalhe in detalhes_erros
+            ):
+                detalhes_erros.append({
+                    "numero": None,
+                    "codigo": codigo,
+                    "erro": "",
+                    "horario": "",
+                })
+
         self._execucao_atual["codigos_erros"] = codigos_erros
+        self._execucao_atual["erros_detalhes"] = detalhes_erros
         self._execucao_atual["erros"] = max(
             int(self._execucao_atual.get("erros", 0) or 0),
             int(getattr(resultado, "erros", 0) or 0),
             len(codigos_erros),
+            len(detalhes_erros),
         )
 
         self._historico_execucoes.append(dict(self._execucao_atual))
@@ -4729,8 +4809,19 @@ class App:
         total = execucao.get("total", 0)
         sucessos = execucao.get("sucessos", 0)
         erros = int(execucao.get("erros", 0) or 0)
+        detalhes_erros = execucao.get("erros_detalhes") or []
+        if not isinstance(detalhes_erros, list):
+            detalhes_erros = execucao.get("erros_detalhes") or []
+        if not isinstance(detalhes_erros, list):
+            detalhes_erros = []
+        codigos_detalhe = [
+            item.get("codigo")
+            for item in detalhes_erros
+            if isinstance(item, dict) and str(item.get("codigo", "")).strip()
+        ]
         codigos_raw = (
-            execucao.get("codigos_erros")
+            codigos_detalhe
+            or execucao.get("codigos_erros")
             or execucao.get("erros_codigos")
             or execucao.get("codigos_erro")
             or execucao.get("codigos")
