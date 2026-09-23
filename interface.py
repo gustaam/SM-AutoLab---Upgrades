@@ -2323,6 +2323,7 @@ class App:
         self._historico_execucoes = []
         self._execucao_atual = None
         self._erros_codigos = []
+        self._codigos_erros_execucao = []
         self._historico_arquivo = Path.home() / "SM AutoLab" / "historico_execucoes.json"
         self._erros_arquivo = Path.home() / "SM AutoLab" / "historico_erros.json"
         self._historico_arquivo_legado = Path.home() / ".sm_autolab_historico.json"
@@ -4269,6 +4270,12 @@ class App:
         texto = str(codigo or "").strip()
         if not texto:
             return
+
+        codigos_execucao = getattr(self, "_codigos_erros_execucao", [])
+        if texto not in codigos_execucao:
+            codigos_execucao.append(texto)
+        self._codigos_erros_execucao = codigos_execucao
+
         codigos = self._execucao_atual.setdefault("codigos_erros", [])
         if texto not in codigos:
             codigos.append(texto)
@@ -4277,7 +4284,6 @@ class App:
             len(codigos),
         )
         self._salvar_estado_persistente()
-        self._restaurar_historico_na_tela()
 
     def _copiar_codigo(self, codigo):
         self.app.clipboard_clear()
@@ -4376,6 +4382,7 @@ class App:
             "erros": 0,
             "codigos_erros": [],
         }
+        self._codigos_erros_execucao = []
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
 
@@ -4389,17 +4396,30 @@ class App:
         self._execucao_atual["erros"] = int(getattr(resultado, "erros", 0) or 0)
         self._execucao_atual["processados"] = int(getattr(resultado, "processados", 0) or 0)
 
+        # Consolida todas as fontes disponíveis para que a quantidade de
+        # erros nunca exista sem os respectivos códigos.
         codigos_erros = []
-        for codigo in self._execucao_atual.get("codigos_erros", []) or []:
-            texto = str(codigo).strip()
-            if texto and texto not in codigos_erros:
-                codigos_erros.append(texto)
-        for item in getattr(resultado, "itens", []):
-            if str(getattr(item, "status", "")).strip().casefold() != "erro":
-                continue
-            texto = str(getattr(item, "codigo", "")).strip()
-            if texto and texto not in codigos_erros:
-                codigos_erros.append(texto)
+        fontes_codigos = [
+            getattr(self, "_codigos_erros_execucao", []),
+            self._execucao_atual.get("codigos_erros", []) or [],
+            getattr(resultado, "codigos_erros", []) or [],
+        ]
+        for fonte in fontes_codigos:
+            for codigo in fonte:
+                texto = str(codigo).strip()
+                if texto and texto not in codigos_erros:
+                    codigos_erros.append(texto)
+
+        for item in getattr(resultado, "itens", []) or []:
+            if isinstance(item, dict):
+                status = str(item.get("status", "")).strip().casefold()
+                texto = str(item.get("codigo") or item.get("code") or "").strip()
+            else:
+                status = str(getattr(item, "status", "")).strip().casefold()
+                texto = str(getattr(item, "codigo", "")).strip()
+            if status in {"erro", "não executado", "nao executado"}:
+                if texto and texto not in codigos_erros:
+                    codigos_erros.append(texto)
         self._execucao_atual["codigos_erros"] = codigos_erros
         self._execucao_atual["erros"] = max(
             int(self._execucao_atual.get("erros", 0) or 0),
@@ -4409,6 +4429,7 @@ class App:
 
         self._historico_execucoes.append(dict(self._execucao_atual))
         self._execucao_atual = None
+        self._codigos_erros_execucao = []
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
         self._atualizar_contador_arquivos()
