@@ -490,6 +490,9 @@ def principal_interno(codigos, aplicativo=None, indice_inicial=0):
             except AutomacaoError as exc:
                 resultados.registrar_erro(numero, codigo, str(exc))
                 if aplicativo:
+                    registrar = getattr(aplicativo, "_registrar_codigo_erro_historico", None)
+                    if callable(registrar):
+                        registrar(codigo)
                     aplicativo._add_activity(
                         f"Erro ({exc.tipo}) no código {codigo}. Indo para o próximo...",
                         aplicativo.ERROR,
@@ -545,6 +548,9 @@ def principal(planilha_path, sheet, aplicativo=None, indice_inicial=0):
             except AutomacaoError as exc:
                 resultados.registrar_erro(numero, codigo, str(exc))
                 if aplicativo:
+                    registrar = getattr(aplicativo, "_registrar_codigo_erro_historico", None)
+                    if callable(registrar):
+                        registrar(codigo)
                     aplicativo._add_activity(
                         f"Erro ({exc.tipo}) no código {codigo}. Indo para o próximo...",
                         aplicativo.ERROR,

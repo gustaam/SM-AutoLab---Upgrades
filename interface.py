@@ -323,7 +323,10 @@ def _ui_tooltip_text(widget):
     return None
 
 def _ui_attach_tooltip(widget):
-    message = _ui_tooltip_text(widget)
+    explicit_message = str(
+        getattr(widget, "_sm_autolab_tooltip_message", "") or ""
+    ).strip()
+    message = explicit_message or _ui_tooltip_text(widget)
     tooltip = getattr(widget, "_sm_autolab_tooltip", None)
     if tooltip is not None:
         tooltip.update_message(message)
@@ -432,6 +435,7 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
     MIN_THUMB = 28
     REPEAT_DELAY = 420
     REPEAT_INTERVAL = 55
+    ARROW_SCROLL_UNITS = 4
 
     def __init__(self, master, orient="vertical", command=None, **kwargs):
         self.orient = str(orient or "vertical").lower()
@@ -515,7 +519,12 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
         thumb_length = max(self.MIN_THUMB, track_length * visible)
         thumb_length = min(track_length, thumb_length)
         movable = max(0.0, track_length - thumb_length)
-        thumb_start = start + movable * self._first
+        if self._first <= 0.001:
+            thumb_start = start
+        elif self._last >= 0.999:
+            thumb_start = end - thumb_length
+        else:
+            thumb_start = start + movable * self._first
         thumb_end = thumb_start + thumb_length
         return start, end, thumb_start, thumb_end
 
@@ -644,7 +653,11 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
                 pass
 
     def _scroll_one(self, direction):
-        self._run_command("scroll", direction, "units")
+        self._run_command(
+            "scroll",
+            int(direction) * self.ARROW_SCROLL_UNITS,
+            "units",
+        )
 
     def _start_repeat(self, direction):
         self._cancel_repeat()
@@ -2387,6 +2400,25 @@ class App:
             # Ícone é somente visual; falha aqui não deve impedir a abertura.
             pass
 
+    def _obter_icone_menu_aplicativo(self):
+        cached = getattr(self, "_menu_app_icon", None)
+        if cached is not None:
+            return cached
+        try:
+            base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+            caminho = base / "SM AutoLab.ico"
+            with Image.open(caminho) as origem:
+                imagem = origem.convert("RGBA").copy()
+            self._menu_app_icon_image = imagem
+            self._menu_app_icon = ctk.CTkImage(
+                light_image=imagem,
+                dark_image=imagem,
+                size=(22, 22),
+            )
+            return self._menu_app_icon
+        except Exception:
+            return None
+
     def _agendar_estabilizacao_apos_retomada(self, _event=None):
         if self._closing:
             return
@@ -3285,6 +3317,8 @@ class App:
         mudar = ctk.CTkButton(
             menu,
             text="Ajustes do Feegow",
+            image=self._obter_icone_menu_aplicativo(),
+            compound="left",
             command=self._abrir_popup_feegow,
             width=202,
             height=40,
@@ -3746,12 +3780,19 @@ class App:
             },
         )
 
+        dark_mode = ctk.get_appearance_mode().lower() == "dark"
         card = ctk.CTkFrame(
             parent,
             fg_color=palette["card"],
             corner_radius=10,
-            border_width=1,
-            border_color=palette["card"][0] if isinstance(palette["card"], tuple) else self.BORDER,
+            border_width=0 if dark_mode else 1,
+            border_color=(
+                palette["card"][1]
+                if dark_mode and isinstance(palette["card"], tuple)
+                else palette["card"][0]
+                if isinstance(palette["card"], tuple)
+                else self.BORDER
+            ),
             height=80,
         )
         row = ctk.CTkFrame(card, fg_color="transparent")
@@ -3803,18 +3844,9 @@ class App:
             "Não executados": "Mostra a quantidade de códigos que apresentaram erro durante a execução.",
             "Código atual": "Mostra o código que está sendo processado no momento.",
         }
+        card._sm_autolab_tooltip_message = card_tooltips.get(title, "")
         _ui_bind_card_hover(card, accent)
         _ui_attach_tooltip(card)
-        card._sm_autolab_tooltip_message = card_tooltips.get(title)
-        if card._sm_autolab_tooltip_message:
-            try:
-                card._sm_autolab_tooltip = _SMAutoLabTooltip(
-                    card,
-                    card._sm_autolab_tooltip_message,
-                    bind_children=True,
-                )
-            except Exception:
-                card._sm_autolab_tooltip = None
         return card
 
     def _fonte_icone_estatistica(self, size):
@@ -4039,28 +4071,54 @@ class App:
             registros = []
             erros = []
             tema = "system"
-            for caminho in (self._historico_arquivo, self._historico_arquivo_legado):
-                if not caminho.exists():
-                    continue
+            usou_legado = False
+
+            if self._historico_arquivo.exists():
+                fontes = [self._historico_arquivo]
+            elif self._historico_arquivo_legado.exists():
+                fontes = [self._historico_arquivo_legado]
+                usou_legado = True
+            else:
+                fontes = []
+
+            execucao_pendente = None
+            for caminho in fontes:
                 dados = read_json_with_backup(caminho, {})
                 if not isinstance(dados, dict):
                     continue
+
                 execucoes = dados.get("historico_execucoes", [])
                 if isinstance(execucoes, list):
-                    registros.extend(item for item in execucoes if isinstance(item, dict))
+                    registros.extend(
+                        item for item in execucoes if isinstance(item, dict)
+                    )
+
                 lista_erros = dados.get("erros", [])
                 if isinstance(lista_erros, list):
-                    erros.extend(str(item).strip() for item in lista_erros if str(item).strip())
+                    erros.extend(
+                        str(item).strip()
+                        for item in lista_erros
+                        if str(item).strip()
+                    )
+
                 valor_tema = dados.get("tema")
                 if valor_tema in ("light", "dark", "system"):
                     tema = valor_tema
+
+                atual = dados.get("execucao_atual")
+                if isinstance(atual, dict):
+                    execucao_pendente = dict(atual)
 
             if self._erros_arquivo.exists():
                 dados_erros = read_json_with_backup(self._erros_arquivo, {})
                 if isinstance(dados_erros, dict):
                     lista_dedicada = dados_erros.get("erros", [])
                     if isinstance(lista_dedicada, list):
-                        erros.extend(str(item).strip() for item in lista_dedicada if str(item).strip())
+                        erros.extend(
+                            str(item).strip()
+                            for item in lista_dedicada
+                            if str(item).strip()
+                        )
 
             unicos = {}
             for item in registros:
@@ -4075,6 +4133,15 @@ class App:
 
             self._tema = tema
             self._historico_execucoes = list(unicos.values())
+            self._execucao_atual = None
+
+            if isinstance(execucao_pendente, dict):
+                status = str(execucao_pendente.get("status", "")).strip().casefold()
+                if any(
+                    marcador in status
+                    for marcador in ("em andamento", "interrompida", "parando")
+                ):
+                    self._execucao_atual = execucao_pendente
 
             erros_reconstruidos = []
             for execucao in self._historico_execucoes:
@@ -4082,24 +4149,44 @@ class App:
                     texto = str(codigo).strip()
                     if texto and texto not in erros_reconstruidos:
                         erros_reconstruidos.append(texto)
+
+            if self._execucao_atual:
+                for codigo in self._execucao_atual.get("codigos_erros", []) or []:
+                    texto = str(codigo).strip()
+                    if texto and texto not in erros_reconstruidos:
+                        erros_reconstruidos.append(texto)
+
             for codigo in erros:
                 texto = str(codigo).strip()
                 if texto and texto not in erros_reconstruidos:
                     erros_reconstruidos.append(texto)
 
             self._erros_codigos = erros_reconstruidos[-200:]
-            if self._erros_codigos and not self._erros_arquivo.exists():
+
+            if usou_legado:
+                self._salvar_estado_persistente()
+                try:
+                    self._historico_arquivo_legado.unlink()
+                except OSError:
+                    pass
+            elif self._erros_codigos and not self._erros_arquivo.exists():
                 self._salvar_erros_persistentes()
         except Exception:
             LOGGER.exception("Falha ao carregar o histórico persistente.")
             self._historico_execucoes = []
+            self._execucao_atual = None
             self._erros_codigos = []
 
     def _salvar_estado_persistente(self):
         try:
             dados = {
-                "version": 3,
+                "version": 4,
                 "historico_execucoes": self._historico_execucoes,
+                "execucao_atual": (
+                    dict(self._execucao_atual)
+                    if isinstance(self._execucao_atual, dict)
+                    else None
+                ),
                 "tema": self._tema,
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
@@ -4140,6 +4227,22 @@ class App:
             return
         self._erros_codigos.append(codigo)
         self._salvar_erros_persistentes()
+
+    def _registrar_codigo_erro_historico(self, codigo):
+        if not self._execucao_atual:
+            return
+        texto = str(codigo or "").strip()
+        if not texto:
+            return
+        codigos = self._execucao_atual.setdefault("codigos_erros", [])
+        if texto not in codigos:
+            codigos.append(texto)
+        self._execucao_atual["erros"] = max(
+            int(self._execucao_atual.get("erros", 0) or 0),
+            len(codigos),
+        )
+        self._salvar_estado_persistente()
+        self._restaurar_historico_na_tela()
 
     def _copiar_codigo(self, codigo):
         self.app.clipboard_clear()
@@ -4250,12 +4353,25 @@ class App:
         self._execucao_atual["sucessos"] = int(getattr(resultado, "sucessos", 0) or 0)
         self._execucao_atual["erros"] = int(getattr(resultado, "erros", 0) or 0)
         self._execucao_atual["processados"] = int(getattr(resultado, "processados", 0) or 0)
-        self._execucao_atual["codigos_erros"] = [
-            str(item.codigo).strip()
-            for item in getattr(resultado, "itens", [])
-            if str(getattr(item, "status", "")).strip().casefold() == "erro"
-            and str(getattr(item, "codigo", "")).strip()
-        ]
+
+        codigos_erros = []
+        for codigo in self._execucao_atual.get("codigos_erros", []) or []:
+            texto = str(codigo).strip()
+            if texto and texto not in codigos_erros:
+                codigos_erros.append(texto)
+        for item in getattr(resultado, "itens", []):
+            if str(getattr(item, "status", "")).strip().casefold() != "erro":
+                continue
+            texto = str(getattr(item, "codigo", "")).strip()
+            if texto and texto not in codigos_erros:
+                codigos_erros.append(texto)
+        self._execucao_atual["codigos_erros"] = codigos_erros
+        self._execucao_atual["erros"] = max(
+            int(self._execucao_atual.get("erros", 0) or 0),
+            int(getattr(resultado, "erros", 0) or 0),
+            len(codigos_erros),
+        )
+
         self._historico_execucoes.append(dict(self._execucao_atual))
         self._execucao_atual = None
         self._salvar_estado_persistente()
@@ -4740,7 +4856,14 @@ class App:
             return
         self._historico_execucoes = []
         self._execucao_atual = None
+        self._erros_codigos = []
         self._salvar_estado_persistente()
+        self._salvar_erros_persistentes()
+        try:
+            if self._historico_arquivo_legado.exists():
+                self._historico_arquivo_legado.unlink()
+        except OSError:
+            pass
         self._restaurar_historico_na_tela()
         self._atualizar_contador_arquivos()
         self._add_activity("Histórico de execuções apagado.", self.WARNING)
@@ -4978,7 +5101,12 @@ class App:
         if recuperar_rascunho:
             self._planilha_recuperar_rascunho_se_houver()
 
-        toolbar=ctk.CTkFrame(win, fg_color=self.CARD, corner_radius=0, height=64)
+        toolbar=ctk.CTkFrame(
+            win,
+            fg_color=("#FFFFFF", "#2D3338"),
+            corner_radius=0,
+            height=64,
+        )
         toolbar.pack(fill="x"); toolbar.pack_propagate(False)
         title_bar=ctk.CTkFrame(toolbar, fg_color="transparent")
         title_bar.pack(side="left", padx=18, pady=8)

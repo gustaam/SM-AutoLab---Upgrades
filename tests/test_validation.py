@@ -52,6 +52,18 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("EXPECTED_COMMIT", release)
         self.assertIn("refs/tags/$($env:RELEASE_TAG)^{commit}", release)
         self.assertNotIn("push:\n    tags:", release)
+        self.assertIn("v3.0.0", release)
+        self.assertIn("DELETE", release)
+        self.assertIn("refs/tags/$oldTag", release)
+
+    def test_regressoes_visuais_e_de_rolagem_estao_protegidas(self):
+        root = Path(__file__).resolve().parents[1]
+        interface = (root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("ARROW_SCROLL_UNITS = 4", interface)
+        self.assertIn("_sm_autolab_tooltip_message", interface)
+        self.assertIn("border_width=0 if dark_mode else 1", interface)
+        self.assertIn("image=self._obter_icone_menu_aplicativo()", interface)
+        self.assertIn('fg_color=("#FFFFFF", "#2D3338")', interface)
 
     def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):
         self.assertTrue(callable(validate_dependencies))

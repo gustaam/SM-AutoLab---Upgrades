@@ -15,7 +15,10 @@ class HistoryPersistenceTests(unittest.TestCase):
     def _app_without_ui(self, root: Path):
         app = App.__new__(App)
         app._historico_arquivo = root / "historico.json"
+        app._historico_arquivo_legado = root / "historico_legado.json"
+        app._erros_arquivo = root / "historico_erros.json"
         app._historico_execucoes = []
+        app._execucao_atual = None
         app._erros_codigos = []
         app._tema = "system"
         app._restaurar_historico_na_tela = lambda: None
@@ -78,6 +81,85 @@ class HistoryPersistenceTests(unittest.TestCase):
             dados = json.loads(app._historico_arquivo.read_text(encoding="utf-8"))
             ids = {item["id"] for item in dados["historico_execucoes"]}
             self.assertEqual(ids, {"antiga", "falha"})
+
+    def test_limpar_historico_nao_reidrata_arquivo_legado(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app = self._app_without_ui(root)
+            agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            app._historico_arquivo.write_text(
+                json.dumps({
+                    "version": 4,
+                    "historico_execucoes": [
+                        {"id": "antiga", "inicio": agora, "erros": 1}
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            app._historico_arquivo_legado.write_text(
+                json.dumps({
+                    "historico_execucoes": [
+                        {"id": "legada", "inicio": agora, "erros": 3}
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            app._erros_arquivo.write_text(
+                json.dumps({"erros": ["123"]}),
+                encoding="utf-8",
+            )
+            app._historico_execucoes = [
+                {"id": "antiga", "inicio": agora, "erros": 1}
+            ]
+            app._erros_codigos = ["123"]
+            app.atualizar_status = lambda *_args: None
+            app._add_activity = lambda *_args: None
+
+            with patch("interface.messagebox.askyesno", return_value=True):
+                app._limpar_historico()
+
+            dados = json.loads(app._historico_arquivo.read_text(encoding="utf-8"))
+            erros = json.loads(app._erros_arquivo.read_text(encoding="utf-8"))
+            self.assertEqual(dados["historico_execucoes"], [])
+            self.assertIsNone(dados["execucao_atual"])
+            self.assertEqual(erros["erros"], [])
+            self.assertFalse(app._historico_arquivo_legado.exists())
+
+    def test_execucao_atual_recente_e_codigos_com_erro_sao_persistidos(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self._app_without_ui(Path(temp))
+            app._execucao_atual = {
+                "id": "recente",
+                "inicio": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "Em andamento",
+                "erros": 1,
+                "codigos_erros": ["ABC123"],
+            }
+
+            app._salvar_estado_persistente()
+
+            dados = json.loads(app._historico_arquivo.read_text(encoding="utf-8"))
+            self.assertEqual(dados["execucao_atual"]["id"], "recente")
+            self.assertEqual(dados["execucao_atual"]["codigos_erros"], ["ABC123"])
+
+    def test_carregamento_recupera_execucao_atual_recente(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self._app_without_ui(Path(temp))
+            app._execucao_atual = {
+                "id": "recente",
+                "inicio": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "Em andamento",
+                "erros": 1,
+                "codigos_erros": ["ABC123"],
+            }
+            app._salvar_estado_persistente()
+
+            app2 = self._app_without_ui(Path(temp))
+            app2._carregar_estado_persistente()
+
+            self.assertIsNotNone(app2._execucao_atual)
+            self.assertEqual(app2._execucao_atual["id"], "recente")
+            self.assertEqual(app2._execucao_atual["codigos_erros"], ["ABC123"])
 
     def test_falha_de_persistencia_e_registrada(self):
         with tempfile.TemporaryDirectory() as temp:

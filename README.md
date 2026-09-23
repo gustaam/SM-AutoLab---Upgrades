@@ -4,7 +4,7 @@
 
 Aplicativo Windows para automação de autorizações no Feegow, com execução de códigos a partir de planilhas, recuperação segura de execuções, histórico, atualização integrada e interface moderna.
 
-**Versão atual no código:** `3.0.0`  
+**Versão atual no código:** `2.99.56`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -153,7 +153,7 @@ O CI utiliza **Python 3.14.7** e **pip 26.2.1**. O build oficial utiliza **PyIns
 
 ## Release
 
-A versão oficial do código neste `main` é **3.0.0**.
+A versão oficial do código neste `main` é **2.99.56**.
 
 O fluxo de release possui dois caminhos:
 
@@ -162,9 +162,9 @@ O fluxo de release possui dois caminhos:
 
 Antes da publicação, o pipeline confirma que a tag corresponde ao commit atualmente validado da `main`, executa novamente os testes, gera o executável, valida metadados e Defender, cria o manifesto e verifica remotamente os assets publicados.
 
-## Histórico recente da versão 3.0.0
+## Histórico recente da versão 2.99.56
 
-A série `3.0.0` consolidou, entre outras mudanças:
+A série `2.99.56` consolidou, entre outras mudanças:
 
 - barras de rolagem arredondadas com setas;
 - recuperação segura de planilhas interrompidas;

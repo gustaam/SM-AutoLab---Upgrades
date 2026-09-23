@@ -58,6 +58,39 @@ jobs:
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "EXPECTED_COMMIT=$expectedCommit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Remover release e tag antigas da série 3.0.0
+        if: env.RELEASE_TAG == 'v2.99.56'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $oldTag = "v3.0.0"
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $apiRoot = "https://api.github.com/repos/${{ github.repository }}"
+
+          try {
+            $oldRelease = Invoke-RestMethod -Uri "$apiRoot/releases/tags/$oldTag" -Headers $headers
+            Invoke-RestMethod -Method Delete -Uri "$apiRoot/releases/$($oldRelease.id)" -Headers $headers
+            Write-Host "Release $oldTag removida."
+          } catch {
+            $status = [int]$_.Exception.Response.StatusCode
+            if ($status -ne 404) { throw }
+            Write-Host "Release $oldTag já não existe."
+          }
+
+          try {
+            Invoke-RestMethod -Method Delete -Uri "$apiRoot/git/refs/tags/$oldTag" -Headers $headers
+            Write-Host "Tag $oldTag removida."
+          } catch {
+            $status = [int]$_.Exception.Response.StatusCode
+            if ($status -ne 404) { throw }
+            Write-Host "Tag $oldTag já não existe."
+          }
+
       - name: Verificar se a release automática já foi publicada
         id: release_state
         shell: pwsh
@@ -144,6 +177,36 @@ jobs:
             $tagCommit = (git rev-parse "refs/tags/$tag^{commit}").Trim()
             "EXPECTED_COMMIT=$tagCommit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
             Write-Host "Reparo manual baseado na tag $tag -> $tagCommit."
+          }
+
+      - name: Garantir tag da release no commit esperado
+        if: steps.release_state.outputs.already_published != 'true'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $apiRoot = "https://api.github.com/repos/${{ github.repository }}"
+          try {
+            $ref = Invoke-RestMethod -Uri "$apiRoot/git/ref/tags/$tag" -Headers $headers
+            if ([string]$ref.object.sha -ne $env:EXPECTED_COMMIT) {
+              $body = @{ sha = $env:EXPECTED_COMMIT; force = $true } | ConvertTo-Json
+              Invoke-RestMethod -Method Patch -Uri "$apiRoot/git/refs/tags/$tag" -Headers $headers -ContentType "application/json" -Body $body | Out-Null
+              Write-Host "Tag $tag alinhada ao commit esperado: $env:EXPECTED_COMMIT"
+            } else {
+              Write-Host "Tag $tag já aponta para $env:EXPECTED_COMMIT"
+            }
+          } catch {
+            $status = [int]$_.Exception.Response.StatusCode
+            if ($status -ne 404) { throw }
+            $body = @{ ref = "refs/tags/$tag"; sha = $env:EXPECTED_COMMIT } | ConvertTo-Json
+            Invoke-RestMethod -Method Post -Uri "$apiRoot/git/refs" -Headers $headers -ContentType "application/json" -Body $body | Out-Null
+            Write-Host "Tag $tag criada no commit esperado: $env:EXPECTED_COMMIT"
           }
 
       - name: Setup Python
