@@ -4762,6 +4762,8 @@ class App:
         erros = int(execucao.get("erros", 0) or 0)
         detalhes_erros = execucao.get("erros_detalhes") or []
         if not isinstance(detalhes_erros, list):
+            detalhes_erros = execucao.get("erros_detalhes") or []
+        if not isinstance(detalhes_erros, list):
             detalhes_erros = []
         codigos_detalhe = [
             item.get("codigo")
