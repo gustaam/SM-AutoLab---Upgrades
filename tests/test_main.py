@@ -753,7 +753,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
         self.assertIn("row = ctk.CTkFrame(",block)
-        self.assertIn('text="!" if pendente else ""',block)
+        self.assertIn('text=""',block)
+        self.assertIn('width=7',block)
+        self.assertIn('height=7',block)
         self.assertNotIn('text="Detalhes"',block)
 
     def test_atalhos_principais_estao_instalados_sem_bind_all(self):
@@ -786,8 +788,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _reposicionar_menus",start)
         block=source[start:end]
         self.assertIn('itens = self._historico_execucoes_visiveis()',block)
-        self.assertIn('child.bind("<Button-1>", abrir_detalhe, add="+")',block)
-        self.assertIn('for child in (row, *labels, indicador)',block)
+        self.assertIn('indicador.bind("<Button-1>", abrir_detalhe, add="+")',block)
+        self.assertIn('for child in (row, *labels)',block)
 
     def test_badge_historico_indica_erros_pendentes(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
