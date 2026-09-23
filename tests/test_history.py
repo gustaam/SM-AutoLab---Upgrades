@@ -42,12 +42,18 @@ class HistoryPersistenceTests(unittest.TestCase):
                 "planilha": "Planilha interna",
                 "pagina": 1,
                 "inicio_indice": 1,
+                "erros": 1,
+                "codigos_erros": ["ABC123"],
             }
             resultado = SimpleNamespace(
                 total_planejado=1,
-                sucessos=1,
-                erros=0,
+                sucessos=0,
+                erros=1,
                 processados=1,
+                codigos_erros=["ABC123"],
+                erros_detalhes=[
+                    {"numero": 1, "codigo": "ABC123", "erro": "falha", "horario": "10:00:00"}
+                ],
                 itens=[],
             )
 
