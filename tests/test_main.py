@@ -575,6 +575,23 @@ class CanonicalRuntimeTests(unittest.TestCase):
         for key in ("atividade", "histórico", "↶", "↷", "‹", "›"):
             self.assertIn(f'"{key}":', source)
 
+    def test_reexecucao_nao_cria_novo_registro_no_historico(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _finalizar_historico_execucao")
+        end = source.index("def _registrar_falha_historico", start)
+        block = source[start:end]
+
+        self.assertIn('eh_reexecucao = bool(self._execucao_atual.get("reexecucao_de"))', block)
+        self.assertIn(
+            'if not eh_reexecucao and self._historico_execucao_tem_erros(self._execucao_atual):',
+            block,
+        )
+
+        start = source.index("def _registrar_falha_historico")
+        end = source.index("def _restaurar_historico_na_tela", start)
+        fail_block = source[start:end]
+        self.assertIn('if not self._execucao_atual.get("reexecucao_de"):', fail_block)
+
     def test_reexecucao_de_erros_fica_registrada_e_nao_reaparece_na_mesma_execucao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _abrir_detalhe_historico")
