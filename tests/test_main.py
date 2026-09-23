@@ -598,7 +598,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _preencher_detalhe_pasta", start)
         open_block = source[start:end]
         detail_start = source.index("def _preencher_detalhe_pasta")
-        detail_end = source.index("def _atualizar_botao_apagar_historico", detail_start)
+        detail_end = source.index("def _limpar_historico", detail_start)
         detail_block = source[detail_start:detail_end]
 
         self.assertIn("codigos_erros_reexecutados", detail_block)
