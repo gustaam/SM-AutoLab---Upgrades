@@ -505,7 +505,7 @@ def principal_interno(codigos, aplicativo=None, indice_inicial=0):
                 if aplicativo:
                     registrar = getattr(aplicativo, "_registrar_codigo_erro_historico", None)
                     if callable(registrar):
-                        registrar(codigo)
+                        registrar(codigo, numero, str(exc))
                     aplicativo._add_activity(
                         f"Erro ({exc.tipo}) no código {codigo}. Indo para o próximo...",
                         aplicativo.ERROR,
