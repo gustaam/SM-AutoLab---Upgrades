@@ -180,10 +180,8 @@ class HistoryPersistenceTests(unittest.TestCase):
                 app._erros_arquivo.name + ".bak"
             )
             historico_backup.parent.mkdir(parents=True, exist_ok=True)
-            historico_backup.write_text("{}
-", encoding="utf-8")
-            erros_backup.write_text("{}
-", encoding="utf-8")
+            historico_backup.write_text("{}\n", encoding="utf-8")
+            erros_backup.write_text("{}\n", encoding="utf-8")
             app.atualizar_status = lambda *_args: None
             app._add_activity = lambda *_args: None
 
