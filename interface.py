@@ -2392,12 +2392,14 @@ class App:
         ctk.set_default_color_theme("blue")
         self.config_app()
 
-    def _configurar_icone_janela(self):
+    def _configurar_icone_janela(self, janela=None):
+        """Aplica o ícone oficial do aplicativo à barra de título da janela."""
+        janela = janela or self.app
         try:
             base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
             icone = base / "SM AutoLab.ico"
             if icone.exists():
-                self.app.iconbitmap(str(icone))
+                janela.iconbitmap(str(icone))
         except Exception:
             # Ícone é somente visual; falha aqui não deve impedir a abertura.
             pass
@@ -3523,6 +3525,7 @@ class App:
             }
 
         popup = ctk.CTkToplevel(self.app)
+        self._configurar_icone_janela(popup)
         popup.title("Ajustes do Feegow")
         popup.geometry("560x420")
         popup.resizable(False, False)
