@@ -1,4 +1,4 @@
-# Inicialização da aplicação e splash.
+# Ponto de entrada do SM AutoLab: inicialização, splash e preparação da interface desktop.
 from __future__ import annotations
 
 import ctypes
