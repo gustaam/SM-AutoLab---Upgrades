@@ -294,7 +294,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
         self.assertIn("height=42",block)
-        self.assertIn("uniform="historico"",block)
+        self.assertIn('uniform="historico"',block)
         self.assertIn("grid_columnconfigure",block)
         self.assertNotIn('text="Detalhes"',block)
 
