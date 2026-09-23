@@ -810,14 +810,19 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("mais_antigo = min(datas)",source)
 
     def test_atualizador_sinaliza_inicio_saudavel_e_reseta_ambiente(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('set "PYINSTALLER_RESET_ENVIRONMENT=1"', source)
-        self.assertIn('set "SM_AUTOLAB_UPDATE_HEALTH=%SM_HEALTH%"', source)
-        self.assertIn('set "SM_AUTOLAB_UPDATE_EXPECTED_VERSION=%SM_EXPECTED_VERSION%"', source)
-        main_source = (self.root / "main.py").read_text(encoding="utf-8")
-        self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso", main_source)
-        self.assertIn("SM_AUTOLAB_UPDATE_EXPECTED_VERSION", main_source)
-        self.assertIn("version=", main_source)
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _schedule_replace_after_exit")
+        end=source.index("def launch_updater",start)
+        block=source[start:end]
+        self.assertIn("SM_AUTOLAB_INSTALLER",block)
+        self.assertIn("SM_AUTOLAB_INSTALLER_TARGET",block)
+        self.assertIn("SM_AUTOLAB_INSTALLER_PAYLOAD",block)
+        self.assertIn("CREATE_NO_WINDOW",block)
+        self.assertNotIn("tasklist /FI",block)
+        self.assertNotIn("taskkill /PID",block)
+        main_source=(self.root/"main.py").read_text(encoding="utf-8")
+        self.assertIn("def _update_installer_mode",main_source)
+        self.assertIn("Instalando a v",main_source)
 
     def test_troca_visualizacao_oferece_reinicio_agora_ou_depois(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
