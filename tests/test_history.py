@@ -191,6 +191,87 @@ class HistoryPersistenceTests(unittest.TestCase):
             self.assertFalse(historico_backup.exists())
             self.assertFalse(erros_backup.exists())
 
+    def test_finalizacao_nao_arquiva_execucao_sem_erros(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self._app_without_ui(Path(temp))
+            agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            app._execucao_atual = {
+                "id": "sucesso",
+                "inicio": agora,
+                "status": "Em andamento",
+                "erros": 0,
+                "codigos_erros": [],
+                "erros_detalhes": [],
+            }
+            resultado = SimpleNamespace(
+                total_planejado=2,
+                sucessos=2,
+                erros=0,
+                processados=2,
+                codigos_erros=[],
+                erros_detalhes=[],
+                itens=[
+                    SimpleNamespace(status="Sucesso", codigo="111"),
+                    SimpleNamespace(status="Sucesso", codigo="222"),
+                ],
+            )
+
+            app._finalizar_historico_execucao(resultado)
+
+            dados = json.loads(app._historico_arquivo.read_text(encoding="utf-8"))
+            self.assertEqual(dados["historico_execucoes"], [])
+
+    def test_registro_de_erro_persiste_codigo_detalhe_e_mensagem_imediatamente(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self._app_without_ui(Path(temp))
+            agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            app._execucao_atual = {
+                "id": "erro-imediato",
+                "inicio": agora,
+                "status": "Em andamento",
+                "erros": 0,
+                "codigos_erros": [],
+                "erros_detalhes": [],
+            }
+            app._codigos_erros_execucao = []
+
+            app._registrar_codigo_erro_historico(
+                "ABC123",
+                numero=4,
+                erro="Falha de teste",
+            )
+
+            dados = json.loads(app._historico_arquivo.read_text(encoding="utf-8"))
+            atual = dados["execucao_atual"]
+            self.assertEqual(atual["codigos_erros"], ["ABC123"])
+            self.assertEqual(atual["erros"], 1)
+            self.assertEqual(atual["erros_detalhes"][0]["codigo"], "ABC123")
+            self.assertEqual(atual["erros_detalhes"][0]["numero"], 4)
+            self.assertEqual(atual["erros_detalhes"][0]["erro"], "Falha de teste")
+
+    def test_carregamento_remove_execucoes_sem_erros_do_historico_de_erros(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self._app_without_ui(Path(temp))
+            agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            app._historico_arquivo.write_text(
+                json.dumps({
+                    "version": 4,
+                    "historico_execucoes": [
+                        {"id": "ok", "inicio": agora, "status": "Concluída", "erros": 0},
+                        {"id": "erro", "inicio": agora, "status": "Concluída", "erros": 1, "codigos_erros": ["ABC"]},
+                    ],
+                    "execucao_atual": None,
+                }),
+                encoding="utf-8",
+            )
+
+            app._carregar_estado_persistente()
+
+            self.assertEqual(
+                [item["id"] for item in app._historico_execucoes],
+                ["erro"],
+            )
+
     def test_finalizacao_consolida_codigos_de_erro_de_todas_as_fontes(self):
         with tempfile.TemporaryDirectory() as temp:
             app = self._app_without_ui(Path(temp))
