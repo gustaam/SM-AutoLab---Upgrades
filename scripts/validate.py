@@ -1,4 +1,4 @@
-# Validação estrutural, dependências e release.
+# Validador do projeto: arquitetura, dependências, versão, workflows e executável Windows.
 from __future__ import annotations
 
 import argparse
