@@ -4188,7 +4188,14 @@ class App:
                 unicos[chave] = item
 
             self._tema = tema
-            self._historico_execucoes = list(unicos.values())
+
+            # Este arquivo representa exclusivamente o histórico de execuções
+            # com erro. Registros bem-sucedidos de versões antigas são removidos
+            # na memória e também persistidos de volta, evitando que reapareçam.
+            self._historico_execucoes = [
+                item for item in unicos.values()
+                if self._historico_execucao_tem_erros(item)
+            ]
             self._execucao_atual = None
 
             if isinstance(execucao_pendente, dict):
@@ -4299,7 +4306,8 @@ class App:
         self._erros_codigos.append(codigo)
         self._salvar_erros_persistentes()
 
-    def _registrar_codigo_erro_historico(self, codigo):
+    def _registrar_codigo_erro_historico(self, codigo, numero=None, erro=""):
+        """Registra imediatamente o código que falhou na execução atual."""
         if not self._execucao_atual:
             return
         texto = str(codigo or "").strip()
@@ -4314,9 +4322,39 @@ class App:
         codigos = self._execucao_atual.setdefault("codigos_erros", [])
         if texto not in codigos:
             codigos.append(texto)
+
+        # Persistência em dois campos independentes: mesmo que a consolidação
+        # final seja interrompida, o código já fica associado à execução.
+        detalhes = self._execucao_atual.setdefault("erros_detalhes", [])
+        if not isinstance(detalhes, list):
+            detalhes = []
+            self._execucao_atual["erros_detalhes"] = detalhes
+
+        existente = next(
+            (
+                item for item in detalhes
+                if isinstance(item, dict)
+                and str(item.get("codigo", "")).strip() == texto
+            ),
+            None,
+        )
+        if existente is None:
+            detalhes.append({
+                "numero": int(numero) if str(numero).isdigit() else None,
+                "codigo": texto,
+                "erro": str(erro or ""),
+                "horario": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            })
+        else:
+            if str(erro or "").strip():
+                existente["erro"] = str(erro)
+            if existente.get("numero") is None and str(numero).isdigit():
+                existente["numero"] = int(numero)
+
         self._execucao_atual["erros"] = max(
             int(self._execucao_atual.get("erros", 0) or 0),
             len(codigos),
+            len(detalhes),
         )
         self._salvar_estado_persistente()
 
@@ -4512,7 +4550,11 @@ class App:
             len(detalhes_erros),
         )
 
-        self._historico_execucoes.append(dict(self._execucao_atual))
+        # O histórico de erros nunca recebe uma execução totalmente bem-sucedida.
+        # Uma execução só é arquivada aqui quando houve pelo menos um erro real.
+        if self._historico_execucao_tem_erros(self._execucao_atual):
+            self._historico_execucoes.append(dict(self._execucao_atual))
+
         self._execucao_atual = None
         self._codigos_erros_execucao = []
         self._salvar_estado_persistente()
@@ -4526,6 +4568,10 @@ class App:
         self._execucao_atual["fim"] = agora
         self._execucao_atual["status"] = "Erro geral"
         self._execucao_atual["mensagem"] = str(mensagem)
+        self._execucao_atual["erros"] = max(
+            int(self._execucao_atual.get("erros", 0) or 0),
+            1,
+        )
         self._historico_execucoes.append(dict(self._execucao_atual))
         self._execucao_atual = None
         self._salvar_estado_persistente()
@@ -4537,7 +4583,17 @@ class App:
             return
         for w in self.historico_lista.winfo_children():
             w.destroy()
-        self._hist_grid=None
+        self._hist_grid = None
+
+        # Limpa imediatamente qualquer registro sem erro que tenha vindo de
+        # uma versão anterior e grava o estado canônico.
+        filtrado = [
+            item for item in self._historico_execucoes
+            if self._historico_execucao_tem_erros(item)
+        ]
+        if len(filtrado) != len(self._historico_execucoes):
+            self._historico_execucoes = filtrado
+            self._salvar_estado_persistente()
         self._historico_tiles = {}
         self._historico_reflow_job = None
         try:
