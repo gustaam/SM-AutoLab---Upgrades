@@ -1,4 +1,4 @@
-# Interface desktop, planilha e histórico.
+# Interface desktop completa: planilha virtualizada, histórico, dashboard, rolagem e integração Windows 11.
 from __future__ import annotations
 
 import calendar as pycalendar
