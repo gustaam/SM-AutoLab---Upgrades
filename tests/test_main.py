@@ -703,7 +703,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('height=10,', block)
         self.assertIn('fg_color=self.BORDER', block)
         self.assertIn('progress_color=self.ACCENT', block)
-        self.assertIn("actions.pack(fill="x", padx=18, pady=(27, 10))", block)
+        self.assertIn('actions.pack(fill="x", padx=18, pady=(27, 10))', block)
         self.assertIn("menu_y = 58", source)
 
     def test_atualizacao_usa_mesma_versao_da_interface(self):
