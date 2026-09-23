@@ -125,6 +125,74 @@ class HistoryPersistenceTests(unittest.TestCase):
             self.assertEqual(erros["erros"], [])
             self.assertFalse(app._historico_arquivo_legado.exists())
 
+    def test_carregamento_nao_reidrata_backup_de_historico_limpo(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app = self._app_without_ui(root)
+            app._historico_arquivo.write_text(
+                json.dumps({
+                    "version": 4,
+                    "historico_execucoes": [],
+                    "execucao_atual": None,
+                }),
+                encoding="utf-8",
+            )
+            app._historico_arquivo.with_name(
+                app._historico_arquivo.name + ".bak"
+            ).write_text(
+                json.dumps({
+                    "version": 3,
+                    "historico_execucoes": [
+                        {"id": "apagada", "inicio": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "erros": 2}
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            app._historico_arquivo_legado.write_text(
+                json.dumps({
+                    "historico_execucoes": [
+                        {"id": "legada", "inicio": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "erros": 4}
+                    ],
+                }),
+                encoding="utf-8",
+            )
+
+            app._carregar_estado_persistente()
+
+            self.assertEqual(app._historico_execucoes, [])
+            self.assertFalse(
+                app._historico_arquivo.with_name(app._historico_arquivo.name + ".bak").exists()
+            )
+            self.assertFalse(app._historico_arquivo_legado.exists())
+
+    def test_limpar_historico_remove_backups_residuais(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app = self._app_without_ui(root)
+            app._historico_execucoes = [
+                {"id": "antiga", "inicio": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "erros": 1}
+            ]
+            app._erros_codigos = ["ABC123"]
+            historico_backup = app._historico_arquivo.with_name(
+                app._historico_arquivo.name + ".bak"
+            )
+            erros_backup = app._erros_arquivo.with_name(
+                app._erros_arquivo.name + ".bak"
+            )
+            historico_backup.parent.mkdir(parents=True, exist_ok=True)
+            historico_backup.write_text("{}
+", encoding="utf-8")
+            erros_backup.write_text("{}
+", encoding="utf-8")
+            app.atualizar_status = lambda *_args: None
+            app._add_activity = lambda *_args: None
+
+            with patch("interface.messagebox.askyesno", return_value=True):
+                app._limpar_historico()
+
+            self.assertFalse(historico_backup.exists())
+            self.assertFalse(erros_backup.exists())
+
     def test_execucao_atual_recente_e_codigos_com_erro_sao_persistidos(self):
         with tempfile.TemporaryDirectory() as temp:
             app = self._app_without_ui(Path(temp))
