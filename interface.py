@@ -2424,6 +2424,29 @@ class App:
         ctk.set_default_color_theme("blue")
         self.config_app()
 
+    def _centralizar_janela(self, janela, largura=None, altura=None):
+        """Centraliza uma janela filha em relação à janela principal."""
+        if janela is None:
+            return
+        try:
+            self.app.update_idletasks()
+            janela.update_idletasks()
+            if largura is None:
+                largura = janela.winfo_width()
+            if altura is None:
+                altura = janela.winfo_height()
+            largura = max(1, int(largura))
+            altura = max(1, int(altura))
+            app_x = self.app.winfo_rootx()
+            app_y = self.app.winfo_rooty()
+            app_largura = self.app.winfo_width()
+            app_altura = self.app.winfo_height()
+            x = app_x + max(0, (app_largura - largura) // 2)
+            y = app_y + max(0, (app_altura - altura) // 2)
+            janela.geometry(f"{largura}x{altura}+{x}+{y}")
+        except (AttributeError, OSError, TypeError, ValueError):
+            pass
+
     def _configurar_icone_janela(self, janela=None):
         """Aplica o ícone oficial do aplicativo à barra de título da janela."""
         janela = janela or self.app
@@ -2958,6 +2981,91 @@ class App:
             return f"{int(valor)} {unidades[indice]}"
         return f"{valor:.1f} {unidades[indice]}"
 
+    def _mostrar_confirmacao_atualizacao(self, info):
+        """Exibe o diálogo de atualização centralizado na janela principal."""
+        version = str(info.get("version", ""))
+        atual = str(info.get("current", ""))
+        resultado = {"confirmado": False}
+
+        janela = ctk.CTkToplevel(self.app)
+        janela.title("Atualização disponível")
+        janela.geometry("470x230")
+        janela.resizable(False, False)
+        janela.transient(self.app)
+        janela.grab_set()
+        janela.configure(fg_color=self.BG)
+        self._configurar_icone_janela(janela)
+
+        self._centralizar_janela(janela, 470, 230)
+
+        ctk.CTkLabel(
+            janela,
+            text="Atualização disponível",
+            text_color=self.TEXT,
+            font=("Segoe UI", 16, "bold"),
+        ).pack(anchor="w", padx=24, pady=(24, 6))
+
+        ctk.CTkLabel(
+            janela,
+            text=(
+                "Uma nova versão do SM AutoLab está disponível.\n\n"
+                f"Versão instalada: v{atual}\n"
+                f"Nova versão: v{version}\n\n"
+                "Deseja baixar e instalar agora?"
+            ),
+            text_color=self.SUBTEXT,
+            font=("Segoe UI", 10),
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", padx=24, expand=True)
+
+        botoes = ctk.CTkFrame(janela, fg_color="transparent")
+        botoes.pack(fill="x", padx=24, pady=(10, 20))
+
+        def concluir(confirmado):
+            resultado["confirmado"] = bool(confirmado)
+            try:
+                janela.grab_release()
+            except Exception:
+                pass
+            janela.destroy()
+
+        ctk.CTkButton(
+            botoes,
+            text="Não",
+            command=lambda: concluir(False),
+            width=100,
+            height=34,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#E5E5E5", "#3A4147"),
+            border_width=1,
+            border_color=self.BORDER,
+            text_color=self.TEXT,
+            font=("Segoe UI", 10, "bold"),
+        ).pack(side="right")
+
+        ctk.CTkButton(
+            botoes,
+            text="Sim",
+            command=lambda: concluir(True),
+            width=100,
+            height=34,
+            corner_radius=8,
+            fg_color=self.ACCENT,
+            hover_color=self.ACCENT_HOVER,
+            text_color="#FFFFFF",
+            font=("Segoe UI", 10, "bold"),
+        ).pack(side="right", padx=(0, 8))
+
+        janela.protocol("WM_DELETE_WINDOW", lambda: concluir(False))
+        janela.bind("<Escape>", lambda _event: concluir(False))
+        janela.update_idletasks()
+        self._centralizar_janela(janela, 470, 230)
+        janela.focus_force()
+        self.app.wait_window(janela)
+        return resultado["confirmado"]
+
     def _mostrar_progresso_atualizacao(self, version):
         self._atualizacao_em_andamento = True
         janela = getattr(self, "_atualizacao_janela", None)
@@ -2973,19 +3081,7 @@ class App:
         janela.geometry("430x165")
         janela.resizable(False, False)
         janela.transient(self.app)
-        try:
-            janela.update_idletasks()
-            largura = janela.winfo_width()
-            altura = janela.winfo_height()
-            app_x = self.app.winfo_rootx()
-            app_y = self.app.winfo_rooty()
-            app_largura = self.app.winfo_width()
-            app_altura = self.app.winfo_height()
-            x = app_x + max(0, (app_largura - largura) // 2)
-            y = app_y + max(0, (app_altura - altura) // 2)
-            janela.geometry(f"{largura}x{altura}+{x}+{y}")
-        except Exception:
-            pass
+        self._centralizar_janela(janela, 430, 165)
         janela.grab_set()
         try:
             janela.attributes("-topmost", True)
@@ -3109,14 +3205,7 @@ class App:
             )
             return
 
-        resposta=messagebox.askyesno(
-            "Atualização disponível",
-            f"Uma nova versão do SM AutoLab está disponível.\n\n"
-            f"Versão instalada: v{info.get('current','')}\n"
-            f"Nova versão: v{version}\n\n"
-            "Deseja baixar e instalar agora?",
-            parent=self.app
-        )
+        resposta = self._mostrar_confirmacao_atualizacao(info)
         if not resposta:
             return
 
@@ -3552,6 +3641,7 @@ class App:
         self._configurar_icone_janela(popup)
         popup.title("Ajustes do Feegow")
         popup.geometry("560x420")
+        self._centralizar_janela(popup, 560, 420)
         popup.resizable(False, False)
         popup.transient(self.app)
         popup.grab_set()
@@ -4797,6 +4887,7 @@ class App:
         win = ctk.CTkToplevel(self.app)
         win.title("Execução — SM AutoLab")
         win.geometry("680x500")
+        self._centralizar_janela(win, 680, 500)
         win.minsize(560, 400)
         win.resizable(True, True)
         win.transient(self.app)
@@ -5272,6 +5363,7 @@ class App:
         self._planilha_window=win
         win.title("Planilha — SM AutoLab")
         win.geometry("1080x720")
+        self._centralizar_janela(win, 1080, 720)
         win.minsize(900, 600)
         win.configure(fg_color=self.BG)
         win.transient(self.app)
@@ -6972,6 +7064,7 @@ class App:
         self._planilha_historico_window = win
         win.title("Arquivos — SM AutoLab")
         win.geometry("820x650")
+        self._centralizar_janela(win, 820, 650)
         win.minsize(760, 590)
         win.resizable(True, True)
         win.transient(self.app)
@@ -6984,13 +7077,6 @@ class App:
         except Exception:
             pass
         win.protocol("WM_DELETE_WINDOW", self._fechar_historico_planilha)
-        try:
-            self.app.update_idletasks()
-            px = self.app.winfo_rootx() + max(0, (self.app.winfo_width() - 820) // 2)
-            py = self.app.winfo_rooty() + max(0, (self.app.winfo_height() - 650) // 2)
-            win.geometry(f"820x650+{px}+{py}")
-        except Exception:
-            pass
 
         header = ctk.CTkFrame(win, fg_color="transparent")
         header.pack(fill="x", padx=18, pady=(16, 8))
