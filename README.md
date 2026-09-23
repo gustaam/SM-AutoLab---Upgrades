@@ -4,7 +4,7 @@
 
 Aplicativo Windows para automação de autorizações no Feegow, com execução de códigos a partir de planilhas, recuperação segura de execuções, histórico, atualização integrada e interface moderna.
 
-**Versão atual no código:** `2.99.62`  
+**Versão atual no código:** `2.99.64`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -101,6 +101,10 @@ O aplicativo diferencia uma execução interrompida de uma planilha que já foi 
 
 Essa proteção possui testes de regressão para alterações de conteúdo, persistência e estado processado.
 
+## Reexecução de erros
+
+A versão `2.99.64` permite reexecutar diretamente os códigos que falharam em uma execução histórica. Depois que uma execução for reexecutada, o botão não reaparece para aqueles mesmos códigos naquela execução original. Se algum deles falhar novamente, a nova falha fica registrada em uma nova execução, que pode ser reexecutada novamente.
+
 ## Histórico de erros
 
 A versão `2.99.62` também corrige a persistência dos códigos de erro por execução: o código, número, mensagem e horário da falha são armazenados durante a execução e consolidados ao final. Execuções sem erros não são arquivadas no histórico de erros, inclusive registros antigos são filtrados ao carregar o histórico.
@@ -156,7 +160,7 @@ O CI utiliza **Python 3.14.7** e **pip 26.2.1**. O build oficial utiliza **PyIns
 
 ## Release
 
-A versão oficial do código neste `main` é **2.99.62**.
+A versão oficial do código neste `main` é **2.99.64**.
 
 O fluxo de release possui dois caminhos:
 
