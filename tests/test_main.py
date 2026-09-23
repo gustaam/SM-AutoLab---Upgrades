@@ -695,6 +695,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Parar"', block)
         self.assertIn('text="Iniciar"', block)
         self.assertIn('bottom_row.pack(anchor="center"', block)
+        self.assertIn('self.botao_configuracoes.pack(side="right"', block)
+        self.assertIn('menu_y = max(6, app_height - menu_height - 6)', source)
 
     def test_troca_visualizacao_oferece_reinicio_agora_ou_depois(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")

@@ -3134,14 +3134,25 @@ class App:
                 bx = self.botao_configuracoes.winfo_rootx() - app_x
                 by = self.botao_configuracoes.winfo_rooty() - app_y + self.botao_configuracoes.winfo_height() + 4
                 menu_width = max(218, self._menu_config.winfo_reqwidth())
+                menu_height = max(1, self._menu_config.winfo_reqheight())
                 app_width = max(1, self.app.winfo_width())
-                # O menu nasce no mesmo eixo X do botão Configurações.
-                menu_x = bx
-                if menu_x + menu_width > app_width - 6:
+                app_height = max(1, self.app.winfo_height())
+
+                if getattr(self, "_visualizacao", "complete") == "compact":
+                    # No modo compacto o menu deve permanecer inteiramente
+                    # dentro da janela, mesmo sendo aberto a partir do cabeçalho.
                     menu_x = max(6, app_width - menu_width - 6)
+                    menu_y = max(6, app_height - menu_height - 6)
+                else:
+                    # O menu nasce no mesmo eixo X do botão Configurações.
+                    menu_x = bx
+                    if menu_x + menu_width > app_width - 6:
+                        menu_x = max(6, app_width - menu_width - 6)
+                    menu_y = max(0, by)
+
                 self._menu_config.place_configure(
                     x=int(menu_x),
-                    y=int(max(0, by)),
+                    y=int(menu_y),
                 )
                 self._menu_config.lift()
 
@@ -3150,6 +3161,7 @@ class App:
                 app_y = self.app.winfo_rooty()
                 sub_width = max(225, self._menu_aparencia.winfo_reqwidth(), self._menu_aparencia.winfo_width())
                 app_width = max(1, self.app.winfo_width())
+                app_height = max(1, self.app.winfo_height())
 
                 if self._menu_config is not None and self._menu_config.winfo_exists():
                     config_root_x = self._menu_config.winfo_rootx() - app_x
@@ -3163,7 +3175,11 @@ class App:
                         x = left_x
                     else:
                         x = min(right_x, max(6, app_width - sub_width - 6))
-                    y = max(6, button_y + max(0, (button_height - self._menu_aparencia.winfo_reqheight()) // 2))
+                    submenu_height = max(1, self._menu_aparencia.winfo_reqheight())
+                    if getattr(self, "_visualizacao", "complete") == "compact":
+                        y = max(6, app_height - submenu_height - 6)
+                    else:
+                        y = max(6, button_y + max(0, (button_height - submenu_height) // 2))
                 else:
                     button_x = self.botao_configuracoes.winfo_rootx() - app_x
                     button_y = self.botao_configuracoes.winfo_rooty() - app_y
@@ -3182,6 +3198,7 @@ class App:
                 app_y = self.app.winfo_rooty()
                 sub_width = max(225, self._menu_visualizacao.winfo_reqwidth(), self._menu_visualizacao.winfo_width())
                 app_width = max(1, self.app.winfo_width())
+                app_height = max(1, self.app.winfo_height())
                 if self._menu_config is not None and self._menu_config.winfo_exists():
                     config_root_x = self._menu_config.winfo_rootx() - app_x
                     config_root_y = self._menu_config.winfo_rooty() - app_y
@@ -3192,7 +3209,11 @@ class App:
                     left_x = config_root_x - sub_width + 2
                     right_x = config_root_x + config_width - 2
                     x = left_x if left_x >= 6 else min(right_x, max(6, app_width - sub_width - 6))
-                    y = max(6, button_y + max(0, (button_height - self._menu_visualizacao.winfo_reqheight()) // 2))
+                    submenu_height = max(1, self._menu_visualizacao.winfo_reqheight())
+                    if getattr(self, "_visualizacao", "complete") == "compact":
+                        y = max(6, app_height - submenu_height - 6)
+                    else:
+                        y = max(6, button_y + max(0, (button_height - submenu_height) // 2))
                 else:
                     btn_x = self.botao_configuracoes.winfo_rootx() - app_x
                     btn_y = self.botao_configuracoes.winfo_rooty() - app_y
