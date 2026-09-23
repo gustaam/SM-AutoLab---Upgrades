@@ -737,8 +737,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('set "PYINSTALLER_RESET_ENVIRONMENT=1"', source)
         self.assertIn('set "SM_AUTOLAB_UPDATE_HEALTH=%SM_HEALTH%"', source)
         self.assertIn('set "SM_AUTOLAB_UPDATE_EXPECTED_VERSION=%SM_EXPECTED_VERSION%"', source)
-        self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso", source)
-        self.assertIn("SM_AUTOLAB_UPDATE_EXPECTED_VERSION", source)
+        main_source = (self.root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso", main_source)
+        self.assertIn("SM_AUTOLAB_UPDATE_EXPECTED_VERSION", main_source)
+        self.assertIn("version=", main_source)
 
     def test_troca_visualizacao_oferece_reinicio_agora_ou_depois(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")

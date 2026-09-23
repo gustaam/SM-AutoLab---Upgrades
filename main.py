@@ -243,8 +243,15 @@ def _sinalizar_inicializacao_atualizacao_sucesso():
     try:
         destino = Path(caminho)
         destino.parent.mkdir(parents=True, exist_ok=True)
+        expected = str(
+            os.environ.get("SM_AUTOLAB_UPDATE_EXPECTED_VERSION", "")
+        ).strip()
+        lines = []
+        if expected:
+            lines.append(f"version={expected}")
+        lines.append(f"pid={os.getpid()}")
         destino.write_text(
-            f"pid={os.getpid()}\\n",
+            "\\n".join(lines) + "\\n",
             encoding="utf-8",
         )
     except OSError:
