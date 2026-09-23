@@ -8221,7 +8221,7 @@ class App:
             else "—"
         )
         ctk.CTkLabel(
-            media_box, text="Média por código", text_color=self.SUBTEXT,
+            media_box, text="Média por código (cód/min)", text_color=self.SUBTEXT,
             font=("Segoe UI", 9, "bold")
         ).pack(side="left", padx=(9, 6))
         self._arquivos_media_codigo_label = ctk.CTkLabel(
