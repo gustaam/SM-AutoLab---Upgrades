@@ -4995,7 +4995,12 @@ class App:
                     f"Reexecutando {len(codigos_reexecutaveis)} código(s) que apresentaram erro.",
                     self.WARNING,
                 )
-                self._iniciar_automacao_interna(list(codigos_reexecutaveis))
+                self._origem_reexecucao = "reexecucao_erros"
+                self._reexecucao_origem_id = self._id_historico_execucao(execucao)
+                self._iniciar_automacao_interna(
+                    list(codigos_reexecutaveis),
+                    ignorar_checkpoint=True,
+                )
                 return "break"
 
             reexecutar_btn = ctk.CTkButton(
@@ -7213,13 +7218,13 @@ class App:
         except Exception:
             iniciar_depois_de_fechar()
 
-    def _iniciar_automacao_interna(self, codigos):
+    def _iniciar_automacao_interna(self, codigos, ignorar_checkpoint=False):
         codigos=[str(c).strip() for c in codigos if str(c).strip()]
         if not codigos:
             messagebox.showwarning("Nenhum código","A coluna 'Senha' está vazia.",parent=self.app)
             return
 
-        inicio=ler_checkpoint_interno(codigos)
+        inicio = None if ignorar_checkpoint else ler_checkpoint_interno(codigos)
         start=0
         if inicio is not None and inicio < len(codigos):
             resposta=messagebox.askyesno(
