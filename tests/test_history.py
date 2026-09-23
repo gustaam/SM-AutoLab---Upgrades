@@ -197,6 +197,14 @@ class HistoryPersistenceTests(unittest.TestCase):
             self.assertFalse(historico_backup.exists())
             self.assertFalse(erros_backup.exists())
 
+    def test_detalhe_historico_renderiza_erros_em_frame_direto(self):
+        source = Path(__file__).resolve().parents[1].joinpath("interface.py").read_text(encoding="utf-8")
+        start = source.index("def _preencher_detalhe_pasta")
+        end = source.index("def _limpar_historico", start)
+        block = source[start:end]
+        self.assertIn("erros_area = ctk.CTkFrame(", block)
+        self.assertNotIn("erros_area = ctk.CTkScrollableFrame(", block)
+
     def test_finalizacao_nao_arquiva_execucao_sem_erros(self):
         with tempfile.TemporaryDirectory() as temp:
             app = self._app_without_ui(Path(temp))
