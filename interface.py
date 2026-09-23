@@ -4843,6 +4843,7 @@ class App:
 
     def _abrir_detalhe_historico(self, execucao):
         win = ctk.CTkToplevel(self.app)
+        self._configurar_icone_janela(win)
         win.title("Execução — SM AutoLab")
         win.geometry("680x500")
         win.minsize(560, 400)
