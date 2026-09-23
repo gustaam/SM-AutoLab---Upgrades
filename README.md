@@ -103,7 +103,7 @@ Essa proteção possui testes de regressão para alterações de conteúdo, pers
 
 ## Reexecução de erros
 
-A versão `2.99.64` permite reexecutar diretamente os códigos que falharam em uma execução histórica. Depois que uma execução for reexecutada, o botão não reaparece para aqueles mesmos códigos naquela execução original. Se algum deles falhar novamente, a nova falha fica registrada em uma nova execução, que pode ser reexecutada novamente.
+A versão `2.99.64` permite reexecutar diretamente os códigos que falharam em uma execução histórica. A reexecução permanece vinculada à execução original e não cria uma nova pasta no histórico. Depois que os códigos forem reexecutados, o botão não reaparece para aqueles mesmos códigos naquela execução original.
 
 ## Histórico de erros
 
