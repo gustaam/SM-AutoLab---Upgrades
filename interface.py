@@ -3302,8 +3302,6 @@ class App:
         mudar = ctk.CTkButton(
             menu,
             text="Ajustes do Feegow",
-            image=self._obter_icone_menu_aplicativo(),
-            compound="left",
             command=self._abrir_popup_feegow,
             width=202,
             height=40,
