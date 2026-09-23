@@ -575,6 +575,23 @@ class CanonicalRuntimeTests(unittest.TestCase):
         for key in ("atividade", "histórico", "↶", "↷", "‹", "›"):
             self.assertIn(f'"{key}":', source)
 
+    def test_botoes_de_exclusao_mostram_contagem_da_selecao(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+
+        start = source.index("def _atualizar_botao_apagar_historico")
+        end = source.index("def _limpar_selecao_historico", start)
+        history_block = source[start:end]
+        self.assertIn('f"Apagar {quantidade} selecionado"', history_block)
+        self.assertIn('f"Apagar {quantidade} selecionados"', history_block)
+        self.assertIn("btn.configure(text=texto)", history_block)
+
+        start = source.index("def _atualizar_botao_apagar_datas_arquivos")
+        end = source.index("def _apagar_datas_arquivos_selecionadas", start)
+        date_block = source[start:end]
+        self.assertIn('f"Apagar {quantidade} selecionada"', date_block)
+        self.assertIn('f"Apagar {quantidade} selecionadas"', date_block)
+        self.assertIn("btn.configure(text=texto)", date_block)
+
     def test_historico_apagar_selecionados_tem_visibilidade_condicional(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('text="Apagar selecionados"', source)
