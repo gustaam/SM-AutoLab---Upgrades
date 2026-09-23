@@ -3980,7 +3980,7 @@ set "SM_PID={pid}"
 set "SM_EXE={executable_cmd}"
 
 :wait_old
-tasklist /FI "PID eq %SM_PID%" /FO CSV /NH 2>nul | findstr /R /C:""%SM_PID%"" >nul
+tasklist /FI "PID eq %SM_PID%" /NH 2>nul | findstr /C:"%SM_PID%" >nul
 if not errorlevel 1 (
     >nul choice /n /t 1 /d y
     goto wait_old
