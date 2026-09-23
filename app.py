@@ -1,4 +1,4 @@
-# Núcleo de automação e persistência.
+# Núcleo de automação Feegow: execução Selenium, resultados, checkpoints e persistência.
 from __future__ import annotations
 
 import hashlib

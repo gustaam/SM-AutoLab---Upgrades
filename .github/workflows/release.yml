@@ -1,4 +1,4 @@
-# Build e publicação das releases.
+# CI/CD de release: validação, build do executável Windows, integridade e publicação.
 name: Build and publish release
 
 on:

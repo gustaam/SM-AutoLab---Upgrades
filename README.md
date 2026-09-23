@@ -1,4 +1,4 @@
-<!-- Documentação e uso do projeto. -->
+<!-- Documentação completa do aplicativo, arquitetura, recursos, operação e release. -->
 
 # SM AutoLab
 

@@ -1,5 +1,5 @@
 @echo off
-rem Geração do executável Windows e validação de build.
+rem Build Windows do SM AutoLab com geração, metadados e validação do executável.
 REM Build do executável Windows.
 setlocal EnableExtensions EnableDelayedExpansion
 
