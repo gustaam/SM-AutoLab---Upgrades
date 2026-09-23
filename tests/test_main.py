@@ -373,7 +373,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _carregar_estado_persistente")
         end = source.index("def _salvar_estado_persistente", start)
         load_block = source[start:end]
-        self.assertIn("self._historico_execucoes = list(unicos.values())", load_block)
+        self.assertIn("self._historico_execucoes = [", load_block)
+        self.assertIn("if self._historico_execucao_tem_erros(item)", load_block)
         self.assertNotIn("_filtrar_historico_execucoes_60_dias(list(unicos.values()))", load_block)
 
         start = source.index("def _salvar_estado_persistente")
