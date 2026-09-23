@@ -692,7 +692,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn('header,\n            text="Configurações"', block)
         self.assertIn('self.botao_configuracoes.pack(side="right"', block)
-        self.assertEqual(block.count('text="Histórico"'), 1)
+        self.assertIn('("Histórico", self._abrir_historico_compacto),', block)
         self.assertIn('text="Arquivos"', block)
         self.assertIn('text="Parar"', block)
         self.assertIn("text=self.INICIAR_LABEL", block)
@@ -700,7 +700,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('largura, altura = 500, 280', block)
         self.assertIn("menu_y = 58", source)
         self.assertIn('self.botao_configuracoes.pack(side="right"', block)
-        self.assertIn('menu_y = max(6, app_height - menu_height - 6)', source)
+        self.assertIn('menu_y = 58', source)
 
     def test_troca_visualizacao_oferece_reinicio_agora_ou_depois(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
