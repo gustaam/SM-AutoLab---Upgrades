@@ -722,7 +722,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("SM_PID", block)
         self.assertIn("goto wait_old", block)
-        self.assertIn("PYINSTALLER_RESET_ENVIRONMENT", block)
+        self.assertIn("env = _prepare_independent_restart_environment()", block)
 
     def test_troca_visualizacao_oferece_reinicio_agora_ou_depois(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
