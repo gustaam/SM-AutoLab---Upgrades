@@ -92,6 +92,11 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Execução em andamento"', source)
         self.assertIn('text="Tempo decorrido"', source)
         self.assertIn('text="Tempo estimado restante"', source)
+        self.assertIn('text="Média por código (cód/min)"', source)
+        self.assertIn('self._arquivos_tempo_decorrido_label', source)
+        self.assertIn('self._arquivos_media_codigo_label', source)
+        self.assertIn('media = concluidos / (decorrido / 60.0)', source)
+        self.assertIn('text=f"{media:.1f} cód/min"', source)
         self.assertIn('self.erro_card = self._stat_card(stats, "!", "Não executados"', source)
         self.assertNotIn('self._execucao_progresso_card = self._stat_card(stats, "▮", "Progresso"', source)
 
