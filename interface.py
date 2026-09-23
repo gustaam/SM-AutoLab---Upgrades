@@ -2383,8 +2383,12 @@ class App:
         self._execucao_timer_job = None
         self._execucao_inicio_indice = 0
         self._execucao_total = 0
+        self._ultimo_tempo_decorrido_segundos = 0.0
+        self._ultimo_codigos_medidos = 0
         self._tempo_decorrido_label = None
         self._tempo_estimado_label = None
+        self._arquivos_tempo_decorrido_label = None
+        self._arquivos_media_codigo_label = None
         self._atualizacao_janela = None
         self._atualizacao_barra = None
         self._atualizacao_label = None
@@ -4949,9 +4953,19 @@ class App:
         self._execucao_inicio_monotonic = time.monotonic()
         self._execucao_inicio_indice = int(start)
         self._execucao_total = int(total)
+        self._ultimo_tempo_decorrido_segundos = 0.0
+        self._ultimo_codigos_medidos = 0
         self._atualizar_metricas_execucao()
 
     def _parar_metricas_execucao(self):
+        # Atualiza uma última vez antes de encerrar o cronômetro para preservar
+        # os números exibidos na tela de Arquivos após a execução.
+        if getattr(self, "_execucao_inicio_monotonic", None) is not None:
+            try:
+                self._atualizar_metricas_execucao()
+            except Exception:
+                pass
+
         job = getattr(self, "_execucao_timer_job", None)
         if job is not None:
             try:
@@ -4973,12 +4987,28 @@ class App:
         except Exception:
             decorrido = 0.0
 
+        processados = int(getattr(self, "_checkpoint_indice_seguro", 0))
+        concluidos = max(0, processados - int(self._execucao_inicio_indice))
+        self._ultimo_tempo_decorrido_segundos = decorrido
+        self._ultimo_codigos_medidos = concluidos
+
         if self._tempo_decorrido_label is not None:
             self._tempo_decorrido_label.configure(text=self._formatar_duracao(decorrido))
 
+        if self._arquivos_tempo_decorrido_label is not None:
+            self._arquivos_tempo_decorrido_label.configure(
+                text=self._formatar_duracao(decorrido)
+            )
+        if self._arquivos_media_codigo_label is not None:
+            if concluidos > 0 and decorrido > 0:
+                media = concluidos / (decorrido / 60.0)
+                self._arquivos_media_codigo_label.configure(
+                    text=f"{media:.1f} cód/min"
+                )
+            else:
+                self._arquivos_media_codigo_label.configure(text="—")
+
         if self._tempo_estimado_label is not None:
-            processados = int(getattr(self, "_checkpoint_indice_seguro", 0))
-            concluidos = max(0, processados - int(self._execucao_inicio_indice))
             restantes = max(0, int(self._execucao_total) - processados)
             if concluidos > 0 and decorrido > 0 and restantes > 0:
                 por_item = decorrido / concluidos
@@ -8156,6 +8186,50 @@ class App:
             self._arquivos_body, text=f"{len(itens)} planilha(s) salva(s) nesta data",
             text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold")
         ).pack(anchor="w", pady=(0, 6))
+
+        metricas = ctk.CTkFrame(self._arquivos_body, fg_color="transparent")
+        metricas.pack(fill="x", pady=(0, 8))
+        metricas.grid_columnconfigure((0, 1), weight=1)
+
+        tempo_box = ctk.CTkFrame(
+            metricas, fg_color=("#F3F7FA", "#24343D"), corner_radius=8, height=42
+        )
+        tempo_box.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        tempo_box.grid_propagate(False)
+        ctk.CTkLabel(
+            tempo_box, text="Tempo decorrido", text_color=self.SUBTEXT,
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left", padx=(9, 6))
+        self._arquivos_tempo_decorrido_label = ctk.CTkLabel(
+            tempo_box,
+            text=self._formatar_duracao(getattr(self, "_ultimo_tempo_decorrido_segundos", 0)),
+            text_color=self.TEXT,
+            font=("Segoe UI", 13, "bold")
+        )
+        self._arquivos_tempo_decorrido_label.pack(side="right", padx=(2, 9))
+
+        media_box = ctk.CTkFrame(
+            metricas, fg_color=("#F3F7FA", "#24343D"), corner_radius=8, height=42
+        )
+        media_box.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+        media_box.grid_propagate(False)
+        ultimo_tempo = float(getattr(self, "_ultimo_tempo_decorrido_segundos", 0) or 0)
+        ultimo_codigos = int(getattr(self, "_ultimo_codigos_medidos", 0) or 0)
+        media_inicial = (
+            f"{ultimo_codigos / (ultimo_tempo / 60.0):.1f} cód/min"
+            if ultimo_codigos > 0 and ultimo_tempo > 0
+            else "—"
+        )
+        ctk.CTkLabel(
+            media_box, text="Média por código", text_color=self.SUBTEXT,
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left", padx=(9, 6))
+        self._arquivos_media_codigo_label = ctk.CTkLabel(
+            media_box, text=media_inicial, text_color=self.TEXT,
+            font=("Segoe UI", 13, "bold")
+        )
+        self._arquivos_media_codigo_label.pack(side="right", padx=(2, 9))
+        self._atualizar_metricas_execucao()
 
         lista = ctk.CTkScrollableFrame(self._arquivos_body, fg_color="transparent")
         lista.pack(fill="both", expand=True)
