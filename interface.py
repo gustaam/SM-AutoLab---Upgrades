@@ -5028,12 +5028,15 @@ class App:
             apagar_btn.pack(side="right")
             apagar_btn.pack_forget()
 
-            erros_area = ctk.CTkScrollableFrame(
+            # O histórico de uma execução normalmente contém poucos códigos.
+            # Usar um CTkFrame simples aqui evita o estado de canvas vazio observado
+            # em algumas combinações de Tk/CustomTkinter ao criar a janela de detalhe.
+            erros_area = ctk.CTkFrame(
                 parent,
-                fg_color=("transparent", "transparent"),
+                fg_color="transparent",
                 corner_radius=0,
             )
-            erros_area.pack(fill="both", expand=True, padx=6, pady=(0, 8))
+            erros_area.pack(fill="x", padx=6, pady=(0, 8))
 
             def selecionar_erro(codigo, event=None):
                 ctrl = bool(event is not None and (getattr(event, "state", 0) & 0x0004))
