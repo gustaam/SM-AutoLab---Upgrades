@@ -137,9 +137,7 @@ jobs:
           if ($env:GITHUB_EVENT_NAME -eq "workflow_run") {
             $body = @{ sha = $env:EXPECTED_COMMIT; force = $true } | ConvertTo-Json
             Invoke-RestMethod -Method Patch -Uri "$apiRoot/git/refs/tags/$tag" -Headers $headers -ContentType "application/json" -Body $body | Out-Null
-            git fetch origin "refs/tags/$tag:refs/tags/$tag" --force
-            git checkout --detach "refs/tags/$tag"
-            Write-Host "Tag $tag alinhada ao commit atual da main: $env:EXPECTED_COMMIT."
+            Write-Host "Tag $tag alinhada ao commit atual da main: $env:EXPECTED_COMMIT. O checkout já corresponde ao commit esperado."
           } else {
             git fetch origin "refs/tags/$tag:refs/tags/$tag" --force
             git checkout --detach "refs/tags/$tag"
