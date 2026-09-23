@@ -575,6 +575,23 @@ class CanonicalRuntimeTests(unittest.TestCase):
         for key in ("atividade", "histórico", "↶", "↷", "‹", "›"):
             self.assertIn(f'"{key}":', source)
 
+    def test_reexecucao_de_erros_fica_registrada_e_nao_reaparece_na_mesma_execucao(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _abrir_detalhe_historico")
+        end = source.index("def _preencher_detalhe_pasta", start)
+        open_block = source[start:end]
+        detail_start = source.index("def _preencher_detalhe_pasta")
+        detail_end = source.index("def _atualizar_botao_apagar_historico", detail_start)
+        detail_block = source[detail_start:detail_end]
+
+        self.assertIn("codigos_erros_reexecutados", detail_block)
+        self.assertIn("codigos_reexecutaveis", detail_block)
+        self.assertIn("self._iniciar_automacao_interna(", detail_block)
+        self.assertIn("ignorar_checkpoint=True", detail_block)
+
+        self.assertIn('getattr(self, "_origem_reexecucao", "planilha_interna")', source)
+        self.assertIn('"reexecucao_de"', source)
+
     def test_botoes_de_exclusao_mostram_contagem_da_selecao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
 
