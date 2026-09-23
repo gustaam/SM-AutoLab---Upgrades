@@ -1,4 +1,4 @@
-# Dependências Python do projeto.
+# Dependências Python do SM AutoLab para automação Selenium, planilha, interface e suporte do aplicativo.
 customtkinter==6.0.0
 pandas==3.0.6
 openpyxl==3.1.5
