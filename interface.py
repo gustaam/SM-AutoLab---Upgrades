@@ -3880,21 +3880,21 @@ class App:
         self._visualizacao_reinicio_dialog = dialog
         self._configurar_icone_janela(dialog)
         dialog.title("Visualização alterada")
-        dialog.geometry("390x185")
+        dialog.geometry("340x160")
         dialog.resizable(False, False)
         dialog.transient(self.app)
         dialog.grab_set()
         dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
 
         body = ctk.CTkFrame(dialog, fg_color=self.BG)
-        body.pack(fill="both", expand=True, padx=18, pady=16)
+        body.pack(fill="both", expand=True, padx=14, pady=12)
 
         ctk.CTkLabel(
             body,
             text=f"A visualização {self.VIEW_LABELS[self._visualizacao]} foi selecionada.",
             text_color=self.TEXT,
             font=("Segoe UI", 12, "bold"),
-            wraplength=340,
+            wraplength=290,
         ).pack(anchor="w", pady=(0, 7))
 
         ctk.CTkLabel(
@@ -3906,7 +3906,7 @@ class App:
         ).pack(anchor="w")
 
         actions = ctk.CTkFrame(body, fg_color="transparent")
-        actions.pack(fill="x", side="bottom", pady=(17, 0))
+        actions.pack(fill="x", side="bottom", pady=(12, 0))
 
         def depois():
             try:
@@ -3935,8 +3935,8 @@ class App:
             actions,
             text="Depois",
             command=depois,
-            width=105,
-            height=36,
+            width=95,
+            height=34,
             corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),

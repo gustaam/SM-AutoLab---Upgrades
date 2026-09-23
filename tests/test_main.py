@@ -733,6 +733,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn('messagebox.showinfo(', block)
         self.assertIn('text="Reiniciar"', source)
         self.assertIn('text="Depois"', source)
+        self.assertIn('dialog.geometry("340x160")', source)
         self.assertIn("def _reiniciar_aplicativo", source)
         self.assertIn("_prepare_independent_restart_environment", source)
 
