@@ -5746,7 +5746,7 @@ class App:
         row.grid(
             row=row_index,
             column=0,
-            columnspan=9,
+            columnspan=7,
             sticky="ew",
             pady=2,
         )
