@@ -2878,7 +2878,7 @@ class App:
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
-        largura, altura = 420, 230
+        largura, altura = 500, 280
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -2969,12 +2969,13 @@ class App:
         for text_value, command in (
             ("Abrir", self.abrir_planilha),
             ("Arquivos", self.abrir_historico_planilha),
+            ("Histórico", self._abrir_historico_compacto),
         ):
             ctk.CTkButton(
                 top_row,
                 text=text_value,
                 command=command,
-                width=120,
+                width=140,
                 height=38,
                 corner_radius=8,
                 fg_color=self.ACCENT if text_value == "Abrir" else self.CARD,
@@ -2986,29 +2987,13 @@ class App:
             ).pack(side="left", padx=3, pady=3)
 
         bottom_row = ctk.CTkFrame(actions, fg_color="transparent")
-        bottom_row.pack(anchor="center", pady=(2, 0))
-
-        self.botao_historico_compacto = ctk.CTkButton(
-            bottom_row,
-            text="Histórico",
-            command=self._abrir_historico_compacto,
-            width=100,
-            height=38,
-            corner_radius=8,
-            fg_color=self.CARD,
-            hover_color=("#EAF4FC", "#263F50"),
-            border_width=1,
-            border_color=self.BORDER,
-            text_color=self.TEXT,
-            font=("Segoe UI", 11, "bold"),
-        )
-        self.botao_historico_compacto.pack(side="left", padx=3, pady=3)
+        bottom_row.pack(anchor="center", pady=(8, 0))
 
         self.botao_parar = ctk.CTkButton(
             bottom_row,
             text="Parar",
             command=self.parar,
-            width=100,
+            width=115,
             height=38,
             corner_radius=8,
             fg_color=self.CARD,
@@ -3025,7 +3010,7 @@ class App:
             bottom_row,
             text=self.INICIAR_LABEL,
             command=self.iniciar_thread,
-            width=100,
+            width=115,
             height=38,
             corner_radius=8,
             fg_color=self.ACCENT,
@@ -3141,10 +3126,11 @@ class App:
                 app_height = max(1, self.app.winfo_height())
 
                 if getattr(self, "_visualizacao", "complete") == "compact":
-                    # No modo compacto o menu deve permanecer inteiramente
-                    # dentro da janela, mesmo sendo aberto a partir do cabeçalho.
+                    # A janela compacta tem altura suficiente para exibir o
+                    # menu inteiro abaixo do cabeçalho, sem cobrir o botão.
                     menu_x = max(6, app_width - menu_width - 6)
-                    menu_y = max(6, app_height - menu_height - 6)
+                    menu_y = max(6, self.app.winfo_rooty() * 0 + 58)
+                    menu_y = min(menu_y, max(6, app_height - menu_height - 6))
                 else:
                     # O menu nasce no mesmo eixo X do botão Configurações.
                     menu_x = bx
@@ -3179,7 +3165,7 @@ class App:
                         x = min(right_x, max(6, app_width - sub_width - 6))
                     submenu_height = max(1, self._menu_aparencia.winfo_reqheight())
                     if getattr(self, "_visualizacao", "complete") == "compact":
-                        y = max(6, app_height - submenu_height - 6)
+                        y = max(6, min(button_y, app_height - submenu_height - 6))
                     else:
                         y = max(6, button_y + max(0, (button_height - submenu_height) // 2))
                 else:
@@ -3213,7 +3199,7 @@ class App:
                     x = left_x if left_x >= 6 else min(right_x, max(6, app_width - sub_width - 6))
                     submenu_height = max(1, self._menu_visualizacao.winfo_reqheight())
                     if getattr(self, "_visualizacao", "complete") == "compact":
-                        y = max(6, app_height - submenu_height - 6)
+                        y = max(6, min(button_y, app_height - submenu_height - 6))
                     else:
                         y = max(6, button_y + max(0, (button_height - submenu_height) // 2))
                 else:
