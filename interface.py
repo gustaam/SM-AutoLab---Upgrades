@@ -4185,12 +4185,16 @@ class App:
 
             if usou_legado:
                 self._salvar_estado_persistente(backup=False)
-                try:
-                    self._historico_arquivo_legado.unlink()
-                except OSError:
-                    pass
             elif self._erros_codigos and not self._erros_arquivo.exists():
                 self._salvar_erros_persistentes(backup=False)
+
+            # Uma vez existente o arquivo canônico, a fonte legada deixa de ser
+            # válida e é removida para impedir reidratação por versões antigas.
+            try:
+                if self._historico_arquivo.exists():
+                    self._historico_arquivo_legado.unlink(missing_ok=True)
+            except OSError:
+                pass
 
             # Backups de histórico nunca podem ressuscitar dados apagados.
             for caminho in (
