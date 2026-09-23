@@ -27,6 +27,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from app import (
     atomic_write_json,
+    backup_path,
     read_json_with_backup,
     carregar_configuracoes,
     excluir_checkpoint_interno,
@@ -4125,7 +4126,11 @@ class App:
                     execucao_pendente = dict(atual)
 
             if self._erros_arquivo.exists():
-                dados_erros = read_json_with_backup(self._erros_arquivo, {})
+                try:
+                    with self._erros_arquivo.open("r", encoding="utf-8") as handle:
+                        dados_erros = json.load(handle)
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    dados_erros = {}
                 if isinstance(dados_erros, dict):
                     lista_dedicada = dados_erros.get("erros", [])
                     if isinstance(lista_dedicada, list):
@@ -4905,6 +4910,16 @@ class App:
 
     def _limpar_historico(self):
         if not self._historico_execucoes and not self._execucao_atual:
+            for caminho in (
+                self._historico_arquivo_legado,
+                backup_path(self._historico_arquivo),
+                backup_path(self._historico_arquivo_legado),
+                backup_path(self._erros_arquivo),
+            ):
+                try:
+                    caminho.unlink(missing_ok=True)
+                except OSError:
+                    pass
             self.atualizar_status("Histórico já está vazio")
             return
         confirmar = messagebox.askyesno(
