@@ -59,7 +59,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
     def test_regressoes_visuais_e_de_rolagem_estao_protegidas(self):
         root = Path(__file__).resolve().parents[1]
         interface = (root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("ARROW_SCROLL_UNITS = 4", interface)
+        self.assertIn("ARROW_SCROLL_UNITS = 8", interface)
         self.assertIn("_sm_autolab_tooltip_message", interface)
         self.assertNotIn("border_width=0 if dark_mode else 1", interface)
         self.assertIn('"border": ("#D4E6D9", "#132219")', interface)
