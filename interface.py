@@ -4528,9 +4528,14 @@ class App:
             len(detalhes_erros),
         )
 
+        # Uma reexecução pertence à execução original e não cria uma
+        # nova pasta/registro no histórico. A execução original já recebeu
+        # a marcação "codigos_erros_reexecutados" antes de ser iniciada.
+        eh_reexecucao = bool(self._execucao_atual.get("reexecucao_de"))
+
         # O histórico de erros nunca recebe uma execução totalmente bem-sucedida.
-        # Uma execução só é arquivada aqui quando houve pelo menos um erro real.
-        if self._historico_execucao_tem_erros(self._execucao_atual):
+        # Uma execução normal só é arquivada aqui quando houve pelo menos um erro real.
+        if not eh_reexecucao and self._historico_execucao_tem_erros(self._execucao_atual):
             self._historico_execucoes.append(dict(self._execucao_atual))
 
         self._execucao_atual = None
@@ -4550,7 +4555,8 @@ class App:
             int(self._execucao_atual.get("erros", 0) or 0),
             1,
         )
-        self._historico_execucoes.append(dict(self._execucao_atual))
+        if not self._execucao_atual.get("reexecucao_de"):
+            self._historico_execucoes.append(dict(self._execucao_atual))
         self._execucao_atual = None
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
