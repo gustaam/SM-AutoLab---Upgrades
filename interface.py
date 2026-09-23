@@ -7056,7 +7056,7 @@ class App:
             header,
             text="Apagar selecionados",
             command=self._apagar_datas_arquivos_selecionadas,
-            width=128, height=32, corner_radius=8,
+            width=150, height=32, corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#FDECEC", "#3A2424"),
             border_width=1, border_color=self.ERROR,
