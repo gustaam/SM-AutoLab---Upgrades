@@ -2318,6 +2318,27 @@ def _ler_versao_aplicativo():
         pass
     return "desconhecida"
 
+
+def _centralizar_janela_no_pai(janela, pai):
+    """Centraliza uma janela auxiliar em relação à janela principal/pai."""
+    try:
+        janela.update_idletasks()
+        pai.update_idletasks()
+
+        largura = int(janela.winfo_width())
+        altura = int(janela.winfo_height())
+        if largura <= 1:
+            largura = int(janela.winfo_reqwidth())
+        if altura <= 1:
+            altura = int(janela.winfo_reqheight())
+
+        x = pai.winfo_rootx() + max(0, (pai.winfo_width() - largura) // 2)
+        y = pai.winfo_rooty() + max(0, (pai.winfo_height() - altura) // 2)
+
+        janela.geometry(f"{largura}x{altura}+{x}+{y}")
+    except Exception:
+        pass
+
 APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
 ARQUIVOS_DIAS = 60
@@ -3016,6 +3037,7 @@ class App:
         try:
             janela.update_idletasks()
             janela.deiconify()
+            _centralizar_janela_no_pai(janela, self.app)
             janela.lift()
             janela.focus_force()
             janela.update()
@@ -3541,6 +3563,7 @@ class App:
         popup.geometry("560x420")
         popup.resizable(False, False)
         popup.transient(self.app)
+        _centralizar_janela_no_pai(popup, self.app)
         popup.grab_set()
         popup.configure(fg_color=self.BG)
         try:
@@ -4787,6 +4810,7 @@ class App:
         win.minsize(560, 400)
         win.resizable(True, True)
         win.transient(self.app)
+        _centralizar_janela_no_pai(win, self.app)
         try:
             aplicar_backdrop_sistema(
                 win, "acrylic",
@@ -5262,6 +5286,7 @@ class App:
         win.minsize(900, 600)
         win.configure(fg_color=self.BG)
         win.transient(self.app)
+        _centralizar_janela_no_pai(win, self.app)
         try:
             aplicar_backdrop_sistema(
                 win, "mica_alt",
@@ -6971,13 +6996,7 @@ class App:
         except Exception:
             pass
         win.protocol("WM_DELETE_WINDOW", self._fechar_historico_planilha)
-        try:
-            self.app.update_idletasks()
-            px = self.app.winfo_rootx() + max(0, (self.app.winfo_width() - 820) // 2)
-            py = self.app.winfo_rooty() + max(0, (self.app.winfo_height() - 650) // 2)
-            win.geometry(f"820x650+{px}+{py}")
-        except Exception:
-            pass
+        _centralizar_janela_no_pai(win, self.app)
 
         header = ctk.CTkFrame(win, fg_color="transparent")
         header.pack(fill="x", padx=18, pady=(16, 8))
