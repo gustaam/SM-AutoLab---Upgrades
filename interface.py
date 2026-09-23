@@ -4091,7 +4091,14 @@ class App:
 
             execucao_pendente = None
             for caminho in fontes:
-                dados = read_json_with_backup(caminho, {})
+                try:
+                    with caminho.open("r", encoding="utf-8") as handle:
+                        dados = json.load(handle)
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    # O arquivo principal é a fonte de verdade. Nunca recupere
+                    # automaticamente um .bak, pois ele pode conter histórico
+                    # explicitamente apagado pelo usuário.
+                    continue
                 if not isinstance(dados, dict):
                     continue
 
@@ -4172,20 +4179,31 @@ class App:
             self._erros_codigos = erros_reconstruidos[-200:]
 
             if usou_legado:
-                self._salvar_estado_persistente()
+                self._salvar_estado_persistente(backup=False)
                 try:
                     self._historico_arquivo_legado.unlink()
                 except OSError:
                     pass
             elif self._erros_codigos and not self._erros_arquivo.exists():
-                self._salvar_erros_persistentes()
+                self._salvar_erros_persistentes(backup=False)
+
+            # Backups de histórico nunca podem ressuscitar dados apagados.
+            for caminho in (
+                backup_path(self._historico_arquivo),
+                backup_path(self._historico_arquivo_legado),
+                backup_path(self._erros_arquivo),
+            ):
+                try:
+                    caminho.unlink(missing_ok=True)
+                except OSError:
+                    pass
         except Exception:
             LOGGER.exception("Falha ao carregar o histórico persistente.")
             self._historico_execucoes = []
             self._execucao_atual = None
             self._erros_codigos = []
 
-    def _salvar_estado_persistente(self):
+    def _salvar_estado_persistente(self, *, backup=True):
         try:
             dados = {
                 "version": 4,
@@ -4199,11 +4217,11 @@ class App:
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
             self._historico_arquivo.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_json(self._historico_arquivo, dados)
+            atomic_write_json(self._historico_arquivo, dados, backup=backup)
         except Exception:
             LOGGER.exception("Falha ao salvar o histórico de execuções.")
 
-    def _salvar_erros_persistentes(self):
+    def _salvar_erros_persistentes(self, *, backup=True):
         try:
             dados = {
                 "version": 1,
@@ -4211,7 +4229,7 @@ class App:
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
             self._erros_arquivo.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_json(self._erros_arquivo, dados)
+            atomic_write_json(self._erros_arquivo, dados, backup=backup)
         except Exception:
             LOGGER.exception("Falha ao salvar o histórico de erros.")
 
@@ -4865,13 +4883,18 @@ class App:
         self._historico_execucoes = []
         self._execucao_atual = None
         self._erros_codigos = []
-        self._salvar_estado_persistente()
-        self._salvar_erros_persistentes()
-        try:
-            if self._historico_arquivo_legado.exists():
-                self._historico_arquivo_legado.unlink()
-        except OSError:
-            pass
+        self._salvar_estado_persistente(backup=False)
+        self._salvar_erros_persistentes(backup=False)
+        for caminho in (
+            self._historico_arquivo_legado,
+            backup_path(self._historico_arquivo),
+            backup_path(self._historico_arquivo_legado),
+            backup_path(self._erros_arquivo),
+        ):
+            try:
+                caminho.unlink(missing_ok=True)
+            except OSError:
+                pass
         self._restaurar_historico_na_tela()
         self._atualizar_contador_arquivos()
         self._add_activity("Histórico de execuções apagado.", self.WARNING)
