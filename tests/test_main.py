@@ -906,7 +906,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _criar_pasta_historico")
         end = source.index("def _abrir_detalhe_historico", start)
         block = source[start:end]
-        self.assertIn("getattr(event,"state",0)", block)
+        self.assertIn('getattr(event,"state",0)', block)
         self.assertIn("0x0004", block)
         self.assertIn("self._historico_selecionados.add(execucao_id)", block)
         self.assertIn('widget.bind("<Button-1>", clicar)', block)
