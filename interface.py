@@ -4800,9 +4800,13 @@ class App:
         if btn is None:
             return
         try:
-            if self._historico_selecionados:
+            quantidade = len(self._historico_selecionados)
+            if quantidade:
+                texto = f"Apagar {quantidade} selecionado" if quantidade == 1 else f"Apagar {quantidade} selecionados"
+                btn.configure(text=texto)
                 btn.pack(side="right", padx=(0, 6))
             else:
+                btn.configure(text="Apagar selecionados")
                 btn.pack_forget()
         except Exception:
             pass
@@ -6881,9 +6885,13 @@ class App:
         if btn is None:
             return
         try:
-            if self._arquivos_datas_selecionadas:
+            quantidade = len(self._arquivos_datas_selecionadas)
+            if quantidade:
+                texto = f"Apagar {quantidade} selecionada" if quantidade == 1 else f"Apagar {quantidade} selecionadas"
+                btn.configure(text=texto)
                 btn.pack(side="right", padx=(0, 6))
             else:
+                btn.configure(text="Apagar selecionados")
                 btn.pack_forget()
         except Exception:
             pass
