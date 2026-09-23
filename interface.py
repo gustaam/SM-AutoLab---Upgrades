@@ -27,6 +27,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from app import (
     atomic_write_json,
+    backup_path,
     read_json_with_backup,
     carregar_configuracoes,
     excluir_checkpoint_interno,
@@ -4091,7 +4092,14 @@ class App:
 
             execucao_pendente = None
             for caminho in fontes:
-                dados = read_json_with_backup(caminho, {})
+                try:
+                    with caminho.open("r", encoding="utf-8") as handle:
+                        dados = json.load(handle)
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    # O arquivo principal é a fonte de verdade. Nunca recupere
+                    # automaticamente um .bak, pois ele pode conter histórico
+                    # explicitamente apagado pelo usuário.
+                    continue
                 if not isinstance(dados, dict):
                     continue
 
@@ -4118,7 +4126,11 @@ class App:
                     execucao_pendente = dict(atual)
 
             if self._erros_arquivo.exists():
-                dados_erros = read_json_with_backup(self._erros_arquivo, {})
+                try:
+                    with self._erros_arquivo.open("r", encoding="utf-8") as handle:
+                        dados_erros = json.load(handle)
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    dados_erros = {}
                 if isinstance(dados_erros, dict):
                     lista_dedicada = dados_erros.get("erros", [])
                     if isinstance(lista_dedicada, list):
@@ -4172,20 +4184,35 @@ class App:
             self._erros_codigos = erros_reconstruidos[-200:]
 
             if usou_legado:
-                self._salvar_estado_persistente()
+                self._salvar_estado_persistente(backup=False)
+            elif self._erros_codigos and not self._erros_arquivo.exists():
+                self._salvar_erros_persistentes(backup=False)
+
+            # Uma vez existente o arquivo canônico, a fonte legada deixa de ser
+            # válida e é removida para impedir reidratação por versões antigas.
+            try:
+                if self._historico_arquivo.exists():
+                    self._historico_arquivo_legado.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+            # Backups de histórico nunca podem ressuscitar dados apagados.
+            for caminho in (
+                backup_path(self._historico_arquivo),
+                backup_path(self._historico_arquivo_legado),
+                backup_path(self._erros_arquivo),
+            ):
                 try:
-                    self._historico_arquivo_legado.unlink()
+                    caminho.unlink(missing_ok=True)
                 except OSError:
                     pass
-            elif self._erros_codigos and not self._erros_arquivo.exists():
-                self._salvar_erros_persistentes()
         except Exception:
             LOGGER.exception("Falha ao carregar o histórico persistente.")
             self._historico_execucoes = []
             self._execucao_atual = None
             self._erros_codigos = []
 
-    def _salvar_estado_persistente(self):
+    def _salvar_estado_persistente(self, *, backup=True):
         try:
             dados = {
                 "version": 4,
@@ -4199,11 +4226,11 @@ class App:
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
             self._historico_arquivo.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_json(self._historico_arquivo, dados)
+            atomic_write_json(self._historico_arquivo, dados, backup=backup)
         except Exception:
             LOGGER.exception("Falha ao salvar o histórico de execuções.")
 
-    def _salvar_erros_persistentes(self):
+    def _salvar_erros_persistentes(self, *, backup=True):
         try:
             dados = {
                 "version": 1,
@@ -4211,7 +4238,7 @@ class App:
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
             self._erros_arquivo.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_json(self._erros_arquivo, dados)
+            atomic_write_json(self._erros_arquivo, dados, backup=backup)
         except Exception:
             LOGGER.exception("Falha ao salvar o histórico de erros.")
 
@@ -4703,10 +4730,33 @@ class App:
             execucao.get("codigos_erros")
             or execucao.get("erros_codigos")
             or execucao.get("codigos_erro")
+            or execucao.get("codigos")
+            or execucao.get("codigo_erro")
             or []
         )
         if isinstance(codigos_raw, str):
             codigos_raw = [codigos_raw]
+
+        # Compatibilidade com históricos mais antigos que guardavam os itens
+        # processados, mas não criavam explicitamente a lista codigos_erros.
+        if not codigos_raw:
+            registros_antigos = (
+                execucao.get("resultados")
+                or execucao.get("itens")
+                or execucao.get("erros_detalhes")
+                or []
+            )
+            if isinstance(registros_antigos, list):
+                codigos_raw = [
+                    item for item in registros_antigos
+                    if isinstance(item, dict)
+                    and (
+                        str(item.get("status", "")).strip().casefold() == "erro"
+                        or item.get("erro")
+                        or item.get("error")
+                    )
+                ]
+
         codigos = []
         for item in codigos_raw:
             if isinstance(item, dict):
@@ -4722,6 +4772,17 @@ class App:
                    f"Status: {status}    Processados: {total}    Executados: {sucessos}    Não executados: {erros}"),
             text_color=self.SUBTEXT, font=("Segoe UI", 9), anchor="w", justify="left"
         ).pack(fill="x", padx=8, pady=(7, 4))
+
+        if erros and not codigos:
+            ctk.CTkLabel(
+                parent,
+                text="Os códigos desta execução não foram armazenados no histórico desta versão.",
+                text_color=self.ERROR,
+                font=("Segoe UI", 10, "bold"),
+                anchor="w",
+                justify="left",
+                wraplength=620,
+            ).pack(fill="x", padx=12, pady=(6, 10))
 
         if erros and codigos:
             header = ctk.CTkFrame(parent, fg_color="transparent")
@@ -4853,6 +4914,16 @@ class App:
 
     def _limpar_historico(self):
         if not self._historico_execucoes and not self._execucao_atual:
+            for caminho in (
+                self._historico_arquivo_legado,
+                backup_path(self._historico_arquivo),
+                backup_path(self._historico_arquivo_legado),
+                backup_path(self._erros_arquivo),
+            ):
+                try:
+                    caminho.unlink(missing_ok=True)
+                except OSError:
+                    pass
             self.atualizar_status("Histórico já está vazio")
             return
         confirmar = messagebox.askyesno(
@@ -4865,13 +4936,18 @@ class App:
         self._historico_execucoes = []
         self._execucao_atual = None
         self._erros_codigos = []
-        self._salvar_estado_persistente()
-        self._salvar_erros_persistentes()
-        try:
-            if self._historico_arquivo_legado.exists():
-                self._historico_arquivo_legado.unlink()
-        except OSError:
-            pass
+        self._salvar_estado_persistente(backup=False)
+        self._salvar_erros_persistentes(backup=False)
+        for caminho in (
+            self._historico_arquivo_legado,
+            backup_path(self._historico_arquivo),
+            backup_path(self._historico_arquivo_legado),
+            backup_path(self._erros_arquivo),
+        ):
+            try:
+                caminho.unlink(missing_ok=True)
+            except OSError:
+                pass
         self._restaurar_historico_na_tela()
         self._atualizar_contador_arquivos()
         self._add_activity("Histórico de execuções apagado.", self.WARNING)
