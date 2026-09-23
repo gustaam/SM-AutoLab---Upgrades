@@ -440,7 +440,7 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
     MIN_THUMB = 28
     REPEAT_DELAY = 420
     REPEAT_INTERVAL = 55
-    ARROW_SCROLL_UNITS = 8
+    ARROW_SCROLL_UNITS = 12
     ARROW_PRESSED_COLOR = "#454545"
 
     def __init__(self, master, orient="vertical", command=None, **kwargs):
@@ -526,9 +526,16 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
         thumb_length = max(self.MIN_THUMB, track_length * visible)
         thumb_length = min(track_length, thumb_length)
         movable = max(0.0, track_length - thumb_length)
-        # Mantém a posição proporcional durante toda a rolagem. O ajuste
-        # especial para _last >= 0.999 fazia o polegar "saltar" para o fim.
-        thumb_start = start + movable * self._first
+        # O primeiro valor do yview/xview vai somente até (1 - visible).
+        # Normaliza esse intervalo para que o polegar percorra todo o trilho
+        # e encoste na seta final quando a área rolável chegar ao fim.
+        scrollable_range = max(0.0, 1.0 - visible)
+        if scrollable_range > 0.0:
+            position_fraction = self._first / scrollable_range
+        else:
+            position_fraction = 0.0
+        position_fraction = max(0.0, min(1.0, position_fraction))
+        thumb_start = start + movable * position_fraction
         thumb_start = max(start, min(end - thumb_length, thumb_start))
         thumb_end = thumb_start + thumb_length
         return start, end, thumb_start, thumb_end
@@ -2733,7 +2740,6 @@ class App:
         activity_card.configure(height=340)
         activity_card.pack_propagate(False)
         self._activity_card = activity_card
-        self._section_title(activity_card, "Acompanhamento")
         self.app.bind("<Configure>", self._ajustar_altura_acompanhamento, add="+")
 
         # Fluent-inspired tab row, like the reference image.
