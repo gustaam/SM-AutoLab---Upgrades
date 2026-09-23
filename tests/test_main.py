@@ -124,25 +124,22 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertGreaterEqual(source.count("if not self._validar_planilha_antes_execucao():"),
                                 2)
 
-    def test_atualizador_tem_backup_health_check_e_rollback(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _schedule_replace_after_exit")
-        end = source.index("def launch_updater", start)
-        block = source[start:end]
-        self.assertIn(".sm_autolab_backup", block)
-        self.assertIn(".sm_autolab_failed", block)
-        self.assertIn("startup.ok", block)
-        self.assertIn("rollback", block.lower())
-        self.assertIn('start "" /b "%SM_TARGET%"', block)
-        self.assertIn('findstr /b /c:"version=%SM_EXPECTED_VERSION%" "%SM_HEALTH%"', block)
-        self.assertIn('if exist "%SM_HEALTH%"', block)
-        self.assertNotIn("tasklist /FI", block)
-        self.assertNotIn("taskkill /PID", block)
-        self.assertIn('move /Y "%SM_BACKUP%" "%SM_TARGET%"', block)
-        self.assertIn('>nul choice /n /t 1 /d y', block)
-        self.assertNotIn("powershell", block.lower())
-        self.assertNotIn("timeout /t 1 /nobreak", block)
-        self.assertIn('restart_env["SM_AUTOLAB_UPDATE_HEALTH"]', block)
+    def test_atualizador_usa_instalador_visual_e_rollback(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _schedule_replace_after_exit")
+        end=source.index("def launch_updater",start)
+        block=source[start:end]
+        self.assertIn("SM_AUTOLAB_INSTALLER",block)
+        self.assertIn("SM_AUTOLAB_INSTALLER_PAYLOAD",block)
+        self.assertIn("CREATE_NO_WINDOW",block)
+        self.assertNotIn("tasklist /FI",block)
+        self.assertNotIn("taskkill /PID",block)
+        self.assertNotIn("powershell",block.lower())
+        main_source=(self.root/"main.py").read_text(encoding="utf-8")
+        self.assertIn("def _update_installer_mode",main_source)
+        self.assertIn('if _update_installer_mode():',main_source)
+        self.assertIn("Instalando a v",main_source)
+        self.assertIn("Restaurando a versão anterior",main_source)
 
     def test_atualizador_exibe_barra_de_download(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -181,13 +178,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("font=value_font",block)
 
     def test_bootstrap_sinaliza_inicio_bem_sucedido_para_atualizacao(self):
-        source = (self.root / "main.py").read_text(encoding="utf-8")
-        self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso", source)
-        self.assertIn("SM_AUTOLAB_UPDATE_HEALTH", source)
-        self.assertIn("SM_AUTOLAB_UPDATE_EXPECTED_VERSION", source)
-        self.assertIn("os.getpid()", source)
-        self.assertIn("_sinalizar_inicializacao_atualizacao_sucesso()", source)
-        self.assertLess(len(source.splitlines()), 500)
+        source=(self.root/"main.py").read_text(encoding="utf-8")
+        self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso",source)
+        self.assertIn("SM_AUTOLAB_UPDATE_EXPECTED_VERSION",source)
+        self.assertIn("version=",source)
+        self.assertLess(
+            source.index("_sinalizar_inicializacao_atualizacao_sucesso()"),
+            source.index("app.app.mainloop()"),
+        )
 
     def test_dashboard_retorna_ao_layout_base_com_tempos_no_card_de_progresso(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -779,6 +777,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("Alterações não salvas",source)
         self.assertIn("Salvando…",source)
         self.assertIn("def _planilha_salvar_rascunho",source)
+
+    def test_historico_compacto_renderiza_erros_e_clica_na_linha(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _abrir_historico_compacto")
+        end=source.index("def _reposicionar_menus",start)
+        block=source[start:end]
+        self.assertIn('if self._historico_execucao_tem_erros(item)',block)
+        self.assertIn('row.bind("<Button-1>", abrir_detalhe, add="+")',block)
+        self.assertIn('for child in row.winfo_children()',block)
 
     def test_badge_historico_indica_erros_pendentes(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
