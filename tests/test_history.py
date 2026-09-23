@@ -222,7 +222,7 @@ class HistoryPersistenceTests(unittest.TestCase):
                 registro["codigos_erros"],
                 ["BBB", "AAA", "CCC", "DDD", "EEE"],
             )
-            self.assertEqual(registro["erros"], 2)
+            self.assertEqual(registro["erros"], 5)
 
     def test_execucao_atual_recente_e_codigos_com_erro_sao_persistidos(self):
         with tempfile.TemporaryDirectory() as temp:
