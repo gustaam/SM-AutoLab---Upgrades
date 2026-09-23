@@ -4721,10 +4721,33 @@ class App:
             execucao.get("codigos_erros")
             or execucao.get("erros_codigos")
             or execucao.get("codigos_erro")
+            or execucao.get("codigos")
+            or execucao.get("codigo_erro")
             or []
         )
         if isinstance(codigos_raw, str):
             codigos_raw = [codigos_raw]
+
+        # Compatibilidade com históricos mais antigos que guardavam os itens
+        # processados, mas não criavam explicitamente a lista codigos_erros.
+        if not codigos_raw:
+            registros_antigos = (
+                execucao.get("resultados")
+                or execucao.get("itens")
+                or execucao.get("erros_detalhes")
+                or []
+            )
+            if isinstance(registros_antigos, list):
+                codigos_raw = [
+                    item for item in registros_antigos
+                    if isinstance(item, dict)
+                    and (
+                        str(item.get("status", "")).strip().casefold() == "erro"
+                        or item.get("erro")
+                        or item.get("error")
+                    )
+                ]
+
         codigos = []
         for item in codigos_raw:
             if isinstance(item, dict):
@@ -4740,6 +4763,17 @@ class App:
                    f"Status: {status}    Processados: {total}    Executados: {sucessos}    Não executados: {erros}"),
             text_color=self.SUBTEXT, font=("Segoe UI", 9), anchor="w", justify="left"
         ).pack(fill="x", padx=8, pady=(7, 4))
+
+        if erros and not codigos:
+            ctk.CTkLabel(
+                parent,
+                text="Os códigos desta execução não foram armazenados no histórico desta versão.",
+                text_color=self.ERROR,
+                font=("Segoe UI", 10, "bold"),
+                anchor="w",
+                justify="left",
+                wraplength=620,
+            ).pack(fill="x", padx=12, pady=(6, 10))
 
         if erros and codigos:
             header = ctk.CTkFrame(parent, fg_color="transparent")
