@@ -1205,6 +1205,8 @@ if not exist "%SM_TARGET%" goto rollback
 
 del /Q "%SM_HEALTH%" >nul 2>&1
 del /Q "%SM_PIDFILE%" >nul 2>&1
+set "PYINSTALLER_RESET_ENVIRONMENT=1"
+set "SM_AUTOLAB_HEALTH_FILE=%SM_HEALTH%"
 start "" /b "%SM_TARGET%"
 
 set /a SM_PID_WAIT=0
@@ -2464,6 +2466,20 @@ class App:
         ctk.set_appearance_mode(self._tema)
         ctk.set_default_color_theme("blue")
         self.config_app()
+        self._sinalizar_inicio_atualizacao()
+
+    def _sinalizar_inicio_atualizacao(self):
+        """Cria o marcador de saúde solicitado pelo processo de atualização."""
+        caminho = str(os.environ.get("SM_AUTOLAB_HEALTH_FILE", "") or "").strip()
+        if not caminho:
+            return
+        try:
+            Path(caminho).write_text(
+                f"SM AutoLab {APP_VERSION}\nPID={os.getpid()}\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            LOGGER.exception("Falha ao sinalizar inicialização do aplicativo.")
 
     def _configurar_icone_janela(self, janela=None):
         """Aplica o ícone oficial do aplicativo à barra de título da janela."""
@@ -3962,37 +3978,16 @@ class App:
         _ui_scan_tooltips(dialog)
 
     def _reiniciar_aplicativo(self):
-        """Reinicia a mesma instalação do aplicativo sem sobrepor instâncias."""
+        """Reinicia a mesma instalação em uma nova instância independente."""
         try:
             self._salvar_estado_persistente()
             executable = Path(sys.executable).resolve()
+            if executable.suffix.lower() != ".exe" or not getattr(sys, "frozen", False):
+                raise RuntimeError(
+                    "O reinício automático exige a versão executável do SM AutoLab."
+                )
+
             env = _prepare_independent_restart_environment()
-            pid = os.getpid()
-
-            restart_dir = Path(tempfile.mkdtemp(prefix="sm_autolab_restart_"))
-            script = restart_dir / "restart_after_exit.cmd"
-            executable_cmd = _escape_cmd_path(str(executable))
-            script_cmd = _escape_cmd_path(str(script))
-
-            script_text = f"""@echo off
-setlocal EnableExtensions DisableDelayedExpansion
-set "SM_PID={pid}"
-set "SM_EXE={executable_cmd}"
-
-:wait_old
-tasklist /FI "PID eq %SM_PID%" /NH 2>nul | findstr /C:"%SM_PID%" >nul
-if not errorlevel 1 (
-    >nul choice /n /t 1 /d y
-    goto wait_old
-)
-
-start "" /b "%SM_EXE%"
-cd /d "%TEMP%" >nul 2>&1
-rmdir /s /q "{_escape_cmd_path(str(restart_dir))}" >nul 2>&1
-exit /b 0
-"""
-            script.write_text(script_text, encoding="utf-8", newline="\r\n")
-
             flags = 0
             if os.name == "nt":
                 flags = (
@@ -4002,8 +3997,8 @@ exit /b 0
                 )
 
             subprocess.Popen(
-                ["cmd.exe", "/d", "/c", script_cmd],
-                cwd=str(restart_dir),
+                [str(executable), *sys.argv[1:]],
+                cwd=str(executable.parent),
                 close_fds=True,
                 creationflags=flags,
                 env=env,

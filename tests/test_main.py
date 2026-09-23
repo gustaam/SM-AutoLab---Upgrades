@@ -703,7 +703,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('height=10,', block)
         self.assertIn('fg_color=self.BORDER', block)
         self.assertIn('progress_color=self.ACCENT', block)
-        self.assertIn('actions.pack(fill="x", padx=18, pady=(27, 10))', block)
+        self.assertIn("actions.pack(fill="x", padx=18, pady=(27, 10))", block)
         self.assertIn("menu_y = 58", source)
 
     def test_atualizacao_usa_mesma_versao_da_interface(self):
@@ -715,14 +715,23 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("current = str(current_override or \"\").strip()", block)
         self.assertIn("find_update(current_override=APP_VERSION)", source)
 
-    def test_reinicio_espera_instancia_anterior_terminar(self):
+    def test_reinicio_usa_nova_instancia_independente(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _reiniciar_aplicativo")
         end = source.index("def _mostrar_menu_aparencia", start)
         block = source[start:end]
-        self.assertIn("SM_PID", block)
-        self.assertIn("goto wait_old", block)
-        self.assertIn("env = _prepare_independent_restart_environment()", block)
+        self.assertIn("_prepare_independent_restart_environment()", block)
+        self.assertIn("subprocess.Popen(", block)
+        self.assertIn("sys.argv[1:]", block)
+        self.assertIn("CREATE_NEW_PROCESS_GROUP", block)
+        self.assertNotIn("tasklist /FI", block)
+
+    def test_atualizador_sinaliza_inicio_saudavel_e_reseta_ambiente(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('set "PYINSTALLER_RESET_ENVIRONMENT=1"', source)
+        self.assertIn('set "SM_AUTOLAB_HEALTH_FILE=%SM_HEALTH%"', source)
+        self.assertIn("def _sinalizar_inicio_atualizacao", source)
+        self.assertIn("SM_AUTOLAB_HEALTH_FILE", source)
 
     def test_troca_visualizacao_oferece_reinicio_agora_ou_depois(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -733,10 +742,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn('messagebox.showinfo(', block)
         self.assertIn('text="Reiniciar"', source)
         self.assertIn('text="Depois"', source)
-        self.assertIn('dialog.geometry("340x160")', source)
         self.assertIn("def _reiniciar_aplicativo", source)
         self.assertIn("_prepare_independent_restart_environment", source)
 
+        self.assertIn('dialog.geometry("340x160")', source)
     def test_status_animation_reproduz_configuracao_da_v2_99_35(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _iniciar_pisca_status")
