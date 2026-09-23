@@ -440,7 +440,8 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
     MIN_THUMB = 28
     REPEAT_DELAY = 420
     REPEAT_INTERVAL = 55
-    ARROW_SCROLL_UNITS = 4
+    ARROW_SCROLL_UNITS = 8
+    ARROW_PRESSED_COLOR = "#454545"
 
     def __init__(self, master, orient="vertical", command=None, **kwargs):
         self.orient = str(orient or "vertical").lower()
@@ -450,6 +451,7 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
         self._drag_offset = None
         self._repeat_job = None
         self._hover_part = None
+        self._pressed_part = None
         self._bg_color = "#F3F3F3"
         self._thumb_color = "#C8C8C8"
         self._thumb_hover_color = "#AFAFAF"
@@ -524,12 +526,10 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
         thumb_length = max(self.MIN_THUMB, track_length * visible)
         thumb_length = min(track_length, thumb_length)
         movable = max(0.0, track_length - thumb_length)
-        if self._first <= 0.001:
-            thumb_start = start
-        elif self._last >= 0.999:
-            thumb_start = end - thumb_length
-        else:
-            thumb_start = start + movable * self._first
+        # Mantém a posição proporcional durante toda a rolagem. O ajuste
+        # especial para _last >= 0.999 fazia o polegar "saltar" para o fim.
+        thumb_start = start + movable * self._first
+        thumb_start = max(start, min(end - thumb_length, thumb_start))
         thumb_end = thumb_start + thumb_length
         return start, end, thumb_start, thumb_end
 
@@ -582,11 +582,17 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
                     "thumb",
                 )
                 arrow_fill_left = (
-                    self._arrow_hover_color if self._hover_part == "decrement"
+                    self.ARROW_PRESSED_COLOR
+                    if self._pressed_part == "decrement"
+                    else self._arrow_hover_color
+                    if self._hover_part == "decrement"
                     else self._arrow_color
                 )
                 arrow_fill_right = (
-                    self._arrow_hover_color if self._hover_part == "increment"
+                    self.ARROW_PRESSED_COLOR
+                    if self._pressed_part == "increment"
+                    else self._arrow_hover_color
+                    if self._hover_part == "increment"
                     else self._arrow_color
                 )
                 cy = center
@@ -613,11 +619,17 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
                     "thumb",
                 )
                 arrow_fill_up = (
-                    self._arrow_hover_color if self._hover_part == "decrement"
+                    self.ARROW_PRESSED_COLOR
+                    if self._pressed_part == "decrement"
+                    else self._arrow_hover_color
+                    if self._hover_part == "decrement"
                     else self._arrow_color
                 )
                 arrow_fill_down = (
-                    self._arrow_hover_color if self._hover_part == "increment"
+                    self.ARROW_PRESSED_COLOR
+                    if self._pressed_part == "increment"
+                    else self._arrow_hover_color
+                    if self._hover_part == "increment"
                     else self._arrow_color
                 )
                 cx = center
@@ -690,9 +702,13 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
         region = self._region(position)
         if region == "decrement":
             self._drag_offset = None
+            self._pressed_part = "decrement"
+            self._redraw()
             self._start_repeat(-1)
         elif region == "increment":
             self._drag_offset = None
+            self._pressed_part = "increment"
+            self._redraw()
             self._start_repeat(1)
         elif region == "thumb":
             self._cancel_repeat()
@@ -722,6 +738,9 @@ class _SMWindowsRoundedScrollbar(tk.Canvas):
     def _on_release(self, _event):
         self._cancel_repeat()
         self._drag_offset = None
+        if self._pressed_part is not None:
+            self._pressed_part = None
+            self._redraw()
 
     def _on_motion_hover(self, event):
         if self._drag_offset is not None:
