@@ -2351,7 +2351,8 @@ def _ler_versao_aplicativo():
 
 APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
-ARQUIVOS_DIAS = 60
+HISTORICO_COL_PESOS = (8, 7, 30, 10, 10, 7, 8, 12, 4)
+HISTORICO_COL_MINS = (62, 54, 140, 70, 70, 48, 62, 80, 28)
 
 class App:
     INICIAR_LABEL = "Iniciar"
@@ -2434,6 +2435,8 @@ class App:
         self._stat_icon_font_cache = {}
         self._planilha_historico_window = None
         self._historico_compacto_window = None
+        self._historico_notificacao_badge = None
+        self._historico_notificacao_reposition_job = None
         self._visualizacao_reinicio_dialog = None
         self._arquivos_body = None
         self._arquivos_calendar_canvas = None
@@ -2727,11 +2730,11 @@ class App:
         elapsed_box.grid_propagate(False)
         ctk.CTkLabel(
             elapsed_box, text="Tempo decorrido", text_color=self.SUBTEXT,
-            font=("Segoe UI", 8, "bold")
+            font=("Segoe UI", 9, "bold")
         ).pack(side="left", padx=(9, 6))
         self._tempo_decorrido_label = ctk.CTkLabel(
             elapsed_box, text="00:00:00", text_color=self.TEXT,
-            font=("Segoe UI", 12, "bold")
+            font=("Segoe UI", 13, "bold")
         )
         self._tempo_decorrido_label.pack(side="right", padx=(2, 9))
 
@@ -2743,11 +2746,11 @@ class App:
         eta_box.grid_propagate(False)
         ctk.CTkLabel(
             eta_box, text="Tempo estimado restante", text_color=self.SUBTEXT,
-            font=("Segoe UI", 8, "bold")
+            font=("Segoe UI", 9, "bold")
         ).pack(side="left", padx=(8, 4))
         self._tempo_estimado_label = ctk.CTkLabel(
             eta_box, text="—", text_color=self.TEXT,
-            font=("Segoe UI", 12, "bold")
+            font=("Segoe UI", 13, "bold")
         )
         self._tempo_estimado_label.pack(side="right", padx=(2, 9))
 
@@ -2790,6 +2793,25 @@ class App:
             btn._fluent_no_press = True
             btn._fluent_no_focus_ring = True
             self.tab_buttons[name] = btn
+
+        self._historico_notificacao_badge = ctk.CTkLabel(
+            tabs,
+            text="!",
+            width=16,
+            height=16,
+            corner_radius=8,
+            fg_color=self.ERROR,
+            text_color="#FFFFFF",
+            font=("Segoe UI", 8, "bold"),
+        )
+        self._historico_notificacao_badge.place_forget()
+        self._historico_notificacao_badge.bind(
+            "<Button-1>",
+            lambda _e: self._selecionar_aba("Histórico"),
+            add="+",
+        )
+        tabs.bind("<Configure>", self._reposicionar_badge_historico, add="+")
+        self.app.after_idle(self._reposicionar_badge_historico)
 
         self.tab_area = ctk.CTkFrame(activity_card, fg_color="transparent")
         self.tab_area.pack(fill="both", expand=True, padx=14, pady=(0, 5))
@@ -3113,6 +3135,8 @@ class App:
                 except (TypeError,ValueError): pass
                 row=ctk.CTkFrame(lista,fg_color=self.CARD,corner_radius=7,border_width=1,border_color=self.BORDER,height=44)
                 row.pack(fill="x",pady=2); row.pack_propagate(False)
+                abrir_detalhe = lambda _e, execucao=item: self._abrir_detalhe_historico(execucao)
+                row.bind("<Button-1>", abrir_detalhe, add="+")
                 ctk.CTkLabel(row,text=data,text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=7,y=10,width=78)
                 ctk.CTkLabel(row,text=horario,text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=90,y=10,width=62)
                 ctk.CTkLabel(row,text=(planilha+(f" • Pág. {pagina}" if pagina else "")),text_color=self.TEXT,font=("Segoe UI",9),anchor="w").place(x=160,y=10,width=255)
@@ -3120,7 +3144,8 @@ class App:
                 ctk.CTkLabel(row,text=str(executados),text_color=self.TEXT,font=("Segoe UI",9),anchor="center").place(x=474,y=10,width=58)
                 ctk.CTkLabel(row,text=str(erros),text_color=self.ERROR,font=("Segoe UI",9,"bold"),anchor="center").place(x=536,y=10,width=45)
                 ctk.CTkLabel(row,text=duracao,text_color=self.SUBTEXT,font=("Segoe UI",9),anchor="center").place(x=585,y=10,width=70)
-                ctk.CTkButton(row,text="Detalhes",command=lambda execucao=item:self._abrir_detalhe_historico(execucao),width=76,height=30,corner_radius=7,fg_color=("#F5F5F5","#353C42"),hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,text_color=self.TEXT,font=("Segoe UI",9,"bold")).place(x=660,y=7)
+                for child in row.winfo_children():
+                    child.bind("<Button-1>", abrir_detalhe, add="+")
         def fechar():
             self._historico_compacto_window=None
             try: win.destroy()
@@ -4464,6 +4489,92 @@ class App:
         atualizar_estado_salvar()
         _ui_scan_tooltips(popup)
 
+    def _historico_codigos_de_erro(self, execucao):
+        if not isinstance(execucao, dict):
+            return []
+        fontes = [
+            execucao.get("codigos_erros"),
+            execucao.get("erros_codigos"),
+            execucao.get("codigos_erro"),
+            execucao.get("codigos"),
+            execucao.get("codigo_erro"),
+        ]
+        detalhes = execucao.get("erros_detalhes") or []
+        if isinstance(detalhes, list):
+            fontes.append([
+                item.get("codigo") or item.get("code")
+                for item in detalhes
+                if isinstance(item, dict)
+            ])
+        codigos = []
+        for fonte in fontes:
+            if isinstance(fonte, str):
+                fonte = [fonte]
+            for codigo in fonte or []:
+                texto = str(codigo or "").strip()
+                if texto and texto not in codigos:
+                    codigos.append(texto)
+        return codigos
+
+    def _historico_tem_erros_pendentes_reexecucao(self, execucao):
+        if not self._historico_execucao_tem_erros(execucao):
+            return False
+        codigos = self._historico_codigos_de_erro(execucao)
+        if not codigos:
+            return True
+        reexecutados = {
+            str(c).strip()
+            for c in (execucao.get("codigos_erros_reexecutados") or [])
+            if str(c).strip()
+        }
+        return any(codigo not in reexecutados for codigo in codigos)
+
+    def _historico_tem_erros_pendentes(self):
+        execucoes = list(getattr(self, "_historico_execucoes", []))
+        atual = getattr(self, "_execucao_atual", None)
+        if isinstance(atual, dict):
+            execucoes.append(atual)
+        return any(
+            self._historico_tem_erros_pendentes_reexecucao(item)
+            for item in execucoes
+        )
+
+    def _reposicionar_badge_historico(self, _event=None):
+        badge = getattr(self, "_historico_notificacao_badge", None)
+        btn = getattr(self, "tab_buttons", {}).get("Histórico")
+        if badge is None or btn is None:
+            return
+        try:
+            if not badge.winfo_exists() or not btn.winfo_exists():
+                return
+            if not badge.winfo_ismapped():
+                return
+            badge.place(
+                x=max(0, btn.winfo_x() + btn.winfo_width() - 9),
+                y=max(0, btn.winfo_y() + 1),
+            )
+            badge.lift()
+        except Exception:
+            pass
+
+    def _atualizar_badge_historico(self):
+        badge = getattr(self, "_historico_notificacao_badge", None)
+        btn = getattr(self, "tab_buttons", {}).get("Histórico")
+        if badge is None or btn is None:
+            return
+        try:
+            if self._historico_tem_erros_pendentes():
+                badge.configure(text="!")
+                badge.place(
+                    x=max(0, btn.winfo_x() + btn.winfo_width() - 9),
+                    y=max(0, btn.winfo_y() + 1),
+                )
+                badge.lift()
+            else:
+                badge.place_forget()
+        except Exception:
+            pass
+
     def _selecionar_aba(self, nome):
         for frame in (self.aba_atividade, self.aba_historico):
             frame.pack_forget()
@@ -4482,6 +4593,7 @@ class App:
                 text_color=self.ACCENT if ativo else self.TEXT,
                 font=("Segoe UI", 11, "bold"),
             )
+        self._atualizar_badge_historico()
 
     def _card(self, parent):
         return ctk.CTkFrame(parent, fg_color=self.CARD, corner_radius=10,
@@ -4570,7 +4682,7 @@ class App:
             text_color=palette["title"],
             font=("Segoe UI", 10, "bold"),
         ).pack(anchor="w")
-        value_font = ("Segoe UI", 17) if str(title) == "Código atual" else ("Segoe UI", 19, "bold")
+        value_font = ("Segoe UI", 15) if str(title) == "Código atual" else ("Segoe UI", 19, "bold")
         value_label = ctk.CTkLabel(
             text_box,
             text=value,
@@ -5348,9 +5460,13 @@ class App:
         self._hist_grid=ctk.CTkFrame(self.historico_lista,fg_color="transparent")
         self._hist_grid.pack(fill="x",padx=8,pady=5)
         headers=("Data","Hora","Planilha","Processados","Executados","Erros","Duração","Status","")
-        widths=(92,68,245,78,78,56,78,105,82)
-        for col,(texto,largura) in enumerate(zip(headers,widths)):
-            self._hist_grid.grid_columnconfigure(col,minsize=largura,weight=0)
+        for col, (peso, minimo) in enumerate(zip(HISTORICO_COL_PESOS, HISTORICO_COL_MINS)):
+            self._hist_grid.grid_columnconfigure(
+                col,
+                weight=peso,
+                minsize=minimo,
+                uniform="historico",
+            )
             if texto:
                 ctk.CTkLabel(
                     self._hist_grid,text=texto,text_color=self.SUBTEXT,
@@ -5361,6 +5477,7 @@ class App:
             self._criar_pasta_historico(execucao)
         self._atualizar_visual_selecao_historico()
         self._atualizar_botao_apagar_historico()
+        self._atualizar_badge_historico()
 
     @staticmethod
     def _historico_execucao_tem_erros(execucao):
@@ -5395,95 +5512,172 @@ class App:
             return data
 
     def _criar_pasta_historico(self, execucao, atual=False):
-        """Renderiza uma execução em linha resumida."""
-        parent=self._hist_grid
+        """Renderiza uma execução em linha resumida alinhada ao cabeçalho."""
+        parent = self._hist_grid
         if parent is None:
-            parent=self.historico_lista
-            self._hist_grid=ctk.CTkFrame(parent,fg_color="transparent")
-            self._hist_grid.pack(fill="x",padx=8,pady=5)
-            for col,largura in enumerate((92,68,245,78,78,56,78,105,82)):
-                self._hist_grid.grid_columnconfigure(col,minsize=largura,weight=0)
-            parent=self._hist_grid
+            parent = self.historico_lista
+            self._hist_grid = ctk.CTkFrame(parent, fg_color="transparent")
+            self._hist_grid.pack(fill="x", padx=8, pady=5)
+            parent = self._hist_grid
 
-        execucao_id=self._id_historico_execucao(execucao)
-        inicio=str(execucao.get("inicio","") or "")
-        fim=str(execucao.get("fim","") or "")
-        data=self._formatar_data_historico(inicio)
-        horario=inicio.split(" ",1)[1] if " " in inicio else ""
-        planilha=str(execucao.get("planilha","") or "Planilha interna")
-        pagina=str(execucao.get("pagina","") or "")
-        if pagina: planilha += f"  •  Página {pagina}"
-        try: total=int(execucao.get("total",0) or 0)
-        except (TypeError,ValueError): total=0
-        try: sucessos=int(execucao.get("sucessos",0) or 0)
-        except (TypeError,ValueError): sucessos=0
-        try: erros=int(execucao.get("erros",0) or 0)
-        except (TypeError,ValueError): erros=0
-        duracao="—"
+        for col, (peso, minimo) in enumerate(
+            zip(HISTORICO_COL_PESOS, HISTORICO_COL_MINS)
+        ):
+            parent.grid_columnconfigure(
+                col,
+                weight=peso,
+                minsize=minimo,
+                uniform="historico",
+            )
+
+        execucao_id = self._id_historico_execucao(execucao)
+        inicio = str(execucao.get("inicio", "") or "")
+        fim = str(execucao.get("fim", "") or "")
+        data = self._formatar_data_historico(inicio)
+        horario = inicio.split(" ", 1)[1] if " " in inicio else ""
+        planilha = str(execucao.get("planilha", "") or "Planilha interna")
+        pagina = str(execucao.get("pagina", "") or "")
+        if pagina:
+            planilha += f"  •  Página {pagina}"
+
         try:
-            inicio_dt=datetime.strptime(inicio,"%Y-%m-%d %H:%M:%S")
-            fim_dt=datetime.strptime(fim,"%Y-%m-%d %H:%M:%S") if fim else None
-            if fim_dt: duracao=self._formatar_duracao((fim_dt-inicio_dt).total_seconds())
-        except (TypeError,ValueError): pass
-        status=str(execucao.get("status","") or "Erro")
-        if len(status)>18: status=status[:17]+"…"
+            total = int(execucao.get("total", 0) or 0)
+        except (TypeError, ValueError):
+            total = 0
+        try:
+            sucessos = int(execucao.get("sucessos", 0) or 0)
+        except (TypeError, ValueError):
+            sucessos = 0
+        try:
+            erros = int(execucao.get("erros", 0) or 0)
+        except (TypeError, ValueError):
+            erros = 0
 
-        row_index=len(parent.winfo_children())
-        row=ctk.CTkFrame(parent,fg_color=self.CARD,corner_radius=7,border_width=1,border_color=self.BORDER,height=42)
-        row.grid(row=row_index,column=0,columnspan=9,sticky="ew",pady=2)
+        duracao = "—"
+        try:
+            inicio_dt = datetime.strptime(inicio, "%Y-%m-%d %H:%M:%S")
+            fim_dt = datetime.strptime(fim, "%Y-%m-%d %H:%M:%S") if fim else None
+            if fim_dt:
+                duracao = self._formatar_duracao((fim_dt - inicio_dt).total_seconds())
+        except (TypeError, ValueError):
+            pass
+
+        status = str(execucao.get("status", "") or "Erro")
+        if len(status) > 18:
+            status = status[:17] + "…"
+
+        row_index = len(parent.winfo_children())
+        row = ctk.CTkFrame(
+            parent,
+            fg_color=self.CARD,
+            corner_radius=7,
+            border_width=1,
+            border_color=self.BORDER,
+            height=42,
+        )
+        row.grid(
+            row=row_index,
+            column=0,
+            columnspan=9,
+            sticky="ew",
+            pady=2,
+        )
         row.grid_propagate(False)
 
-        valores=((data,"center"),(horario,"center"),(planilha,"w"),(str(total),"center"),
-                 (str(sucessos),"center"),(str(erros),"center"),(duracao,"center"),(status,"w"))
-        labels=[]
-        for col,(valor,anchor) in enumerate(valores):
-            label=ctk.CTkLabel(
-                row,text=valor,text_color=self.ERROR if col in (5,7) else self.TEXT,
-                font=("Segoe UI",9,"bold" if col in (5,7) else "normal"),
-                anchor=anchor
+        for col, (peso, minimo) in enumerate(
+            zip(HISTORICO_COL_PESOS, HISTORICO_COL_MINS)
+        ):
+            row.grid_columnconfigure(
+                col,
+                weight=peso,
+                minsize=minimo,
+                uniform="historico",
             )
-            label.grid(row=0,column=col,sticky="ew",padx=5,pady=2)
+
+        valores = (
+            (data, "center"),
+            (horario, "center"),
+            (planilha, "w"),
+            (str(total), "center"),
+            (str(sucessos), "center"),
+            (str(erros), "center"),
+            (duracao, "center"),
+            (status, "w"),
+        )
+        labels = []
+        for col, (valor, anchor) in enumerate(valores):
+            label = ctk.CTkLabel(
+                row,
+                text=valor,
+                text_color=self.ERROR if col in (5, 7) else self.TEXT,
+                font=("Segoe UI", 9, "bold" if col in (5, 7) else "normal"),
+                anchor=anchor,
+            )
+            label.grid(row=0, column=col, sticky="ew", padx=5, pady=2)
             labels.append(label)
 
-        detalhe=ctk.CTkButton(
-            row,text="Detalhes",command=lambda e=execucao:self._abrir_detalhe_historico(e),
-            width=70,height=30,corner_radius=7,fg_color=("#F5F5F5","#353C42"),
-            hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,
-            text_color=self.TEXT,font=("Segoe UI",9,"bold")
+        pendente = self._historico_tem_erros_pendentes_reexecucao(execucao)
+        indicador = ctk.CTkLabel(
+            row,
+            text="!" if pendente else "",
+            width=22,
+            height=22,
+            corner_radius=11,
+            fg_color=self.ERROR if pendente else "transparent",
+            text_color="#FFFFFF",
+            font=("Segoe UI", 10, "bold"),
         )
-        detalhe.grid(row=0,column=8,padx=6,pady=5)
-        self._historico_tiles[execucao_id]=row
+        indicador.grid(row=0, column=8, padx=4, pady=7)
+
+        self._historico_tiles[execucao_id] = row
 
         def atualizar_visual(hover=False):
-            selecionado=execucao_id in self._historico_selecionados
+            selecionado = execucao_id in self._historico_selecionados
             if selecionado:
-                row.configure(border_color=self.ACCENT,fg_color=("#EAF4FF","#1B3C53"))
+                row.configure(
+                    border_color=self.ACCENT,
+                    fg_color=("#EAF4FF", "#1B3C53"),
+                )
             elif hover:
-                row.configure(border_color=self.ACCENT_HOVER,fg_color=("#EAF4FC","#263F50"))
+                row.configure(
+                    border_color=self.ACCENT_HOVER,
+                    fg_color=("#EAF4FC", "#263F50"),
+                )
             else:
-                row.configure(border_color=self.BORDER,fg_color=self.CARD)
+                row.configure(
+                    border_color=self.BORDER,
+                    fg_color=self.CARD,
+                )
 
         def clicar(event=None):
-            ctrl=bool(event is not None and (getattr(event,"state",0) & 0x0004))
+            ctrl = bool(
+                event is not None and (getattr(event, "state", 0) & 0x0004)
+            )
             if ctrl:
-                if execucao_id in self._historico_selecionados: self._historico_selecionados.remove(execucao_id)
-                else: self._historico_selecionados.add(execucao_id)
+                if execucao_id in self._historico_selecionados:
+                    self._historico_selecionados.remove(execucao_id)
+                else:
+                    self._historico_selecionados.add(execucao_id)
                 self._atualizar_visual_selecao_historico()
                 self._atualizar_botao_apagar_historico()
                 return "break"
+
             self._historico_selecionados.clear()
             self._atualizar_visual_selecao_historico()
             self._atualizar_botao_apagar_historico()
             self._abrir_detalhe_historico(execucao)
             return "break"
 
-        for widget in (row,*labels):
-            try: widget.configure(cursor="hand2")
-            except Exception: pass
-            widget.bind("<Enter>",lambda _e:atualizar_visual(True))
-            widget.bind("<Leave>",lambda _e:atualizar_visual(False))
-            widget.bind("<Button-1>",clicar)
-            widget.bind("<Escape>",self._limpar_selecao_historico,add="+")
+        widgets = (row, *labels, indicador)
+        for widget in widgets:
+            try:
+                widget.configure(cursor="hand2")
+            except Exception:
+                pass
+            widget.bind("<Enter>", lambda _e: atualizar_visual(True))
+            widget.bind("<Leave>", lambda _e: atualizar_visual(False))
+            widget.bind("<Button-1>", clicar)
+            widget.bind("<Escape>", self._limpar_selecao_historico, add="+")
         return row
 
     def _atualizar_visual_selecao_historico(self):
@@ -7418,28 +7612,33 @@ class App:
         return str(valor)
 
     def _mes_minimo_arquivos(self):
-        limite = datetime.now().date() - timedelta(days=ARQUIVOS_DIAS)
-        return datetime(limite.year, limite.month, 1)
+        """Retorna o mês mais antigo existente no histórico de Arquivos."""
+        itens = self._carregar_historico_planilhas()
+        datas = []
+        for item in itens:
+            try:
+                datas.append(datetime.fromisoformat(str(item.get("saved_at", ""))))
+            except Exception:
+                continue
+        if not datas:
+            return self._mes_atual_arquivos()
+        mais_antigo = min(datas)
+        return datetime(mais_antigo.year, mais_antigo.month, 1)
 
     def _mes_atual_arquivos(self):
         agora = datetime.now()
         return datetime(agora.year, agora.month, 1)
 
     def _historico_planilhas_visiveis(self):
-        """Retorna somente os registros dentro da janela de navegação do calendário.
-        
-        O filtro é aplicado apenas à interface. O arquivo de histórico permanece
-        completo para evitar perda de dados durante reinicializações/atualizações.
-        """
+        """Retorna todo o histórico válido de Arquivos, sem limite de idade."""
         agora = datetime.now()
-        limite = agora - timedelta(days=ARQUIVOS_DIAS)
         visiveis = []
         for item in self._carregar_historico_planilhas():
             try:
                 salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
             except Exception:
                 continue
-            if limite <= salvo <= agora:
+            if salvo <= agora:
                 visiveis.append(item)
         return visiveis
 
@@ -7455,7 +7654,6 @@ class App:
         self._arquivos_calendar_widget = None
 
         hoje = datetime.now().date()
-        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
         itens = self._historico_planilhas_visiveis()
         por_dia = {}
         for item in itens:
@@ -7479,7 +7677,7 @@ class App:
         ).pack(anchor="w")
         ctk.CTkLabel(
             intro,
-            text="Os dias com planilhas salvas ficam destacados. O histórico mantém até 60 dias.",
+            text="Os dias com planilhas salvas ficam destacados. O histórico de arquivos é mantido sem limite de idade.",
             text_color=self.SUBTEXT, font=("Segoe UI", 9)
         ).pack(anchor="w", pady=(2, 0))
 
@@ -7536,7 +7734,6 @@ class App:
         canvas.delete("all")
 
         hoje = datetime.now().date()
-        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
         mes = self._arquivos_mes
         if not mes:
             mes = self._mes_atual_arquivos()
@@ -7607,7 +7804,7 @@ class App:
                 x1 = margem_x + (col + 1) * col_w - 3
                 centro_x = (x0 + x1) / 2
                 centro_y = (y0 + y1) / 2
-                valido = limite <= data <= hoje
+                valido = self._mes_minimo_arquivos().date() <= data <= hoje
                 tem_arquivo = data in por_dia
                 eh_hoje = data == hoje
                 selecionado = data in self._arquivos_datas_selecionadas
@@ -7668,8 +7865,7 @@ class App:
             return
 
         hoje = datetime.now().date()
-        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
-        if not (limite <= data <= hoje):
+        if not (self._mes_minimo_arquivos().date() <= data <= hoje):
             return
 
         ctrl = bool(getattr(event, "state", 0) & 0x0004)
@@ -7755,8 +7951,7 @@ class App:
         if self._arquivos_body is None:
             return
         hoje = datetime.now().date()
-        limite = hoje - timedelta(days=ARQUIVOS_DIAS)
-        if data < limite or data > hoje:
+        if data < self._mes_minimo_arquivos().date() or data > hoje:
             return
         itens = []
         for item in self._carregar_historico_planilhas():

@@ -177,7 +177,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _stat_card")
         end = source.index("def _set_stat", start)
         block = source[start:end]
-        self.assertIn('value_font = ("Segoe UI", 17) if str(title) == "Código atual" else ("Segoe UI", 19, "bold")', block)
+        self.assertIn('value_font = ("Segoe UI", 15) if str(title) == "Código atual" else ("Segoe UI", 19, "bold")', block)
         self.assertIn("font=value_font", block)
 
     def test_bootstrap_sinaliza_inicio_bem_sucedido_para_atualizacao(self):
@@ -228,7 +228,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("row.grid(", block)
         self.assertIn('columnspan=9', block)
         self.assertIn('sticky="ew"', block)
-        self.assertIn('text="Detalhes"', block)
+        self.assertNotIn('text="Detalhes"', block)
         self.assertNotIn('icone = "📁"', block)
     def test_icones_de_estatistica_problematicos_sao_vetoriais(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -409,7 +409,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn('text="Tempo decorrido"', block)
         self.assertIn('text="Tempo estimado restante"', block)
-        self.assertIn('font=("Segoe UI", 8, "bold")', block)
+        self.assertIn('font=("Segoe UI", 9, "bold")', block)
 
     def test_planilha_recupera_ultima_apenas_quando_nao_processada(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -752,8 +752,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start=source.index("def _criar_pasta_historico"); end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
         self.assertIn("row.grid(",block)
-        self.assertIn('text="Detalhes"',block)
+        self.assertNotIn('text="Detalhes"',block)
         self.assertNotIn('icone = "📁"',block)
+        self.assertIn('text="!" if pendente else ""',block)
 
     def test_atalhos_principais_estao_instalados_sem_bind_all(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
@@ -778,6 +779,28 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("Alterações não salvas",source)
         self.assertIn("Salvando…",source)
         self.assertIn("def _planilha_salvar_rascunho",source)
+
+    def test_badge_historico_indica_erros_pendentes(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _historico_tem_erros_pendentes_reexecucao",source)
+        self.assertIn("def _historico_tem_erros_pendentes",source)
+        self.assertIn("def _atualizar_badge_historico",source)
+        self.assertIn("self._historico_notificacao_badge",source)
+        self.assertIn("codigos_erros_reexecutados",source)
+
+    def test_indicador_de_exclamacao_na_linha_de_erro(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _criar_pasta_historico")
+        end=source.index("def _atualizar_visual_selecao_historico",start)
+        block=source[start:end]
+        self.assertIn('text="!" if pendente else ""',block)
+        self.assertIn("fg_color=self.ERROR if pendente else",block)
+
+    def test_arquivos_nao_tem_limite_de_idade(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertNotIn("ARQUIVOS_DIAS",source)
+        self.assertIn("sem limite de idade",source)
+        self.assertIn("mais_antigo = min(datas)",source)
 
     def test_atualizador_sinaliza_inicio_saudavel_e_reseta_ambiente(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
