@@ -2365,9 +2365,13 @@ class App:
     INFO = ("#0F6CBD", "#4CC2FF")
 
     THEME_LABELS = {
-        "light": "Claro",
-        "dark": "Escuro",
+        "light": "Clara",
+        "dark": "Escura",
         "system": "Padrão do Windows",
+    }
+    VIEW_LABELS = {
+        "complete": "Completa",
+        "compact": "Compacta",
     }
 
     def __init__(self):
@@ -2405,8 +2409,12 @@ class App:
         self._planilha_historico_cache = None
         self._planilha_historico_cache_signature = None
         self._tema = "system"
+        self._visualizacao = "complete"
         self._menu_config = None
         self._menu_aparencia = None
+        self._menu_visualizacao = None
+        self._menu_visualizacao_btn = None
+        self._menu_visualizacao_close_job = None
         self._menu_close_job = None
         self._menu_reposition_job = None
         self._menu_reposition_binding = None
@@ -2417,6 +2425,7 @@ class App:
         self._arquivos_datas_selecionadas = set()
         self._stat_icon_font_cache = {}
         self._planilha_historico_window = None
+        self._historico_compacto_window = None
         self._arquivos_body = None
         self._arquivos_calendar_canvas = None
         self._arquivos_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -2506,6 +2515,11 @@ class App:
         x = max((tela_w - largura) // 2, 0)
         y = max((tela_h - altura) // 2, 0)
         self.app.geometry(f"{largura}x{altura}+{x}+{y}")
+
+        if self._visualizacao == "compact":
+            self._configurar_dashboard_compacto()
+            return
+
         # Cabeçalho Fluent 2: maior e com ações de configuração.
         header = ctk.CTkFrame(
             self.app,
@@ -2857,6 +2871,190 @@ class App:
         self.app.after(350, self._verificar_retomada_pendente)
         self.app.after(1200, self._verificar_atualizacao_automatica)
 
+
+    def _configurar_dashboard_compacto(self):
+        """Cria a dashboard mínima da visualização Compacta."""
+        self.app.title("SM AutoLab")
+        largura, altura = 420, 230
+        self.app.geometry(f"{largura}x{altura}")
+        self.app.minsize(largura, altura)
+        self.app.maxsize(largura, altura)
+        self.app.resizable(False, False)
+        self.app.configure(fg_color=self.BG)
+        self.app.protocol("WM_DELETE_WINDOW", self._fechar_aplicativo)
+        try:
+            desabilitar_transicoes_dwm(self.app)
+        except Exception:
+            pass
+
+        self.app.update_idletasks()
+        tela_w = self.app.winfo_screenwidth()
+        tela_h = self.app.winfo_screenheight()
+        x = max((tela_w - largura) // 2, 0)
+        y = max((tela_h - altura) // 2, 0)
+        self.app.geometry(f"{largura}x{altura}+{x}+{y}")
+
+        header = ctk.CTkFrame(self.app, fg_color=self.CARD, corner_radius=0, height=58)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+
+        title_row = ctk.CTkFrame(header, fg_color="transparent")
+        title_row.pack(anchor="w", padx=16, pady=(9, 0))
+        ctk.CTkLabel(
+            title_row, text="SM AutoLab", text_color=self.TEXT,
+            font=("Segoe UI", 20, "bold")
+        ).pack(side="left")
+        ctk.CTkLabel(
+            title_row, text=f"v{APP_VERSION}", text_color=self.SUBTEXT,
+            font=("Segoe UI", 10, "bold")
+        ).pack(side="left", padx=(8, 0), pady=(6, 0))
+
+        self.percentual_label = ctk.CTkLabel(
+            self.app, text="0%", text_color=self.TEXT,
+            font=("Segoe UI", 22, "bold")
+        )
+        self.percentual_label.pack(pady=(6, 1))
+
+        class _CompactProgressProxy:
+            def __init__(self):
+                self.value = 0.0
+            def get(self):
+                return self.value
+            def set(self, value):
+                try:
+                    self.value = max(0.0, min(1.0, float(value)))
+                except (TypeError, ValueError):
+                    self.value = 0.0
+
+        self.progresso = _CompactProgressProxy()
+        self.progresso_label = ctk.CTkLabel(self.app, text="")
+        self.progresso_label.pack_forget()
+        self._execucao_progresso_card = None
+
+        # Elementos opcionais do dashboard completo não existem no modo compacto.
+        self.sucesso_card = None
+        self.erro_card = None
+        self.codigo_card = None
+        self.atividade = None
+        self.status_label = None
+        self.status_text = None
+        self.status_pill = None
+        self.status_indicator = None
+
+        buttons = ctk.CTkFrame(self.app, fg_color="transparent")
+        buttons.pack(fill="both", expand=True, padx=14, pady=(0, 11))
+        for col in range(3):
+            buttons.grid_columnconfigure(col, weight=1)
+
+        def make_button(text, command, primary=False):
+            return ctk.CTkButton(
+                buttons, text=text, command=command,
+                height=38, corner_radius=8,
+                fg_color=self.ACCENT if primary else self.CARD,
+                hover_color=self.ACCENT_HOVER if primary else ("#EAF4FC", "#263F50"),
+                border_width=0 if primary else 1,
+                border_color=self.BORDER,
+                text_color="#FFFFFF" if primary else self.TEXT,
+                font=("Segoe UI", 11, "bold"),
+            )
+
+        self.botao_planilha = make_button("Abrir", self.abrir_planilha, primary=True)
+        self.botao_planilha.grid(row=0, column=0, padx=3, pady=3, sticky="ew")
+
+        self.botao_historico_planilha = make_button("Arquivos", self.abrir_historico_planilha)
+        self.botao_historico_planilha.grid(row=0, column=1, padx=3, pady=3, sticky="ew")
+
+        self.botao_configuracoes = make_button("Configurações", self._alternar_menu_configuracoes)
+        self.botao_configuracoes.grid(row=0, column=2, padx=3, pady=3, sticky="ew")
+
+        self.botao_historico_compacto = make_button("Histórico", self._abrir_historico_compacto)
+        self.botao_historico_compacto.grid(row=1, column=0, padx=3, pady=3, sticky="ew")
+
+        self.botao_parar = make_button("Parar", self.parar)
+        self.botao_parar.configure(border_color=self.ERROR, text_color=self.ERROR, state="disabled")
+        self.botao_parar.grid(row=1, column=1, padx=3, pady=3, sticky="ew")
+
+        self.botao_iniciar = make_button("Iniciar", self.iniciar_thread, primary=True)
+        self.botao_iniciar.grid(row=1, column=2, padx=3, pady=3, sticky="ew")
+
+        _ui_scan_tooltips(self.app)
+        self._atualizar_contador_arquivos()
+        self._add_activity("Sistema pronto para iniciar.", self.INFO)
+        self.app.after(350, self._verificar_retomada_pendente)
+        self.app.after(1200, self._verificar_atualizacao_automatica)
+
+    def _abrir_historico_compacto(self):
+        """Exibe o histórico de execuções em uma janela auxiliar."""
+        win = getattr(self, "_historico_compacto_window", None)
+        if win is not None:
+            try:
+                if win.winfo_exists():
+                    win.lift()
+                    return
+            except Exception:
+                pass
+
+        win = ctk.CTkToplevel(self.app)
+        self._historico_compacto_window = win
+        self._configurar_icone_janela(win)
+        win.title("Histórico")
+        win.geometry("440x360")
+        win.resizable(False, False)
+        win.transient(self.app)
+
+        header = ctk.CTkFrame(win, fg_color=self.CARD, corner_radius=0, height=48)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        ctk.CTkLabel(
+            header, text="Histórico", text_color=self.TEXT,
+            font=("Segoe UI", 15, "bold")
+        ).pack(side="left", padx=14, pady=10)
+
+        lista = ctk.CTkScrollableFrame(
+            win, fg_color=self.BG, corner_radius=0,
+            scrollbar_button_color=("#C8C8C8", "#626262"),
+            scrollbar_button_hover_color=("#AFAFAF", "#777777")
+        )
+        lista.pack(fill="both", expand=True, padx=10, pady=10)
+
+        itens = [
+            item for item in reversed(self._historico_execucoes)
+            if self._historico_execucao_tem_erros(item)
+        ]
+        if not itens:
+            ctk.CTkLabel(
+                lista, text="Nenhuma execução com erros registrada ainda.",
+                text_color=self.SUBTEXT, font=("Segoe UI", 10)
+            ).pack(anchor="w", padx=8, pady=8)
+        else:
+            for item in itens:
+                inicio = str(item.get("inicio", "") or "")
+                data = self._formatar_data_historico(inicio)
+                horario = inicio.split(" ", 1)[1] if " " in inicio else ""
+                try:
+                    erros = int(item.get("erros", 0) or 0)
+                except (TypeError, ValueError):
+                    erros = 0
+                ctk.CTkButton(
+                    lista,
+                    text=f"{data}  {horario}  •  {erros} não executado(s)",
+                    anchor="w", height=38, corner_radius=8,
+                    fg_color=self.CARD, hover_color=("#EAF4FC", "#263F50"),
+                    border_width=1, border_color=self.BORDER,
+                    text_color=self.TEXT, font=("Segoe UI", 10, "bold"),
+                    command=lambda execucao=item: self._abrir_detalhe_historico(execucao),
+                ).pack(fill="x", padx=2, pady=2)
+
+        def fechar():
+            self._historico_compacto_window = None
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        win.protocol("WM_DELETE_WINDOW", fechar)
+        _ui_scan_tooltips(win)
+
     def _reposicionar_menus(self, _event=None):
         if self._closing:
             return
@@ -2919,6 +3117,35 @@ class App:
 
                 self._menu_aparencia.place_configure(x=int(x), y=int(y))
                 self._menu_aparencia.lift()
+
+            if self._menu_visualizacao is not None and self._menu_visualizacao.winfo_exists():
+                app_x = self.app.winfo_rootx()
+                app_y = self.app.winfo_rooty()
+                sub_width = max(225, self._menu_visualizacao.winfo_reqwidth(), self._menu_visualizacao.winfo_width())
+                app_width = max(1, self.app.winfo_width())
+                if self._menu_config is not None and self._menu_config.winfo_exists():
+                    config_root_x = self._menu_config.winfo_rootx() - app_x
+                    config_root_y = self._menu_config.winfo_rooty() - app_y
+                    config_width = self._menu_config.winfo_width()
+                    btn = getattr(self, "_menu_visualizacao_btn", None)
+                    button_y = btn.winfo_rooty() - app_y if btn is not None else config_root_y
+                    button_height = btn.winfo_height() if btn is not None else self._menu_config.winfo_height()
+                    left_x = config_root_x - sub_width + 2
+                    right_x = config_root_x + config_width - 2
+                    x = left_x if left_x >= 6 else min(right_x, max(6, app_width - sub_width - 6))
+                    y = max(6, button_y + max(0, (button_height - self._menu_visualizacao.winfo_reqheight()) // 2))
+                else:
+                    btn_x = self.botao_configuracoes.winfo_rootx() - app_x
+                    btn_y = self.botao_configuracoes.winfo_rooty() - app_y
+                    btn_w = self.botao_configuracoes.winfo_width()
+                    x = btn_x - sub_width + 2
+                    if x < 6:
+                        x = btn_x + btn_w - 2
+                    x = min(x, max(6, app_width - sub_width - 6))
+                    y = max(6, btn_y)
+                self._menu_visualizacao.place_configure(x=int(x), y=int(y))
+                self._menu_visualizacao.lift()
+
         except Exception:
             pass
 
@@ -3221,11 +3448,19 @@ class App:
     def _pointer_no_botao_aparencia(self):
         return self._widget_recebe_pointer(getattr(self, "_menu_aparencia_btn", None))
 
+    def _pointer_no_menu_visualizacao(self):
+        return self._widget_recebe_pointer(getattr(self, "_menu_visualizacao", None))
+
+    def _pointer_no_botao_visualizacao(self):
+        return self._widget_recebe_pointer(getattr(self, "_menu_visualizacao_btn", None))
+
     def _pointer_em_area_dos_menus(self):
         return (
             self._pointer_no_menu_config()
             or self._pointer_no_menu_aparencia()
             or self._pointer_no_botao_aparencia()
+            or self._pointer_no_menu_visualizacao()
+            or self._pointer_no_botao_visualizacao()
             or self._widget_recebe_pointer(getattr(self, "botao_configuracoes", None))
         )
 
@@ -3250,7 +3485,8 @@ class App:
         self._menu_monitor_job = None
         config_aberto = self._menu_config is not None and self._menu_config.winfo_exists()
         sub_aberto = self._menu_aparencia is not None and self._menu_aparencia.winfo_exists()
-        if not config_aberto and not sub_aberto:
+        vis_aberto = self._menu_visualizacao is not None and self._menu_visualizacao.winfo_exists()
+        if not config_aberto and not sub_aberto and not vis_aberto:
             return
 
         if not self._pointer_em_area_dos_menus():
@@ -3262,6 +3498,12 @@ class App:
                 self._cancelar_fechar_aparencia()
             else:
                 self._agendar_fechar_aparencia()
+
+        if vis_aberto:
+            if self._pointer_no_menu_visualizacao() or self._pointer_no_botao_visualizacao():
+                self._cancelar_fechar_visualizacao()
+            else:
+                self._agendar_fechar_visualizacao()
 
         self._menu_monitor_job = self.app.after(100, self._monitorar_menus)
 
@@ -3298,6 +3540,39 @@ class App:
         if not self._pointer_no_menu_aparencia() and not self._pointer_no_botao_aparencia():
             self._fechar_menu_aparencia()
 
+    def _cancelar_fechar_visualizacao(self, _event=None):
+        job = getattr(self, "_menu_visualizacao_close_job", None)
+        if job is not None:
+            try:
+                self.app.after_cancel(job)
+            except Exception:
+                pass
+            self._menu_visualizacao_close_job = None
+
+    def _agendar_fechar_visualizacao(self, _event=None):
+        if self._menu_visualizacao_close_job is not None:
+            return
+        try:
+            self._menu_visualizacao_close_job = self.app.after(120, self._fechar_visualizacao_se_fora)
+        except Exception:
+            self._menu_visualizacao_close_job = None
+
+    def _fechar_visualizacao_se_fora(self):
+        self._menu_visualizacao_close_job = None
+        if not self._pointer_no_menu_visualizacao() and not self._pointer_no_botao_visualizacao():
+            self._fechar_menu_visualizacao()
+
+    def _fechar_menu_visualizacao(self):
+        self._cancelar_fechar_visualizacao()
+        sub = getattr(self, "_menu_visualizacao", None)
+        if sub is not None:
+            try:
+                if sub.winfo_exists():
+                    sub.destroy()
+            except Exception:
+                pass
+        self._menu_visualizacao = None
+
     def _mostrar_menu_configuracoes(self, _event=None):
         """Abre o menu principal de configurações sem bindings concorrentes."""
         self._cancelar_fechar_menus()
@@ -3318,7 +3593,7 @@ class App:
             border_width=1,
             border_color=self.BORDER,
             width=218,
-            height=150,
+            height=210,
         )
         menu.place_forget()
         menu.pack_propagate(False)
@@ -3326,7 +3601,7 @@ class App:
 
         aparencia = ctk.CTkButton(
             menu,
-            text="Aparência  ›",
+            text="Aparências  ›",
             command=self._mostrar_menu_aparencia,
             width=202,
             height=40,
@@ -3337,7 +3612,7 @@ class App:
             font=("Segoe UI", 12),
             anchor="w",
         )
-        aparencia.pack(fill="x", padx=7, pady=(3, 8))
+        aparencia.pack(fill="x", padx=7, pady=(3, 3))
         self._menu_aparencia_btn = aparencia
 
         self._configurar_hover_menu(self._menu_config)
@@ -3357,6 +3632,33 @@ class App:
                 widget.bind("<Leave>", self._agendar_fechar_aparencia, add="+")
             except Exception:
                 pass
+        visualizacao = ctk.CTkButton(
+            menu,
+            text="Visualização  ›",
+            command=self._mostrar_menu_visualizacao,
+            width=202,
+            height=40,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#EAF4FC", "#263F50"),
+            text_color=self.TEXT,
+            font=("Segoe UI", 12),
+            anchor="w",
+        )
+        visualizacao.pack(fill="x", padx=7, pady=(3, 3))
+        self._menu_visualizacao_btn = visualizacao
+        visualizacao.bind("<Enter>", self._mostrar_menu_visualizacao, add="+")
+        visualizacao.bind("<Enter>", self._cancelar_fechar_visualizacao, add="+")
+        visualizacao.bind("<Leave>", self._agendar_fechar_visualizacao, add="+")
+        for widget in self._iterar_descendentes_ui(visualizacao):
+            if widget is visualizacao:
+                continue
+            try:
+                widget.bind("<Enter>", self._mostrar_menu_visualizacao, add="+")
+                widget.bind("<Leave>", self._agendar_fechar_visualizacao, add="+")
+            except Exception:
+                pass
+
         mudar = ctk.CTkButton(
             menu,
             text="Ajustes do Feegow",
@@ -3401,6 +3703,88 @@ class App:
         if self._menu_aparencia is None or not self._menu_aparencia.winfo_exists():
             self._mostrar_menu_aparencia()
 
+
+    def _mostrar_menu_visualizacao(self, _event=None):
+        """Abre o submenu de visualização no mesmo padrão de Aparências."""
+        self._cancelar_fechar_menus()
+        self._cancelar_fechar_aparencia()
+        self._cancelar_fechar_visualizacao()
+
+        if self._menu_config is None or not self._menu_config.winfo_exists():
+            self._mostrar_menu_configuracoes()
+            self.app.after_idle(lambda: self._mostrar_menu_visualizacao())
+            return
+
+        if self._menu_visualizacao is not None:
+            try:
+                if self._menu_visualizacao.winfo_exists():
+                    self._reposicionar_menus()
+                    self._menu_visualizacao.lift()
+                    return
+            except Exception:
+                self._menu_visualizacao = None
+
+        sub = ctk.CTkFrame(
+            self.app, fg_color=self.CARD, corner_radius=10,
+            border_width=1, border_color=self.BORDER, width=225, height=118
+        )
+        sub.place_forget()
+        sub.pack_propagate(False)
+        self._menu_visualizacao = sub
+
+        ctk.CTkLabel(
+            sub, text="Visualização", text_color=self.TEXT,
+            font=("Segoe UI", 12, "bold"), anchor="w"
+        ).pack(fill="x", padx=12, pady=(9, 4))
+
+        for modo in ("complete", "compact"):
+            rotulo = self.VIEW_LABELS[modo]
+            marcado = "✓  " if modo == self._visualizacao else "    "
+            btn = ctk.CTkButton(
+                sub,
+                text=marcado + rotulo,
+                command=lambda m=modo: self._selecionar_visualizacao(m),
+                width=210, height=34, corner_radius=8,
+                fg_color=("#E5F1FB", "#183B54") if modo == self._visualizacao else self.CARD,
+                hover_color=("#EAF4FC", "#263F50"),
+                text_color=self.ACCENT if modo == self._visualizacao else self.TEXT,
+                font=("Segoe UI", 11, "bold") if modo == self._visualizacao else ("Segoe UI", 11),
+                anchor="w",
+            )
+            btn.pack(fill="x", padx=6, pady=2)
+
+        self._configurar_hover_menu(sub)
+        for widget in self._iterar_descendentes_ui(sub):
+            try:
+                widget.bind("<Enter>", self._cancelar_fechar_visualizacao, add="+")
+                widget.bind("<Leave>", self._agendar_fechar_visualizacao, add="+")
+            except Exception:
+                pass
+        _ui_scan_tooltips(sub)
+
+        self.app.update_idletasks()
+        self._reposicionar_menus()
+
+    def _selecionar_visualizacao(self, visualizacao):
+        if visualizacao not in ("complete", "compact"):
+            return
+        if visualizacao == self._visualizacao:
+            self._fechar_menus()
+            return
+        self._visualizacao = visualizacao
+        self._salvar_estado_persistente()
+        self._fechar_menus()
+        messagebox.showinfo(
+            "Visualização alterada",
+            f"A visualização {self.VIEW_LABELS[visualizacao]} foi selecionada.\n\n"
+            "Reinicie o SM AutoLab para aplicar a alteração.",
+            parent=self.app,
+        )
+        self._add_activity(
+            f"Visualização alterada para {self.VIEW_LABELS[visualizacao]}. Reinicialização necessária.",
+            self.INFO,
+        )
+
     def _mostrar_menu_aparencia(self, _event=None):
         """Abre o submenu de aparência; um segundo clique não o fecha acidentalmente."""
         self._cancelar_fechar_menus()
@@ -3435,7 +3819,7 @@ class App:
 
         ctk.CTkLabel(
             sub,
-            text="Aparência",
+            text="Aparências",
             text_color=self.TEXT,
             font=("Segoe UI", 12, "bold"),
             anchor="w",
@@ -3515,7 +3899,9 @@ class App:
                 pass
         self._config_hover_binding = None
         self._menu_aparencia_btn = None
-        for attr in ("_menu_aparencia", "_menu_config"):
+        self._menu_visualizacao_btn = None
+        self._cancelar_fechar_visualizacao()
+        for attr in ("_menu_visualizacao", "_menu_aparencia", "_menu_config"):
             menu = getattr(self, attr, None)
             if menu is not None:
                 try:
@@ -4084,19 +4470,26 @@ class App:
         )
 
     def _set_stat(self, card, value):
-        card.value_label.configure(text=str(value))
+        if card is None:
+            return
+        label = getattr(card, "value_label", None)
+        if label is not None:
+            label.configure(text=str(value))
 
     def _add_activity(self, text, kind="info"):
+        atividade = getattr(self, "atividade", None)
+        if atividade is None:
+            return
         prefix = {self.SUCCESS: "✓", self.ERROR: "✕", self.WARNING: "!", self.INFO: "→"}.get(kind, "→")
         line = f"{datetime.now():%H:%M:%S}  {prefix}  {text}\n"
-        self.atividade.configure(state="normal")
-        self.atividade.insert("end", line)
+        atividade.configure(state="normal")
+        atividade.insert("end", line)
         self._log_count += 1
         if self._log_count > 80:
-            self.atividade.delete("1.0", "2.0")
+            atividade.delete("1.0", "2.0")
             self._log_count -= 1
-        self.atividade.see("end")
-        self.atividade.configure(state="disabled")
+        atividade.see("end")
+        atividade.configure(state="disabled")
 
     def _filtrar_historico_execucoes_60_dias(self, execucoes):
         """Limita apenas a exibição do histórico aos últimos 60 dias."""
@@ -4119,6 +4512,7 @@ class App:
             registros = []
             erros = []
             tema = "system"
+            visualizacao = "complete"
             usou_legado = False
 
             if self._historico_arquivo.exists():
@@ -4159,6 +4553,9 @@ class App:
                 valor_tema = dados.get("tema")
                 if valor_tema in ("light", "dark", "system"):
                     tema = valor_tema
+                valor_visualizacao = dados.get("visualizacao")
+                if valor_visualizacao in ("complete", "compact"):
+                    visualizacao = valor_visualizacao
 
                 atual = dados.get("execucao_atual")
                 if isinstance(atual, dict):
@@ -4191,6 +4588,7 @@ class App:
                 unicos[chave] = item
 
             self._tema = tema
+            self._visualizacao = visualizacao
 
             # Este arquivo representa exclusivamente o histórico de execuções
             # com erro. Registros bem-sucedidos de versões antigas são removidos
@@ -4269,6 +4667,7 @@ class App:
                     else None
                 ),
                 "tema": self._tema,
+                "visualizacao": self._visualizacao,
                 "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
             self._historico_arquivo.parent.mkdir(parents=True, exist_ok=True)
@@ -7404,7 +7803,8 @@ class App:
         for item in resultado.itens:
             if item.status == "Erro":
                 self._add_erro_codigo(item.codigo)
-        self._selecionar_aba("Atividade")
+        if getattr(self, "_visualizacao", "complete") != "compact":
+            self._selecionar_aba("Atividade")
 
         if resultado.erros == 0 and not self._parar:
             messagebox.showinfo(
@@ -7524,6 +7924,8 @@ class App:
             self._status_blink_job = None
 
     def _aplicar_status(self, texto):
+        if getattr(self, "_visualizacao", "complete") == "compact":
+            return
         self.status_label.configure(text=texto.replace("Status:", "").strip())
         low = texto.lower()
 
@@ -7735,6 +8137,13 @@ class App:
                     pass
 
         self._fechar_menus()
+        win = getattr(self, "_historico_compacto_window", None)
+        if win is not None:
+            try:
+                win.destroy()
+            except Exception:
+                pass
+            self._historico_compacto_window = None
         self.app.destroy()
 
     def run(self):

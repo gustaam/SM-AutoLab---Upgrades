@@ -612,8 +612,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_botoes_de_exclusao_mostram_contagem_da_selecao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
 
-        start = source.index("def _atualizar_botao_apagar_historico")
-        end = source.index("def _limpar_selecao_historico", start)
+        start = source.index("def _limpar_historico")
+        end = source.index("    def _add_historico", start)
         history_block = source[start:end]
         self.assertIn('f"Apagar {quantidade} selecionado"', history_block)
         self.assertIn('f"Apagar {quantidade} selecionados"', history_block)
