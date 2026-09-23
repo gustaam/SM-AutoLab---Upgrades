@@ -2426,6 +2426,7 @@ class App:
         self._stat_icon_font_cache = {}
         self._planilha_historico_window = None
         self._historico_compacto_window = None
+        self._visualizacao_reinicio_dialog = None
         self._arquivos_body = None
         self._arquivos_calendar_canvas = None
         self._arquivos_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -2894,12 +2895,14 @@ class App:
         y = max((tela_h - altura) // 2, 0)
         self.app.geometry(f"{largura}x{altura}+{x}+{y}")
 
-        header = ctk.CTkFrame(self.app, fg_color=self.CARD, corner_radius=0, height=58)
+        header = ctk.CTkFrame(
+            self.app, fg_color=self.CARD, corner_radius=0, height=58
+        )
         header.pack(fill="x")
         header.pack_propagate(False)
 
         title_row = ctk.CTkFrame(header, fg_color="transparent")
-        title_row.pack(anchor="w", padx=16, pady=(9, 0))
+        title_row.pack(side="left", anchor="w", padx=16, pady=(9, 0))
         ctk.CTkLabel(
             title_row, text="SM AutoLab", text_color=self.TEXT,
             font=("Segoe UI", 20, "bold")
@@ -2908,6 +2911,22 @@ class App:
             title_row, text=f"v{APP_VERSION}", text_color=self.SUBTEXT,
             font=("Segoe UI", 10, "bold")
         ).pack(side="left", padx=(8, 0), pady=(6, 0))
+
+        self.botao_configuracoes = ctk.CTkButton(
+            header,
+            text="Configurações",
+            command=self._alternar_menu_configuracoes,
+            width=124,
+            height=36,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#EAF4FC", "#263F50"),
+            border_width=1,
+            border_color=self.BORDER,
+            text_color=self.TEXT,
+            font=("Segoe UI", 11, "bold"),
+        )
+        self.botao_configuracoes.pack(side="right", padx=12, pady=11)
 
         self.percentual_label = ctk.CTkLabel(
             self.app, text="0%", text_color=self.TEXT,
@@ -2941,45 +2960,85 @@ class App:
         self.status_pill = None
         self.status_indicator = None
 
-        buttons = ctk.CTkFrame(self.app, fg_color="transparent")
-        buttons.pack(fill="both", expand=True, padx=14, pady=(0, 11))
-        for col in range(3):
-            buttons.grid_columnconfigure(col, weight=1)
-
-        def make_button(text, command, primary=False):
-            return ctk.CTkButton(
-                buttons, text=text, command=command,
-                height=38, corner_radius=8,
-                fg_color=self.ACCENT if primary else self.CARD,
-                hover_color=self.ACCENT_HOVER if primary else ("#EAF4FC", "#263F50"),
-                border_width=0 if primary else 1,
+        actions = ctk.CTkFrame(self.app, fg_color="transparent")
+        actions.pack(fill="both", expand=True, padx=14, pady=(0, 10))
+        top_row = ctk.CTkFrame(actions, fg_color="transparent")
+        top_row.pack(fill="x")
+        for text_value, command in (
+            ("Abrir", self.abrir_planilha),
+            ("Arquivos", self.abrir_historico_planilha),
+        ):
+            ctk.CTkButton(
+                top_row,
+                text=text_value,
+                command=command,
+                width=120,
+                height=38,
+                corner_radius=8,
+                fg_color=self.ACCENT if text_value == "Abrir" else self.CARD,
+                hover_color=self.ACCENT_HOVER if text_value == "Abrir" else ("#EAF4FC", "#263F50"),
+                border_width=0 if text_value == "Abrir" else 1,
                 border_color=self.BORDER,
-                text_color="#FFFFFF" if primary else self.TEXT,
+                text_color="#FFFFFF" if text_value == "Abrir" else self.TEXT,
                 font=("Segoe UI", 11, "bold"),
-            )
+            ).pack(side="left", padx=3, pady=3)
 
-        self.botao_planilha = make_button("Abrir", self.abrir_planilha, primary=True)
-        self.botao_planilha.grid(row=0, column=0, padx=3, pady=3, sticky="ew")
+        bottom_row = ctk.CTkFrame(actions, fg_color="transparent")
+        bottom_row.pack(anchor="center", pady=(2, 0))
 
-        self.botao_historico_planilha = make_button("Arquivos", self.abrir_historico_planilha)
-        self.botao_historico_planilha.grid(row=0, column=1, padx=3, pady=3, sticky="ew")
+        self.botao_historico_compacto = ctk.CTkButton(
+            bottom_row,
+            text="Histórico",
+            command=self._abrir_historico_compacto,
+            width=100,
+            height=38,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#EAF4FC", "#263F50"),
+            border_width=1,
+            border_color=self.BORDER,
+            text_color=self.TEXT,
+            font=("Segoe UI", 11, "bold"),
+        )
+        self.botao_historico_compacto.pack(side="left", padx=3, pady=3)
 
-        self.botao_configuracoes = make_button("Configurações", self._alternar_menu_configuracoes)
-        self.botao_configuracoes.grid(row=0, column=2, padx=3, pady=3, sticky="ew")
+        self.botao_parar = ctk.CTkButton(
+            bottom_row,
+            text="Parar",
+            command=self.parar,
+            width=100,
+            height=38,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#FDECEC", "#3A2424"),
+            border_width=1,
+            border_color=self.ERROR,
+            text_color=self.ERROR,
+            font=("Segoe UI", 11, "bold"),
+            state="disabled",
+        )
+        self.botao_parar.pack(side="left", padx=3, pady=3)
 
-        self.botao_historico_compacto = make_button("Histórico", self._abrir_historico_compacto)
-        self.botao_historico_compacto.grid(row=1, column=0, padx=3, pady=3, sticky="ew")
+        self.botao_iniciar = ctk.CTkButton(
+            bottom_row,
+            text="Iniciar",
+            command=self.iniciar_thread,
+            width=100,
+            height=38,
+            corner_radius=8,
+            fg_color=self.ACCENT,
+            hover_color=self.ACCENT_HOVER,
+            border_width=0,
+            text_color="#FFFFFF",
+            font=("Segoe UI", 11, "bold"),
+        )
+        self.botao_iniciar.pack(side="left", padx=3, pady=3)
 
-        self.botao_parar = make_button("Parar", self.parar)
-        self.botao_parar.configure(border_color=self.ERROR, text_color=self.ERROR, state="disabled")
-        self.botao_parar.grid(row=1, column=1, padx=3, pady=3, sticky="ew")
-
-        self.botao_iniciar = make_button("Iniciar", self.iniciar_thread, primary=True)
-        self.botao_iniciar.grid(row=1, column=2, padx=3, pady=3, sticky="ew")
+        self.botao_planilha = top_row.winfo_children()[0]
+        self.botao_historico_planilha = top_row.winfo_children()[1]
 
         _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
-        self._add_activity("Sistema pronto para iniciar.", self.INFO)
         self.app.after(350, self._verificar_retomada_pendente)
         self.app.after(1200, self._verificar_atualizacao_automatica)
 
@@ -3771,19 +3830,133 @@ class App:
         if visualizacao == self._visualizacao:
             self._fechar_menus()
             return
+
         self._visualizacao = visualizacao
         self._salvar_estado_persistente()
         self._fechar_menus()
-        messagebox.showinfo(
-            "Visualização alterada",
-            f"A visualização {self.VIEW_LABELS[visualizacao]} foi selecionada.\n\n"
-            "Reinicie o SM AutoLab para aplicar a alteração.",
-            parent=self.app,
-        )
-        self._add_activity(
-            f"Visualização alterada para {self.VIEW_LABELS[visualizacao]}. Reinicialização necessária.",
-            self.INFO,
-        )
+        self._perguntar_reinicio_visualizacao()
+
+    def _perguntar_reinicio_visualizacao(self):
+        """Pergunta se a nova visualização deve ser aplicada imediatamente."""
+        dialog = ctk.CTkToplevel(self.app)
+        self._visualizacao_reinicio_dialog = dialog
+        self._configurar_icone_janela(dialog)
+        dialog.title("Visualização alterada")
+        dialog.geometry("390x185")
+        dialog.resizable(False, False)
+        dialog.transient(self.app)
+        dialog.grab_set()
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+
+        body = ctk.CTkFrame(dialog, fg_color=self.BG)
+        body.pack(fill="both", expand=True, padx=18, pady=16)
+
+        ctk.CTkLabel(
+            body,
+            text=f"A visualização {self.VIEW_LABELS[self._visualizacao]} foi selecionada.",
+            text_color=self.TEXT,
+            font=("Segoe UI", 12, "bold"),
+            wraplength=340,
+        ).pack(anchor="w", pady=(0, 7))
+
+        ctk.CTkLabel(
+            body,
+            text="Deseja reiniciar agora para aplicar a mudança?",
+            text_color=self.TEXT,
+            font=("Segoe UI", 11),
+            wraplength=340,
+        ).pack(anchor="w")
+
+        actions = ctk.CTkFrame(body, fg_color="transparent")
+        actions.pack(fill="x", side="bottom", pady=(17, 0))
+
+        def depois():
+            try:
+                dialog.grab_release()
+            except Exception:
+                pass
+            try:
+                dialog.destroy()
+            except Exception:
+                pass
+            self._visualizacao_reinicio_dialog = None
+
+        def reiniciar():
+            try:
+                dialog.grab_release()
+            except Exception:
+                pass
+            try:
+                dialog.destroy()
+            except Exception:
+                pass
+            self._visualizacao_reinicio_dialog = None
+            self._reiniciar_aplicativo()
+
+        ctk.CTkButton(
+            actions,
+            text="Depois",
+            command=depois,
+            width=105,
+            height=36,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#EAF4FC", "#263F50"),
+            border_width=1,
+            border_color=self.BORDER,
+            text_color=self.TEXT,
+            font=("Segoe UI", 11, "bold"),
+        ).pack(side="right")
+
+        ctk.CTkButton(
+            actions,
+            text="Reiniciar",
+            command=reiniciar,
+            width=105,
+            height=36,
+            corner_radius=8,
+            fg_color=self.ACCENT,
+            hover_color=self.ACCENT_HOVER,
+            text_color="#FFFFFF",
+            font=("Segoe UI", 11, "bold"),
+        ).pack(side="right", padx=(0, 8))
+
+        _ui_scan_tooltips(dialog)
+
+    def _reiniciar_aplicativo(self):
+        """Inicia uma nova instância e encerra esta para aplicar a preferência."""
+        try:
+            self._salvar_estado_persistente()
+            executable = Path(sys.executable).resolve()
+            if executable.suffix.lower() == ".exe" and getattr(sys, "frozen", False):
+                args = [str(executable), *sys.argv[1:]]
+            else:
+                args = [sys.executable, *sys.argv]
+            env = _prepare_independent_restart_environment()
+
+            flags = 0
+            if os.name == "nt":
+                flags = (
+                    subprocess.CREATE_NEW_PROCESS_GROUP
+                    | subprocess.DETACHED_PROCESS
+                    | subprocess.CREATE_NO_WINDOW
+                )
+            subprocess.Popen(
+                args,
+                cwd=str(executable.parent),
+                close_fds=True,
+                creationflags=flags,
+                env=env,
+            )
+        except Exception as exc:
+            messagebox.showerror(
+                "Não foi possível reiniciar",
+                f"O modo foi salvo, mas o aplicativo não pôde ser reiniciado automaticamente.\n\n{exc}",
+                parent=self.app,
+            )
+            return
+
+        self._fechar_aplicativo()
 
     def _mostrar_menu_aparencia(self, _event=None):
         """Abre o submenu de aparência; um segundo clique não o fecha acidentalmente."""

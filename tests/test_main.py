@@ -684,6 +684,30 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('"light": "Clara"', source)
         self.assertIn('"dark": "Escura"', source)
 
+    def test_visualizacao_compacta_posiciona_configuracoes_no_cabecalho(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _configurar_dashboard_compacto")
+        end = source.index("def _abrir_historico_compacto", start)
+        block = source[start:end]
+        self.assertIn('header,\n            text="Configurações"', block)
+        self.assertIn('self.botao_configuracoes.pack(side="right"', block)
+        self.assertIn('text="Histórico"', block)
+        self.assertIn('text="Parar"', block)
+        self.assertIn('text="Iniciar"', block)
+        self.assertIn('bottom_row.pack(anchor="center"', block)
+
+    def test_troca_visualizacao_oferece_reinicio_agora_ou_depois(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _selecionar_visualizacao")
+        end = source.index("def _mostrar_menu_aparencia", start)
+        block = source[start:end]
+        self.assertIn("self._perguntar_reinicio_visualizacao()", block)
+        self.assertNotIn('messagebox.showinfo(', block)
+        self.assertIn('text="Reiniciar"', source)
+        self.assertIn('text="Depois"', source)
+        self.assertIn("def _reiniciar_aplicativo", source)
+        self.assertIn("_prepare_independent_restart_environment", source)
+
     def test_status_animation_reproduz_configuracao_da_v2_99_35(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _iniciar_pisca_status")
