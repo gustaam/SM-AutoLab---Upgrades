@@ -1163,22 +1163,24 @@ def _prepare_independent_restart_environment(environ: dict[str, str] | None = No
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     return env
 
-def _schedule_replace_after_exit(target: Path, downloaded: Path) -> tuple[bool, str]:
-    """Prepara a troca do executável com CMD oculto e rollback por health-check."""
+def _schedule_replace_after_exit(
+    target: Path,
+    downloaded: Path,
+    expected_version: str = "",
+) -> tuple[bool, str]:
+    """Prepara a troca do executável com handshake de versão antes do rollback."""
     script_dir = downloaded.parent
     script = script_dir / "apply_update.cmd"
     backup = script_dir / f"{target.name}.sm_autolab_backup"
     failed = script_dir / f"{target.name}.sm_autolab_failed"
     health = script_dir / "startup.ok"
-    pid_file = script_dir / "started.pid"
 
     target_cmd = _escape_cmd_path(str(target))
     downloaded_cmd = _escape_cmd_path(str(downloaded))
     backup_cmd = _escape_cmd_path(str(backup))
     failed_cmd = _escape_cmd_path(str(failed))
     health_cmd = _escape_cmd_path(str(health))
-    pid_cmd = _escape_cmd_path(str(pid_file))
-    exe_name = _escape_cmd_path(target.name)
+    expected_version_cmd = _escape_cmd_path(str(expected_version or ""))
 
     script_text = f"""@echo off
 setlocal EnableExtensions DisableDelayedExpansion
@@ -1187,15 +1189,14 @@ set "SM_DOWNLOADED={downloaded_cmd}"
 set "SM_BACKUP={backup_cmd}"
 set "SM_FAILED={failed_cmd}"
 set "SM_HEALTH={health_cmd}"
-set "SM_PIDFILE={pid_cmd}"
-set "SM_EXE={exe_name}"
+set "SM_EXPECTED_VERSION={expected_version_cmd}"
 set /a SM_REPLACE_WAIT=0
 
 :wait_replace
 move /Y "%SM_TARGET%" "%SM_BACKUP%" >nul 2>&1
 if not exist "%SM_TARGET%" goto install_new
 set /a SM_REPLACE_WAIT+=1
-if %SM_REPLACE_WAIT% GEQ 45 goto abort_update
+if %SM_REPLACE_WAIT% GEQ 60 goto abort_update
 >nul choice /n /t 1 /d y
 goto wait_replace
 
@@ -1204,34 +1205,39 @@ move /Y "%SM_DOWNLOADED%" "%SM_TARGET%" >nul 2>&1
 if not exist "%SM_TARGET%" goto rollback
 
 del /Q "%SM_HEALTH%" >nul 2>&1
-del /Q "%SM_PIDFILE%" >nul 2>&1
 set "PYINSTALLER_RESET_ENVIRONMENT=1"
-set "SM_AUTOLAB_HEALTH_FILE=%SM_HEALTH%"
+set "SM_AUTOLAB_UPDATE_HEALTH=%SM_HEALTH%"
+set "SM_AUTOLAB_UPDATE_EXPECTED_VERSION=%SM_EXPECTED_VERSION%"
 start "" /b "%SM_TARGET%"
 
-set /a SM_PID_WAIT=0
 set /a SM_HEALTH_WAIT=0
-:find_pid
-for /f "tokens=2 delims=," %%P in ('tasklist /FI "IMAGENAME eq %SM_EXE%" /FO CSV /NH 2^>nul') do (
-    if not defined SM_PID set "SM_PID=%%~P"
-)
-if defined SM_PID goto wait_health
-set /a SM_PID_WAIT+=1
-if %SM_PID_WAIT% GEQ 10 goto rollback
->nul choice /n /t 1 /d y
-goto find_pid
-
 :wait_health
->nul choice /n /t 1 /d y
-if exist "%SM_HEALTH%" goto success
+if exist "%SM_HEALTH%" (
+    if not defined SM_EXPECTED_VERSION goto success_without_version_check
+    findstr /b /c:"version=%SM_EXPECTED_VERSION%" "%SM_HEALTH%" >nul 2>&1
+    if not errorlevel 1 goto success
+)
 if not exist "%SM_TARGET%" goto rollback
 set /a SM_HEALTH_WAIT+=1
-if %SM_HEALTH_WAIT% GEQ 30 goto rollback
+if %SM_HEALTH_WAIT% GEQ 90 goto rollback
+>nul choice /n /t 1 /d y
 goto wait_health
 
+:success_without_version_check
+del /Q "%SM_BACKUP%" >nul 2>&1
+del /Q "%SM_HEALTH%" >nul 2>&1
+cd /d "%TEMP%" >nul 2>&1
+rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
+exit /b 0
+
+:success
+del /Q "%SM_BACKUP%" >nul 2>&1
+del /Q "%SM_HEALTH%" >nul 2>&1
+cd /d "%TEMP%" >nul 2>&1
+rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
+exit /b 0
+
 :rollback
-if defined SM_PID taskkill /PID %SM_PID% /T /F >nul 2>&1
->nul choice /n /t 1 /d y
 move /Y "%SM_TARGET%" "%SM_FAILED%" >nul 2>&1
 if exist "%SM_TARGET%" (
     >nul choice /n /t 1 /d y
@@ -1241,23 +1247,13 @@ move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
 if exist "%SM_FAILED%" del /Q "%SM_FAILED%" >nul 2>&1
 del /Q "%SM_DOWNLOADED%" >nul 2>&1
 del /Q "%SM_HEALTH%" >nul 2>&1
-del /Q "%SM_PIDFILE%" >nul 2>&1
 cd /d "%TEMP%" >nul 2>&1
 rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
 exit /b 1
 
-:success
-del /Q "%SM_BACKUP%" >nul 2>&1
-del /Q "%SM_HEALTH%" >nul 2>&1
-del /Q "%SM_PIDFILE%" >nul 2>&1
-cd /d "%TEMP%" >nul 2>&1
-rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
-exit /b 0
-
 :abort_update
 del /Q "%SM_DOWNLOADED%" >nul 2>&1
 del /Q "%SM_HEALTH%" >nul 2>&1
-del /Q "%SM_PIDFILE%" >nul 2>&1
 if exist "%SM_BACKUP%" move /Y "%SM_BACKUP%" "%SM_TARGET%" >nul 2>&1
 cd /d "%TEMP%" >nul 2>&1
 rmdir /s /q "{_escape_cmd_path(str(script_dir))}" >nul 2>&1
@@ -1274,7 +1270,7 @@ exit /b 1
             )
         restart_env = _prepare_independent_restart_environment()
         restart_env["SM_AUTOLAB_UPDATE_HEALTH"] = str(health)
-        restart_env["SM_AUTOLAB_UPDATE_PIDFILE"] = str(pid_file)
+        restart_env["SM_AUTOLAB_UPDATE_EXPECTED_VERSION"] = str(expected_version or "")
         subprocess.Popen(
             ["cmd.exe", "/d", "/c", str(script)],
             cwd=str(script_dir),
@@ -1305,7 +1301,11 @@ def launch_updater(update: dict, progress_callback=None) -> tuple[bool, str]:
             str(update.get("sha256") or ""),
             progress_callback=progress_callback,
         )
-        ok, error = _schedule_replace_after_exit(target, downloaded)
+        ok, error = _schedule_replace_after_exit(
+            target,
+            downloaded,
+            expected_version=str(update.get("version") or ""),
+        )
         if not ok:
             raise RuntimeError(error or "Não foi possível preparar a substituição da atualização.")
         return True, ""
@@ -2469,17 +2469,8 @@ class App:
         self._sinalizar_inicio_atualizacao()
 
     def _sinalizar_inicio_atualizacao(self):
-        """Cria o marcador de saúde solicitado pelo processo de atualização."""
-        caminho = str(os.environ.get("SM_AUTOLAB_HEALTH_FILE", "") or "").strip()
-        if not caminho:
-            return
-        try:
-            Path(caminho).write_text(
-                f"SM AutoLab {APP_VERSION}\nPID={os.getpid()}\n",
-                encoding="utf-8",
-            )
-        except OSError:
-            LOGGER.exception("Falha ao sinalizar inicialização do aplicativo.")
+        """Compatibilidade: o health-check agora é sinalizado pelo bootstrap."""
+        return
 
     def _configurar_icone_janela(self, janela=None):
         """Aplica o ícone oficial do aplicativo à barra de título da janela."""

@@ -302,7 +302,10 @@ def install_ui(App):
 if __name__ == "__main__":
     install_ui(App)
     _validar_base_aplicacao()
+    # O health-check da atualização precisa ocorrer antes do splash/UI:
+    # o atualizador só deve fazer rollback se o novo executável realmente
+    # não conseguir iniciar o bootstrap.
+    _sinalizar_inicializacao_atualizacao_sucesso()
     run_splash()
     app = App()
-    _sinalizar_inicializacao_atualizacao_sucesso()
     app.app.mainloop()
