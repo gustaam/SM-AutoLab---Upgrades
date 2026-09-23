@@ -62,11 +62,14 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("ARROW_SCROLL_UNITS = 4", interface)
         self.assertIn("_sm_autolab_tooltip_message", interface)
         self.assertIn("border_width=0 if dark_mode else 1", interface)
-        self.assertIn("image=self._obter_icone_menu_aplicativo()", interface)
+        self.assertNotIn("image=self._obter_icone_menu_aplicativo()", interface)
         self.assertIn('fg_color=("#FFFFFF", "#2D3338")', interface)
         self.assertIn("def _configurar_icone_janela(self, janela=None):", interface)
         self.assertIn("janela.iconbitmap(str(icone))", interface)
         self.assertIn("self._configurar_icone_janela(popup)", interface)
+        self.assertIn('text="Ajustes do Feegow"', interface)
+        self.assertNotIn("image=self._obter_icone_menu_aplicativo()", interface)
+        self.assertNotIn('compound="left"', interface)
 
     def test_validadores_de_workflow_e_dependencias_continuam_disponiveis(self):
         self.assertTrue(callable(validate_dependencies))
