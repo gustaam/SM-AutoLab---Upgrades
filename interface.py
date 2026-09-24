@@ -2735,19 +2735,9 @@ class App:
 
         # Ponto vermelho real: Canvas + oval evita o efeito de "cilindro"
         # do CTkLabel em dimensões muito pequenas.
-        self._historico_notificacao_badge = Canvas(
+        self._historico_notificacao_badge = self._criar_ponto_notificacao(
             self.tab_buttons["Histórico"],
-            width=7,
-            height=7,
-            highlightthickness=0,
-            bd=0,
-            relief="flat",
-            bg=self._cor(self.CARD),
-        )
-        self._historico_notificacao_badge.create_oval(
-            1, 1, 6, 6,
-            fill=self._cor(self.ERROR),
-            outline=self._cor(self.ERROR),
+            self._fundo_ponto_notificacao(self.tab_buttons["Histórico"]),
         )
         self._historico_notificacao_badge.place_forget()
         self._historico_notificacao_badge.bind(
@@ -2757,6 +2747,7 @@ class App:
         )
         tabs.bind("<Configure>", self._reposicionar_badge_historico, add="+")
         self.app.after_idle(self._reposicionar_badge_historico)
+        self.app.after_idle(self._sincronizar_pontos_notificacao)
 
         self.tab_area = ctk.CTkFrame(activity_card, fg_color="transparent")
         self.tab_area.pack(fill="both", expand=True, padx=14, pady=(0, 5))
@@ -3040,19 +3031,9 @@ class App:
         self.botao_historico_compacto = top_buttons[2]
 
         # Mesmo ponto vermelho real no modo compacto.
-        self._historico_compacto_notificacao_badge = Canvas(
+        self._historico_compacto_notificacao_badge = self._criar_ponto_notificacao(
             self.botao_historico_compacto,
-            width=7,
-            height=7,
-            highlightthickness=0,
-            bd=0,
-            relief="flat",
-            bg=self._cor(self.CARD),
-        )
-        self._historico_compacto_notificacao_badge.create_oval(
-            1, 1, 6, 6,
-            fill=self._cor(self.ERROR),
-            outline=self._cor(self.ERROR),
+            self._fundo_ponto_notificacao(self.botao_historico_compacto),
         )
         self._historico_compacto_notificacao_badge.place_forget()
         self.botao_historico_compacto.bind(
@@ -3062,6 +3043,7 @@ class App:
             "<Configure>", self._reposicionar_badge_historico_compacto, add="+"
         )
         self.app.after_idle(self._reposicionar_badge_historico_compacto)
+        self.app.after_idle(self._sincronizar_pontos_notificacao)
         self._atualizar_badge_historico()
 
         _ui_scan_tooltips(self.app)
@@ -3235,12 +3217,8 @@ class App:
                     label = ctk.CTkLabel(
                         row,
                         text=valor,
-                        text_color=self.ERROR if col in (5, 6) else self.TEXT,
-                        font=(
-                            "Segoe UI",
-                            9,
-                            "bold" if col in (5, 6) else "normal",
-                        ),
+                        text_color=self.TEXT,
+                        font=("Segoe UI", 9, "normal"),
                         anchor=anchor,
                     )
                     label.grid(
@@ -3252,15 +3230,19 @@ class App:
                     )
                     labels.append(label)
 
-                indicador = ctk.CTkLabel(
+                indicador = self._criar_ponto_notificacao(
                     row,
-                    text="",
-                    width=7,
-                    height=7,
-                    corner_radius=4,
-                    fg_color=self.ERROR if pendente else "transparent",
+                    self._cor(self.CARD),
                 )
-                indicador.grid(row=0, column=7, padx=7, pady=7)
+                if pendente:
+                    indicador.place(
+                        relx=1.0,
+                        rely=0.5,
+                        x=-3,
+                        anchor="e",
+                    )
+                else:
+                    indicador.place_forget()
 
                 abrir_detalhe = (
                     lambda _e, execucao=item:
@@ -4547,6 +4529,7 @@ class App:
                 _ui_refresh_all_windows_scrollbars(win)
                 atualizar_backdrop_tema(win, dark)
             self._atualizar_icones_cards_estatistica()
+            self._sincronizar_pontos_notificacao()
             self._planilha_desenhar_cabecalho_linhas()
             self._planilha_desenhar_borda()
         except Exception:
@@ -6068,23 +6051,27 @@ class App:
             label = ctk.CTkLabel(
                 row,
                 text=valor,
-                text_color=self.ERROR if col in (5, 6) else self.TEXT,
-                font=("Segoe UI", 9, "bold" if col in (5, 6) else "normal"),
+                text_color=self.TEXT,
+                font=("Segoe UI", 9, "normal"),
                 anchor=anchor,
             )
             label.grid(row=0, column=col, sticky="ew", padx=5, pady=2)
             labels.append(label)
 
         pendente = self._historico_tem_erros_pendentes_reexecucao(execucao)
-        indicador = ctk.CTkLabel(
+        indicador = self._criar_ponto_notificacao(
             row,
-            text="",
-            width=7,
-            height=7,
-            corner_radius=4,
-            fg_color=self.ERROR if pendente else "transparent",
+            self._cor(self.CARD),
         )
-        indicador.grid(row=0, column=7, padx=7, pady=7)
+        if pendente:
+            indicador.place(
+                relx=1.0,
+                rely=0.5,
+                x=-3,
+                anchor="e",
+            )
+        else:
+            indicador.place_forget()
 
         self._historico_tiles[execucao_id] = row
 
