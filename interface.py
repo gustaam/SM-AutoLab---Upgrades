@@ -2281,12 +2281,12 @@ APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
 # Histórico: Data, Hora, Processados, Executados, Erros, Status e indicador.
 # Não exibe mais o nome da planilha nem a duração na listagem.
-# Grid responsivo: Data/Hora ficam ancorados à esquerda e o conjunto
-# Processados/Executados/Erros/Status + indicador é "empurrado" ao máximo
-# para a direita. O espaço intermediário absorve a largura excedente e as
-# larguras mínimas garantem que nada saia da área visível em janelas menores.
-HISTORICO_COL_PESOS = (0, 0, 1, 4, 4, 3, 5, 1, 0)
-HISTORICO_COL_MINS = (72, 60, 8, 70, 70, 52, 68, 16, 0)
+# Data/Hora ficam ancorados à esquerda. O grande espaçador absorve a
+# largura livre e empurra Processados, Executados, Erros, Status e o indicador
+# para o extremo direito. Os pesos das cinco colunas finais ainda permitem
+# adaptação contínua quando a janela diminui.
+HISTORICO_COL_PESOS = (0, 0, 18, 4, 4, 3, 5, 1, 0)
+HISTORICO_COL_MINS = (72, 60, 8, 60, 60, 46, 58, 16, 0)
 
 class App:
     INICIAR_LABEL = "Iniciar"
@@ -4857,6 +4857,70 @@ class App:
             indice = 1 if str(ctk.get_appearance_mode()).lower() == "dark" else 0
             return str(valor[min(indice, len(valor) - 1)])
         return str(valor)
+
+    def _fundo_ponto_notificacao(self, widget):
+        """Obtém a cor efetivamente visível atrás do ponto."""
+        atual = None
+        try:
+            atual = widget.cget("fg_color")
+        except Exception:
+            atual = None
+
+        atual_widget = widget
+        while atual is not None:
+            valor = self._cor(atual)
+            if valor.strip().lower() != "transparent":
+                return valor
+            try:
+                atual_widget = atual_widget.master
+                atual = atual_widget.cget("fg_color")
+            except Exception:
+                break
+
+        return self._cor(self.CARD)
+
+    def _sincronizar_pontos_notificacao(self):
+        pares = (
+            (
+                getattr(self, "_historico_notificacao_badge", None),
+                getattr(self, "tab_buttons", {}).get("Histórico"),
+            ),
+            (
+                getattr(self, "_historico_compacto_notificacao_badge", None),
+                getattr(self, "botao_historico_compacto", None),
+            ),
+        )
+        for badge, btn in pares:
+            if badge is None or btn is None:
+                continue
+            try:
+                if not badge.winfo_exists() or not btn.winfo_exists():
+                    continue
+                badge.configure(bg=self._fundo_ponto_notificacao(btn))
+                badge.itemconfigure(
+                    1,
+                    fill=self._cor(self.ERROR),
+                    outline=self._cor(self.ERROR),
+                )
+            except Exception:
+                LOGGER.debug("Falha ao sincronizar ponto de notificação.", exc_info=True)
+
+    def _criar_ponto_notificacao(self, parent, fundo=None):
+        ponto = Canvas(
+            parent,
+            width=7,
+            height=7,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            bg=self._cor(fundo if fundo is not None else self.CARD),
+        )
+        ponto.create_oval(
+            1, 1, 6, 6,
+            fill=self._cor(self.ERROR),
+            outline=self._cor(self.ERROR),
+        )
+        return ponto
 
     def _reposicionar_badge_historico(self, _event=None):
         badge = getattr(self, "_historico_notificacao_badge", None)
