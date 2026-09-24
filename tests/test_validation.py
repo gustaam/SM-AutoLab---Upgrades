@@ -1,3 +1,4 @@
+# Validação automática de workflows e release.
 # Testes de qualidade do projeto: arquitetura, workflows, versão, release e executável.
 
 import struct
