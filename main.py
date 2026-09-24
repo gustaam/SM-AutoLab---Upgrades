@@ -312,6 +312,11 @@ def _update_installer_mode():
         f"{max((root.winfo_screenwidth()-width)//2,0)}+"
         f"{max((root.winfo_screenheight()-height)//2,0)}"
     )
+    # Exibe a janela do instalador explicitamente antes de iniciar a troca.
+    root.deiconify()
+    root.lift()
+    root.focus_force()
+    root.update_idletasks()
     title_var = tk.StringVar(value="Atualização do SM AutoLab")
     status_var = tk.StringVar(value=f"Preparando a instalação da v{expected or 'nova versão'}…")
     tk.Label(root,textvariable=title_var,bg="#F5F5F5",fg="#242424",
