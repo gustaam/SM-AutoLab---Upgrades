@@ -3995,14 +3995,6 @@ class App:
         for child in children:
             yield from self._iterar_descendentes_ui(child)
 
-    def _configurar_hover_menu(self, root):
-        """Mantém os menus responsivos ao movimento do ponteiro."""
-        if root is None:
-            return
-        for widget in self._iterar_descendentes_ui(root):
-            try:
-            except Exception:
-                pass
 
     def _widget_recebe_pointer(self, widget):
         if widget is None:
@@ -4190,7 +4182,6 @@ class App:
         aparencia.pack(fill="x", padx=7, pady=(3, 3))
         self._menu_aparencia_btn = aparencia
 
-        self._configurar_hover_menu(self._menu_config)
         self._ativar_clique_fora_menus()
         if self._menu_reposition_binding is None:
             self._menu_reposition_binding = self.app.bind(
@@ -4273,7 +4264,6 @@ class App:
 
     def _mostrar_menu_visualizacao(self, _event=None):
         """Abre o submenu de visualização no mesmo padrão de Aparência."""
-        self._cancelar_fechar_menus()
         self._fechar_menu_aparencia()
         self._cancelar_fechar_visualizacao()
 
@@ -4320,7 +4310,6 @@ class App:
             )
             btn.pack(fill="x", padx=6, pady=2)
 
-        self._configurar_hover_menu(sub)
         for widget in self._iterar_descendentes_ui(sub):
             try:
                 widget.bind("<Enter>", self._cancelar_fechar_visualizacao, add="+")
@@ -4475,7 +4464,6 @@ class App:
 
     def _mostrar_menu_aparencia(self, _event=None):
         """Abre o submenu de aparência; um segundo clique não o fecha acidentalmente."""
-        self._cancelar_fechar_menus()
         self._fechar_menu_visualizacao()
         self._cancelar_fechar_aparencia()
 
@@ -4532,7 +4520,6 @@ class App:
             )
             btn.pack(fill="x", padx=6, pady=2)
 
-        self._configurar_hover_menu(sub)
         for widget in self._iterar_descendentes_ui(sub):
             try:
                 widget.bind("<Enter>", self._cancelar_fechar_aparencia, add="+")
@@ -4545,7 +4532,6 @@ class App:
         self._reposicionar_menus()
 
     def _fechar_menus(self):
-        self._menu_close_job = None
         job = getattr(self, "_menu_reposition_job", None)
         if job is not None:
             try:
@@ -4561,13 +4547,6 @@ class App:
             except Exception:
                 pass
         self._menu_reposition_binding = None
-        hover_binding = getattr(self, "_config_hover_binding", None)
-        if hover_binding:
-            try:
-                self.app.unbind("<Motion>", hover_binding)
-            except Exception:
-                pass
-        self._config_hover_binding = None
         self._menu_aparencia_btn = None
         self._menu_visualizacao_btn = None
         self._cancelar_fechar_visualizacao()
@@ -4626,7 +4605,6 @@ class App:
         )
 
     def _abrir_popup_feegow(self):
-        self._cancelar_fechar_menus()
         self._fechar_menus()
 
         try:

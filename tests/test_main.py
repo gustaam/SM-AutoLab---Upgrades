@@ -54,7 +54,6 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _mostrar_menu_configuracoes")
         end = source.index("def _mostrar_menu_aparencia", start)
         block = source[start:end]
-        self.assertIn("def _configurar_hover_menu", source)
         self.assertIn("command=self._mostrar_menu_aparencia", block)
         self.assertIn("self._ativar_clique_fora_menus()", block)
         self.assertIn("def _pointer_em_area_dos_menus", source)
@@ -1166,7 +1165,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("menu.place(x=0, y=0)", block)
 
         start = source.index("def _mostrar_menu_aparencia")
-        end = source.index("def _cancelar_fechar_menus", start)
+        end = source.index("def _fechar_menus", start)
         block = source[start:end]
         self.assertIn("sub.place_forget()", block)
         self.assertNotIn("sub.place(x=0, y=0)", block)
@@ -1196,7 +1195,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_menu_aparencia_fecha_ao_mudar_para_outro_item(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _monitorar_menus")
-        end = source.index("def _cancelar_fechar_menus", start)
+        end = source.index("def _fechar_menu_aparencia", start)
         block = source[start:end]
         self.assertIn("self._pointer_no_menu_aparencia()", block)
         self.assertIn("self._pointer_no_botao_aparencia()", block)

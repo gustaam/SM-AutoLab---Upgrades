@@ -212,7 +212,6 @@ def validate_architecture(root: Path) -> None:
         "def _planilha_soltar_selecao",
         "def _planilha_duplo_clique_celula",
         "def _planilha_desenhar_borda",
-        "def _configurar_hover_menu",
         'command=self._mostrar_menu_aparencia',
         'aparencia.bind("<Enter>", self._mostrar_menu_aparencia',
         'aparencia.bind("<Leave>", self._agendar_fechar_aparencia',
