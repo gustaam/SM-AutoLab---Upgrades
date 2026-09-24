@@ -1016,11 +1016,31 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("rely=0.5",block)
         self.assertNotIn("fg_color=self.ERROR if pendente else",block)
 
-    def test_arquivos_nao_tem_limite_de_idade(self):
+    def test_arquivos_nao_tem_limite_de_quantidade(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertNotIn("ARQUIVOS_DIAS",source)
-        self.assertIn("sem limite de idade",source)
-        self.assertIn("mais_antigo = min(datas)",source)
+        self.assertNotIn("HISTORICO_DIAS",source)
+        self.assertNotIn("_filtrar_historico_execucoes_60_dias",source)
+        self.assertIn("sem limite de quantidade",source)
+        self.assertIn("validos = [item for item in itens if isinstance(item, dict)]",source)
+        self.assertIn("Retorna todo o histórico válido de Arquivos, sem limite de idade.",source)
+
+    def test_reexecucao_remove_do_historico_os_codigos_resolvidos(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _remover_erros_resolvidos_por_reexecucao", source)
+        helper_start = source.index("def _remover_erros_resolvidos_por_reexecucao")
+        helper_end = source.index("def _finalizar_historico_execucao", helper_start)
+        block = source[helper_start:helper_end]
+        self.assertIn("estado in {"sucesso", "executado", "processado"}", block)
+        self.assertIn('str(detalhe.get("codigo", "")).strip() not in resolvidos', block)
+        self.assertIn("self._historico_execucoes = [", block)
+        self.assertIn("self._erros_codigos = [", block)
+
+        final_start = source.index("def _finalizar_historico_execucao")
+        final_end = source.index("def _registrar_falha_historico", final_start)
+        final_block = source[final_start:final_end]
+        self.assertIn("origem_reexecucao = self._execucao_atual.get("reexecucao_de")", final_block)
+        self.assertIn("self._remover_erros_resolvidos_por_reexecucao(", final_block)
 
     def test_atualizador_sinaliza_inicio_saudavel_e_reseta_ambiente(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
