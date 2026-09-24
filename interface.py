@@ -6579,10 +6579,14 @@ class App:
         label = getattr(self, "_planilha_estado_salvamento_label", None)
         if label is None:
             return
+        tem_dados = any(
+            str(valor or "").strip()
+            for valor in (self._planilha_data or {}).values()
+        )
         estados = {
             "salvo": (
-                "Salvo ✓" if self._planilha_data else "Planilha vazia",
-                self.SUCCESS if self._planilha_data else self.SUBTEXT,
+                "Salvo ✓" if tem_dados else "Planilha vazia",
+                self.SUCCESS if tem_dados else self.SUBTEXT,
             ),
             "alterado": ("Alterações não salvas", self.WARNING),
             "salvando": ("Salvando…", self.INFO),
@@ -6727,10 +6731,14 @@ class App:
             b.configure(cursor="hand2")
         self._planilha_contador_label=ctk.CTkLabel(title_bar,text="0 preenchidas",text_color=self.SUBTEXT,font=("Segoe UI",10))
         self._planilha_contador_label.pack(side="left", padx=(10,0))
+        tem_dados = any(
+            str(valor or "").strip()
+            for valor in (self._planilha_data or {}).values()
+        )
         self._planilha_estado_salvamento_label = ctk.CTkLabel(
             title_bar,
-            text="Planilha vazia" if not self._planilha_data else "Salvo ✓",
-            text_color=self.SUBTEXT if not self._planilha_data else self.SUCCESS,
+            text="Planilha vazia" if not tem_dados else "Salvo ✓",
+            text_color=self.SUBTEXT if not tem_dados else self.SUCCESS,
             font=("Segoe UI",10,"bold")
         )
         self._planilha_estado_salvamento_label.pack(side="left", padx=(14,0))
@@ -7567,8 +7575,7 @@ class App:
         self._planilha_commit_edit(True)
 
     def _planilha_atalho_salvar(self, event=None):
-        if self._planilha_tem_entry_em_foco():
-            return None
+        # Ctrl+S também conclui uma edição de célula antes de salvar.
         self._planilha_salvar()
         return "break"
 
