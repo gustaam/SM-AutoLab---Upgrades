@@ -1110,6 +1110,19 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("if not self._historico_tem_erros_pendentes():", block)
         self.assertIn("badge.place_forget()", block)
 
+    def test_badge_compacto_tem_guard_no_reposicionamento_assincrono(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _configurar_dashboard_compacto")
+        end = source.index("def _abrir_historico_compacto", start)
+        block = source[start:end]
+        self.assertIn("self.app.after_idle(self._reposicionar_badge_historico_compacto)", block)
+
+        start = source.index("def _reposicionar_badge_historico_compacto")
+        end = source.index("def _atualizar_badge_historico", start)
+        reposition = source[start:end]
+        self.assertIn("if not self._historico_tem_erros_pendentes():", reposition)
+        self.assertIn("badge.place_forget()", reposition)
+
     def test_badge_historico_indica_erros_pendentes(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _historico_tem_erros_pendentes_reexecucao",source)
