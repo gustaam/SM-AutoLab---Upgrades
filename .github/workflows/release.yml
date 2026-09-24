@@ -26,19 +26,37 @@ jobs:
   release:
     permissions:
       contents: write
-    if: >-
-      ${{ github.event_name == 'workflow_dispatch' ||
-          (github.event_name == 'workflow_run' &&
-           github.event.workflow_run.conclusion == 'success' &&
-           github.event.workflow_run.event == 'push' &&
-           github.event.workflow_run.head_branch == 'main' &&
-           github.event.workflow_run.head_sha == github.sha) }}
     runs-on: windows-latest
     timeout-minutes: 30
     env:
       RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
     steps:
+      - name: Determinar elegibilidade da release
+        id: release_gate
+        shell: pwsh
+        run: |
+          $eligible = $false
+          if ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch") {
+            $eligible = $true
+          } elseif (
+            $env:GITHUB_EVENT_NAME -eq "workflow_run" -and
+            "${{ github.event.workflow_run.conclusion }}" -eq "success" -and
+            "${{ github.event.workflow_run.event }}" -eq "push" -and
+            "${{ github.event.workflow_run.head_branch }}" -eq "main" -and
+            "${{ github.event.workflow_run.head_sha }}" -eq "${{ github.sha }}"
+          ) {
+            $eligible = $true
+          }
+
+          "should_release=$($eligible.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          if ($eligible) {
+            Write-Host "Release elegível."
+          } else {
+            Write-Host "Execução recebida para contexto obsoleto/não publicável; concluindo como no-op."
+          }
+
       - name: Checkout da tag exata
+        if: steps.release_gate.outputs.should_release == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || format('refs/tags/{0}', github.event.inputs.release_tag) }}
@@ -46,6 +64,7 @@ jobs:
           persist-credentials: false
 
       - name: Resolver contexto da release
+        if: steps.release_gate.outputs.should_release == 'true'
         shell: pwsh
         run: |
           if ($env:GITHUB_EVENT_NAME -eq "workflow_run") {
@@ -62,6 +81,7 @@ jobs:
           "EXPECTED_COMMIT=$expectedCommit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Verificar se a release automática já foi publicada
+        if: steps.release_gate.outputs.should_release == 'true'
         id: release_state
         shell: pwsh
         env:
