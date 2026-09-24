@@ -155,9 +155,7 @@ def validate_workflow_runtime(root: Path) -> None:
 def validate_workflow_security(root: Path) -> None:
     validate = read_text(root, ".github/workflows/validate-main.yml")
     release = read_text(root, ".github/workflows/release.yml")
-    if "
-  tag:
-" in validate:
+    if "\n  tag:\n" in validate:
         fail("validate-main.yml não deve manter um job tag concorrente com release.yml")
     expected_group = "group: sm-autolab-release-${{ github.event_name == 'workflow_run' && 'automatic' || github.event.inputs.release_tag }}"
     if expected_group not in release:
