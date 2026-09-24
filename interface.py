@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
-from tkinter import Canvas, Entry, Menu, messagebox, ttk
+from tkinter import Canvas, Entry, Menu, messagebox, simpledialog, ttk
 
 import customtkinter as ctk
 from PIL import Image, ImageDraw, ImageFont, ImageTk
@@ -2281,8 +2281,9 @@ APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
 # Histórico: Data, Hora, Processados, Executados, Erros, Status e indicador.
 # Não exibe mais o nome da planilha nem a duração na listagem.
-HISTORICO_COL_PESOS = (9, 8, 12, 12, 8, 13, 3)
-HISTORICO_COL_MINS = (68, 58, 72, 72, 50, 84, 18)
+# Espaço após Hora desloca o conjunto de métricas para a direita.
+HISTORICO_COL_PESOS = (9, 8, 3, 12, 12, 8, 13, 3)
+HISTORICO_COL_MINS = (68, 58, 26, 72, 72, 50, 84, 18)
 
 class App:
     INICIAR_LABEL = "Iniciar"
@@ -2733,8 +2734,8 @@ class App:
         self._historico_notificacao_badge = ctk.CTkLabel(
             tabs,
             text="",
-            width=7,
-            height=7,
+            width=8,
+            height=8,
             corner_radius=4,
             fg_color=self.ERROR,
         )
@@ -3032,8 +3033,8 @@ class App:
         self._historico_compacto_notificacao_badge = ctk.CTkLabel(
             top_row,
             text="",
-            width=7,
-            height=7,
+            width=8,
+            height=8,
             corner_radius=4,
             fg_color=self.ERROR,
         )
@@ -3111,14 +3112,15 @@ class App:
             headers = (
                 "Data",
                 "Hora",
+                "",
                 "Processados",
                 "Executados",
                 "Erros",
                 "Status",
                 "",
             )
-            widths = (72, 62, 82, 82, 58, 98, 24)
-            weights = (9, 8, 12, 12, 8, 13, 3)
+            widths = (72, 62, 26, 82, 82, 58, 98, 24)
+            weights = (9, 8, 3, 12, 12, 8, 13, 3)
 
             for col, (label_text, width, weight) in enumerate(
                 zip(headers, widths, weights)
@@ -3188,7 +3190,7 @@ class App:
                 row.grid(
                     row=row_index,
                     column=0,
-                    columnspan=7,
+                    columnspan=8,
                     sticky="ew",
                     pady=2,
                 )
@@ -3205,6 +3207,7 @@ class App:
                 valores = (
                     (data, "center"),
                     (horario, "center"),
+                    ("", "center"),
                     (str(total), "center"),
                     (str(executados), "center"),
                     (str(erros), "center"),
@@ -3215,11 +3218,11 @@ class App:
                     label = ctk.CTkLabel(
                         row,
                         text=valor,
-                        text_color=self.ERROR if col in (4, 5) else self.TEXT,
+                        text_color=self.ERROR if col in (5, 6) else self.TEXT,
                         font=(
                             "Segoe UI",
                             9,
-                            "bold" if col in (4, 5) else "normal",
+                            "bold" if col in (5, 6) else "normal",
                         ),
                         anchor=anchor,
                     )
@@ -3240,7 +3243,7 @@ class App:
                     corner_radius=4,
                     fg_color=self.ERROR if pendente else "transparent",
                 )
-                indicador.grid(row=0, column=6, padx=7, pady=7)
+                indicador.grid(row=0, column=7, padx=7, pady=7)
 
                 abrir_detalhe = (
                     lambda _e, execucao=item:
@@ -3266,6 +3269,8 @@ class App:
                 pass
 
         win.protocol("WM_DELETE_WINDOW", fechar)
+        win.bind("<Control-KeyPress-f>", self._abrir_busca_historico_execucoes, add="+")
+        win.bind("<Control-KeyPress-F>", self._abrir_busca_historico_execucoes, add="+")
         _ui_scan_tooltips(win)
 
     def _reposicionar_menus(self, _event=None):
@@ -3406,6 +3411,8 @@ class App:
             self.app.bind("<Escape>", self._atalho_escape, add="+")
             self.app.bind("<Control-KeyPress-h>", self._atalho_historico, add="+")
             self.app.bind("<Control-KeyPress-H>", self._atalho_historico, add="+")
+            self.app.bind("<Control-KeyPress-f>", self._atalho_buscar_contexto, add="+")
+            self.app.bind("<Control-KeyPress-F>", self._atalho_buscar_contexto, add="+")
         except Exception:
             LOGGER.debug("Não foi possível instalar atalhos de teclado.", exc_info=True)
 
@@ -3454,6 +3461,166 @@ class App:
                 self._selecionar_aba("Histórico")
             except Exception:
                 pass
+        return "break"
+
+    def _atalho_buscar_contexto(self, _event=None):
+        if self._closing:
+            return "break"
+        try:
+            foco = self.app.focus_get()
+            topo = foco.winfo_toplevel() if foco is not None else self.app
+        except Exception:
+            topo = self.app
+        if topo is getattr(self, "_planilha_window", None):
+            return self._abrir_busca_planilha()
+        if topo is getattr(self, "_planilha_historico_window", None):
+            return self._abrir_busca_arquivos()
+        if topo is getattr(self, "_historico_compacto_window", None):
+            return self._abrir_busca_historico_execucoes()
+        return "break"
+
+    def _abrir_busca_planilha(self, _event=None):
+        win = getattr(self, "_planilha_window", None)
+        if win is None:
+            return "break"
+        try:
+            if not win.winfo_exists():
+                return "break"
+        except Exception:
+            return "break"
+        termo = simpledialog.askstring(
+            "Localizar na planilha",
+            "Digite o texto que deseja localizar:",
+            parent=win,
+        )
+        termo = str(termo or "").strip()
+        if not termo:
+            return "break"
+        termo_cf = termo.casefold()
+        correspondencias = []
+        for chave, valor in (self._planilha_data or {}).items():
+            try:
+                row, col = (int(part.strip()) for part in str(chave).split(","))
+            except (TypeError, ValueError):
+                continue
+            if termo_cf in str(valor or "").casefold():
+                correspondencias.append((row, col))
+        correspondencias.sort()
+        if not correspondencias:
+            messagebox.showinfo(
+                "Localizar",
+                f'Nenhum resultado encontrado para "{termo}".',
+                parent=win,
+            )
+            return "break"
+        row, col = correspondencias[0]
+        tree = getattr(self, "_planilha_tree", None)
+        if tree is not None:
+            try:
+                self._planilha_fechar_edicao()
+                self._planilha_definir_selecao(
+                    {(row, col)}, active=(row, col), ctrl_multiselect=False
+                )
+                tree.focus(str(row))
+                tree.see(str(row))
+                tree.focus_set()
+            except Exception:
+                LOGGER.debug(
+                    "Falha ao posicionar resultado da busca na planilha.",
+                    exc_info=True,
+                )
+        return "break"
+
+    def _abrir_busca_arquivos(self, _event=None):
+        win = getattr(self, "_planilha_historico_window", None)
+        if win is None:
+            return "break"
+        try:
+            if not win.winfo_exists():
+                return "break"
+        except Exception:
+            return "break"
+        termo = simpledialog.askstring(
+            "Localizar em Arquivos",
+            "Digite o código, item, data, hora ou outro texto:",
+            parent=win,
+        )
+        termo = str(termo or "").strip()
+        if not termo:
+            return "break"
+        termo_cf = termo.casefold()
+        resultados = []
+        for item in reversed(self._carregar_historico_planilhas()):
+            if not isinstance(item, dict):
+                continue
+            saved = str(item.get("saved_at", "") or "")
+            try:
+                dt = datetime.fromisoformat(saved)
+                campos = (
+                    dt.strftime("%d/%m/%Y"),
+                    dt.strftime("%H:%M"),
+                    dt.strftime("%d/%m/%Y %H:%M"),
+                )
+            except Exception:
+                campos = (saved,)
+            valores = [*campos, str(item.get("filled", "") or "")]
+            cells = item.get("cells", {}) or {}
+            if isinstance(cells, dict):
+                valores.extend(str(valor) for valor in cells.values())
+            if any(termo_cf in valor.casefold() for valor in valores):
+                resultados.append(item)
+        if not resultados:
+            messagebox.showinfo(
+                "Localizar",
+                f'Nenhum resultado encontrado para "{termo}".',
+                parent=win,
+            )
+            return "break"
+        item = resultados[0]
+        try:
+            data = datetime.fromisoformat(str(item.get("saved_at", ""))).date()
+        except Exception:
+            data = None
+        if data is not None:
+            self._mostrar_planilhas_do_dia(
+                data, destaque_id=str(item.get("id", ""))
+            )
+        return "break"
+
+    def _abrir_busca_historico_execucoes(self, _event=None):
+        win = getattr(self, "_historico_compacto_window", None)
+        if win is None:
+            return "break"
+        try:
+            if not win.winfo_exists():
+                return "break"
+        except Exception:
+            return "break"
+        termo = simpledialog.askstring(
+            "Localizar no Histórico",
+            "Digite o código, status, data ou outro texto:",
+            parent=win,
+        )
+        termo = str(termo or "").strip()
+        if not termo:
+            return "break"
+        termo_cf = termo.casefold()
+        for item in reversed(self._historico_execucoes_visiveis()):
+            valores = [
+                str(item.get("inicio", "") or ""),
+                str(item.get("fim", "") or ""),
+                str(item.get("status", "") or ""),
+                str(item.get("planilha", "") or ""),
+                *self._historico_codigos_de_erro(item),
+            ]
+            if any(termo_cf in valor.casefold() for valor in valores):
+                self._abrir_detalhe_historico(item)
+                return "break"
+        messagebox.showinfo(
+            "Localizar",
+            f'Nenhum resultado encontrado para "{termo}".',
+            parent=win,
+        )
         return "break"
 
     def _verificar_atualizacao_automatica(self):
@@ -4675,7 +4842,7 @@ class App:
             if not badge.winfo_exists() or not btn.winfo_exists():
                 return
             badge.place(
-                x=max(0, btn.winfo_x() + btn.winfo_width() - 3),
+                x=max(0, btn.winfo_x() + btn.winfo_width() - 10),
                 y=max(0, btn.winfo_y() + 2),
             )
             badge.lift()
@@ -4691,7 +4858,7 @@ class App:
             if not badge.winfo_exists() or not btn.winfo_exists():
                 return
             badge.place(
-                x=max(0, btn.winfo_x() + btn.winfo_width() - 3),
+                x=max(0, btn.winfo_x() + btn.winfo_width() - 10),
                 y=max(0, btn.winfo_y() + 2),
             )
             badge.lift()
@@ -5633,7 +5800,7 @@ class App:
 
         self._hist_grid=ctk.CTkFrame(self.historico_lista,fg_color="transparent")
         self._hist_grid.pack(fill="x",padx=8,pady=5)
-        headers=("Data","Hora","Processados","Executados","Erros","Status","")
+        headers=("Data","Hora","","Processados","Executados","Erros","Status","")
         for col, (texto, peso, minimo) in enumerate(
             zip(headers, HISTORICO_COL_PESOS, HISTORICO_COL_MINS)
         ):
@@ -5776,7 +5943,7 @@ class App:
         row.grid(
             row=row_index,
             column=0,
-            columnspan=7,
+            columnspan=8,
             sticky="ew",
             pady=2,
         )
@@ -5795,6 +5962,7 @@ class App:
         valores = (
             (data, "center"),
             (horario, "center"),
+            ("", "center"),
             (str(total), "center"),
             (str(sucessos), "center"),
             (str(erros), "center"),
@@ -5805,8 +5973,8 @@ class App:
             label = ctk.CTkLabel(
                 row,
                 text=valor,
-                text_color=self.ERROR if col in (4, 5) else self.TEXT,
-                font=("Segoe UI", 9, "bold" if col in (4, 5) else "normal"),
+                text_color=self.ERROR if col in (5, 6) else self.TEXT,
+                font=("Segoe UI", 9, "bold" if col in (5, 6) else "normal"),
                 anchor=anchor,
             )
             label.grid(row=0, column=col, sticky="ew", padx=5, pady=2)
@@ -5821,7 +5989,7 @@ class App:
             corner_radius=4,
             fg_color=self.ERROR if pendente else "transparent",
         )
-        indicador.grid(row=0, column=6, padx=7, pady=7)
+        indicador.grid(row=0, column=7, padx=7, pady=7)
 
         self._historico_tiles[execucao_id] = row
 
@@ -6412,7 +6580,10 @@ class App:
         if label is None:
             return
         estados = {
-            "salvo": ("Salvo ✓", self.SUCCESS),
+            "salvo": (
+                "Salvo ✓" if self._planilha_data else "Planilha vazia",
+                self.SUCCESS if self._planilha_data else self.SUBTEXT,
+            ),
             "alterado": ("Alterações não salvas", self.WARNING),
             "salvando": ("Salvando…", self.INFO),
             "erro": ("Falha ao salvar", self.ERROR),
@@ -6523,6 +6694,12 @@ class App:
         except Exception:
             pass
         win.protocol("WM_DELETE_WINDOW", self._planilha_fechar_pela_janela)
+        win.bind("<Control-KeyPress-f>", self._abrir_busca_planilha, add="+")
+        win.bind("<Control-KeyPress-F>", self._abrir_busca_planilha, add="+")
+        win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")
+        win.bind("<Control-KeyPress-S>", self._planilha_atalho_salvar, add="+")
+        win.bind("<Control-Return>", self._atalho_iniciar, add="+")
+        win.bind("<Control-KP_Enter>", self._atalho_iniciar, add="+")
         # Restaurar rascunho após a janela existir para que o diálogo tenha parent válido.
         try:
             win.iconbitmap(str(Path(getattr(sys,"_MEIPASS",Path(__file__).resolve().parent))/"SM AutoLab.ico"))
@@ -6551,13 +6728,16 @@ class App:
         self._planilha_contador_label=ctk.CTkLabel(title_bar,text="0 preenchidas",text_color=self.SUBTEXT,font=("Segoe UI",10))
         self._planilha_contador_label.pack(side="left", padx=(10,0))
         self._planilha_estado_salvamento_label = ctk.CTkLabel(
-            title_bar, text="Salvo ✓", text_color=self.SUCCESS,
+            title_bar,
+            text="Planilha vazia" if not self._planilha_data else "Salvo ✓",
+            text_color=self.SUBTEXT if not self._planilha_data else self.SUCCESS,
             font=("Segoe UI",10,"bold")
         )
         self._planilha_estado_salvamento_label.pack(side="left", padx=(14,0))
+        self._planilha_atualizar_estado_salvamento("salvo")
         actions=ctk.CTkFrame(toolbar,fg_color="transparent"); actions.pack(side="right",padx=16,pady=9)
         ctk.CTkButton(actions,text="Limpar",command=self._planilha_limpar,width=80,height=36,corner_radius=8,fg_color=self.CARD,hover_color=("#FDECEC","#3A2424"),border_width=1,border_color=self.ERROR,text_color=self.ERROR,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
-        ctk.CTkButton(actions,text="Salvar e Sair",command=self._planilha_salvar_e_sair,width=115,height=36,corner_radius=8,fg_color=self.CARD,hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,text_color=self.TEXT,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
+        ctk.CTkButton(actions,text="Salvar",command=self._planilha_salvar,width=95,height=36,corner_radius=8,fg_color=self.CARD,hover_color=("#EAF4FC","#263F50"),border_width=1,border_color=self.BORDER,text_color=self.TEXT,font=("Segoe UI",12,"bold")).pack(side="left",padx=4)
         ctk.CTkButton(actions,text="Salvar e Iniciar",command=self._planilha_salvar_e_iniciar,width=150,height=46,corner_radius=8,fg_color=self.ACCENT,hover_color=self.ACCENT_HOVER,font=("Segoe UI",14,"bold")).pack(side="left",padx=4)
 
         body=ctk.CTkFrame(win,fg_color=self.BG,corner_radius=0)
@@ -7386,6 +7566,34 @@ class App:
     def _planilha_fechar_edicao(self):
         self._planilha_commit_edit(True)
 
+    def _planilha_atalho_salvar(self, event=None):
+        if self._planilha_tem_entry_em_foco():
+            return None
+        self._planilha_salvar()
+        return "break"
+
+    def _planilha_salvar(self):
+        self._planilha_fechar_edicao()
+        self._planilha_atualizar_estado_salvamento("salvando")
+        try:
+            self._salvar_planilha_interna_data()
+            self._registrar_historico_planilha(self._planilha_data)
+            self._planilha_salva_data = dict(self._planilha_data)
+            self._planilha_apagar_rascunho()
+            self._planilha_efetuou_alteracao = False
+            self._planilha_atualizar_contador()
+            self._planilha_atualizar_estado_salvamento("salvo")
+            self._add_activity("Planilha interna salva.", self.SUCCESS)
+            return True
+        except Exception as exc:
+            self._planilha_atualizar_estado_salvamento("erro")
+            messagebox.showerror(
+                "Não foi possível salvar",
+                str(exc),
+                parent=self._planilha_window,
+            )
+            return False
+
     def _planilha_encerrar_janela(self):
         """Fecha a janela da planilha de forma robusta, sem depender do foco."""
         win=self._planilha_window
@@ -7461,25 +7669,8 @@ class App:
         self._planilha_encerrar_janela()
 
     def _planilha_salvar_e_sair(self):
-        self._planilha_fechar_edicao()
-        self._planilha_atualizar_estado_salvamento("salvando")
-        try:
-            self._salvar_planilha_interna_data()
-            self._registrar_historico_planilha(self._planilha_data)
-            self._planilha_salva_data=dict(self._planilha_data)
-            self._planilha_apagar_rascunho()
-            self._planilha_efetuou_alteracao=False
-            self._planilha_atualizar_contador()
-            self._planilha_atualizar_estado_salvamento("salvo")
-            self._add_activity("Planilha interna salva.",self.SUCCESS)
-        except Exception as exc:
-            messagebox.showerror(
-                "Não foi possível salvar",
-                str(exc),
-                parent=self._planilha_window
-            )
+        if not self._planilha_salvar():
             return
-
         self._planilha_encerrar_janela()
 
     def _extrair_codigos_planilha(self):
@@ -8141,7 +8332,7 @@ class App:
         self._atualizar_contador_arquivos(novo)
         self._desenhar_calendario_arquivos()
 
-    def _mostrar_planilhas_do_dia(self, data):
+    def _mostrar_planilhas_do_dia(self, data, destaque_id=None):
         if self._arquivos_body is None:
             return
         hoje = datetime.now().date()
@@ -8241,7 +8432,17 @@ class App:
             except Exception:
                 hora = ""
             filled = int(item.get("filled", 0) or 0)
-            card = ctk.CTkFrame(lista, fg_color=self.CARD, corner_radius=8, border_width=1, border_color=self.BORDER)
+            card = ctk.CTkFrame(
+                lista,
+                fg_color=self.CARD,
+                corner_radius=8,
+                border_width=1,
+                border_color=(
+                    self.ACCENT
+                    if str(item.get("id", "")) == str(destaque_id or "")
+                    else self.BORDER
+                ),
+            )
             card.pack(fill="x", pady=4)
             left = ctk.CTkFrame(card, fg_color="transparent")
             left.pack(side="left", fill="x", expand=True, padx=10, pady=8)
@@ -8268,6 +8469,8 @@ class App:
         self._planilha_historico_window = win
         win.title("Arquivos — SM AutoLab")
         win.geometry("820x650")
+        win.bind("<Control-KeyPress-f>", self._abrir_busca_arquivos, add="+")
+        win.bind("<Control-KeyPress-F>", self._abrir_busca_arquivos, add="+")
         win.minsize(760, 590)
         win.resizable(True, True)
         win.transient(self.app)
