@@ -61,6 +61,9 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertNotIn("refs/tags/$oldTag", release)
         self.assertNotIn("  tag:", workflow)
         self.assertIn("group: sm-autolab-release", release)
+        self.assertIn("id: release_gate", release)
+        self.assertIn("should_release=$($eligible.ToString().ToLower())", release)
+        self.assertNotIn("    if: >-", release)
 
     def test_regressoes_visuais_e_de_rolagem_estao_protegidas(self):
         root = Path(__file__).resolve().parents[1]
