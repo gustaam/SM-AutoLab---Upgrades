@@ -2732,7 +2732,7 @@ class App:
 
         # Ponto vermelho discreto, alinhado ao canto direito da aba.
         self._historico_notificacao_badge = ctk.CTkLabel(
-            tabs,
+            self.tab_buttons["Histórico"],
             text="",
             width=8,
             height=8,
@@ -3031,7 +3031,7 @@ class App:
 
         # Mesmo indicador do modo normal: um ponto vermelho pequeno.
         self._historico_compacto_notificacao_badge = ctk.CTkLabel(
-            top_row,
+            self.botao_historico_compacto,
             text="",
             width=8,
             height=8,
@@ -4842,8 +4842,11 @@ class App:
             if not badge.winfo_exists() or not btn.winfo_exists():
                 return
             badge.place(
-                x=max(0, btn.winfo_x() + btn.winfo_width() - 10),
-                y=max(0, btn.winfo_y() + 2),
+                relx=1.0,
+                rely=0.0,
+                x=-4,
+                y=4,
+                anchor="ne",
             )
             badge.lift()
         except Exception:
@@ -4858,8 +4861,11 @@ class App:
             if not badge.winfo_exists() or not btn.winfo_exists():
                 return
             badge.place(
-                x=max(0, btn.winfo_x() + btn.winfo_width() - 10),
-                y=max(0, btn.winfo_y() + 2),
+                relx=1.0,
+                rely=0.0,
+                x=-4,
+                y=4,
+                anchor="ne",
             )
             badge.lift()
         except Exception:
