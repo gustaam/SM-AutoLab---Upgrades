@@ -771,32 +771,34 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('height=7',block)
         self.assertNotIn('text="Detalhes"',block)
 
-    def test_historico_usa_posicoes_fixas_de_referencia(self):
+    def test_historico_usa_grid_responsivo(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn(
-            "HISTORICO_COL_MINS = (139, 121, 196, 116, 114, 112, 112, 74)",
+            "HISTORICO_COL_PESOS = (6, 5, 4, 9, 9, 6, 7, 2, 8)",
             source,
         )
         self.assertIn(
-            "HISTORICO_COL_PESOS = (0, 0, 0, 0, 0, 0, 0, 0)",
+            "HISTORICO_COL_MINS = (55, 48, 10, 65, 65, 48, 60, 14, 20)",
             source,
         )
+        self.assertIn('headers=("Data","Hora","","Processados","Executados","Erros","Status","","")', source)
+        self.assertIn("columnspan=9", source)
 
-    def test_historico_tem_oito_colunas_com_espacador_de_metricas(self):
+    def test_historico_tem_nove_colunas_com_espacador_de_metricas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn(
-            'HISTORICO_COL_PESOS = (0, 0, 0, 0, 0, 0, 0, 0)',
+            'HISTORICO_COL_PESOS = (6, 5, 4, 9, 9, 6, 7, 2, 8)',
             source,
         )
         self.assertIn(
-            'HISTORICO_COL_MINS = (139, 121, 196, 116, 114, 112, 112, 74)',
+            'HISTORICO_COL_MINS = (55, 48, 10, 65, 65, 48, 60, 14, 20)',
             source,
         )
         self.assertIn(
             'headers=("Data","Hora","","Processados","Executados","Erros","Status","")',
             source,
         )
-        self.assertIn("columnspan=8", source)
+        self.assertIn("columnspan=9", source)
         self.assertIn('indicador.grid(row=0,column=7', source.replace(" ", ""))
 
     def test_notificacao_do_historico_e_um_ponto_redondo_e_mais_a_direita(self):
