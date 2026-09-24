@@ -3206,7 +3206,7 @@ class App:
                 row.grid(
                     row=row_index,
                     column=0,
-                    columnspan=8,
+                    columnspan=9,
                     sticky="ew",
                     pady=2,
                 )
@@ -5830,7 +5830,7 @@ class App:
 
         self._hist_grid=ctk.CTkFrame(self.historico_lista,fg_color="transparent")
         self._hist_grid.pack(fill="x",padx=8,pady=5)
-        headers=("Data","Hora","","Processados","Executados","Erros","Status","")
+        headers=("Data","Hora","","Processados","Executados","Erros","Status","","")
         for col, (texto, peso, minimo) in enumerate(
             zip(headers, HISTORICO_COL_PESOS, HISTORICO_COL_MINS)
         ):
@@ -5973,7 +5973,7 @@ class App:
         row.grid(
             row=row_index,
             column=0,
-            columnspan=8,
+            columnspan=9,
             sticky="ew",
             pady=2,
         )
