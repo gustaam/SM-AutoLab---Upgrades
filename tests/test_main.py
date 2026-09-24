@@ -238,7 +238,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("row = ctk.CTkFrame(",block)
         self.assertIn("HISTORICO_COL_PESOS",block)
         self.assertIn("HISTORICO_COL_MINS",block)
-        self.assertIn('columnspan=7',block)
+        self.assertIn('columnspan=8',block)
         self.assertIn('sticky="ew"',block)
         self.assertNotIn('text="Detalhes"',block)
 
@@ -860,7 +860,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_indicador_de_salvamento_sem_autosave_novo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _planilha_atualizar_estado_salvamento",source)
-        self.assertIn('text="Salvo ✓"',source)
+        self.assertIn('text="Salvo ✓" if self._planilha_data else "Planilha vazia"', source)
+        self.assertIn('"Planilha vazia"', source)
         self.assertIn("Alterações não salvas",source)
         self.assertIn("Salvando…",source)
         self.assertIn("def _planilha_salvar_rascunho",source)
