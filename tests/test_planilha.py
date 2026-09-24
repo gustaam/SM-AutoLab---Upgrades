@@ -174,6 +174,54 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertEqual(App._planilha_teclar_celula(app, event), "break")
         self.assertEqual(entry.value, "X")
 
+    def test_tab_avanca_para_a_direita_e_quebra_para_a_linha_seguinte(self):
+        app = self._app()
+        class Tree:
+            def __init__(self):
+                self.focused = None
+                self.seen = None
+            def focus(self, iid=None):
+                if iid is not None:
+                    self.focused = str(iid)
+            def focus_set(self):
+                return None
+            def see(self, iid):
+                self.seen = str(iid)
+
+        tree = Tree()
+        app._planilha_tree = tree
+        app._planilha_celula_ativa = ("0", 0)
+        self.assertEqual(App._planilha_tabular(app), "break")
+        self.assertEqual(app._planilha_celula_ativa, ("0", 1))
+        self.assertEqual(app._planilha_celulas_selecionadas, {(0, 1)})
+        self.assertEqual(tree.focused, "0")
+        self.assertEqual(tree.seen, "0")
+
+        app._planilha_celula_ativa = ("0", 2)
+        self.assertEqual(App._planilha_tabular(app), "break")
+        self.assertEqual(app._planilha_celula_ativa, ("1", 0))
+        self.assertEqual(app._planilha_celulas_selecionadas, {(1, 0)})
+        self.assertEqual(tree.focused, "1")
+        self.assertEqual(tree.seen, "1")
+
+    def test_tab_da_ultima_celula_nao_ultrapassa_limite_da_planilha(self):
+        app = self._app()
+        class Tree:
+            def focus(self, iid=None):
+                return None
+            def focus_set(self):
+                return None
+            def see(self, iid):
+                return None
+
+        app._planilha_tree = Tree()
+        app._planilha_celula_ativa = (str(MAX_ROWS - 1), MAX_COLS - 1)
+        self.assertEqual(App._planilha_tabular(app), "break")
+        self.assertEqual(
+            app._planilha_celula_ativa,
+            (str(MAX_ROWS - 1), MAX_COLS - 1),
+        )
+
     def test_planilha_instala_tecla_de_edicao_apos_clique(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)', source)
