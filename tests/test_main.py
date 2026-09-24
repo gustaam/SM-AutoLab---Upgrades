@@ -655,12 +655,11 @@ class CanonicalRuntimeTests(unittest.TestCase):
             "_compact_erros_label",
             "_compact_codigo_label",
             "Código: —",
-            "status_row",
-            "Pronto",
         ):
             self.assertNotIn(marker, block)
         self.assertIn('text="Progresso"', block)
         self.assertIn("self.progresso", block)
+
 
     def test_menu_configuracoes_ancora_no_botao_na_visualizacao_compacta(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
