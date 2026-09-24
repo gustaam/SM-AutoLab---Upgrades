@@ -1191,6 +1191,7 @@ def _schedule_replace_after_exit(
             "SM_AUTOLAB_INSTALLER_BACKUP": str(backup),
             "SM_AUTOLAB_INSTALLER_FAILED": str(failed),
             "SM_AUTOLAB_INSTALLER_HEALTH": str(health),
+            "SM_AUTOLAB_UPDATE_CLEANUP_DIR": str(downloaded.parent),
         })
         flags = 0
         if os.name == "nt":
