@@ -3078,6 +3078,8 @@ class App:
         self.app.after(1200, self._verificar_atualizacao_automatica)
 
     def _abrir_historico_compacto(self):
+        # Recalcula antes de abrir para nunca deixar um badge órfão visível.
+        self._atualizar_badge_historico()
         win = getattr(self, "_historico_compacto_window", None)
         if win is not None:
             try:
@@ -3122,6 +3124,7 @@ class App:
         # Usa exatamente a mesma fonte de dados do histórico normal, incluindo
         # uma execução atual que já possua códigos não executados.
         itens = self._historico_execucoes_visiveis()
+        self._atualizar_badge_historico()
 
         if not itens:
             ctk.CTkLabel(
