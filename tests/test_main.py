@@ -829,7 +829,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def principal(", start)
         block = source[start:end]
         self.assertIn("aplicativo._automacao_atual = auto", block)
-        self.assertIn("if aplicativo is not None and getattr(aplicativo, "_automacao_atual", None) is auto:", block)
+        self.assertIn(
+            'if aplicativo is not None and getattr(aplicativo, "_automacao_atual", None) is auto:',
+            block,
+        )
         self.assertIn("aplicativo._automacao_atual = None", block)
 
     def test_historico_usa_cores_padrao_nos_numeros(self):
