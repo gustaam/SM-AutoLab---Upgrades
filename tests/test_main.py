@@ -791,6 +791,45 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('headers=("Data","Hora","","Processados","Executados","Erros","Status","","")', source)
         self.assertIn("columnspan=9", source)
 
+    def test_historico_aplica_cores_dos_numeros_por_status(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_pasta_historico")
+        end = source.index("def _abrir_historico_compacto", start)
+        block = source[start:end]
+        self.assertIn("if col == 3:       # Processados", block)
+        self.assertIn("cor = self.INFO", block)
+        self.assertIn("elif col == 4:     # Executados", block)
+        self.assertIn("cor = self.SUCCESS", block)
+        self.assertIn("elif col == 5:     # Erros", block)
+        self.assertIn("cor = self.ERROR", block)
+        self.assertIn("text_color=cor", block)
+
+    def test_historico_compacto_aplica_mesmas_cores(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _abrir_historico_compacto")
+        end = source.index("def _historico_tem_erros_pendentes", start)
+        block = source[start:end]
+        self.assertIn("if col == 3:       # Processados", block)
+        self.assertIn("elif col == 4:     # Executados", block)
+        self.assertIn("elif col == 5:     # Erros", block)
+        self.assertIn("text_color=cor", block)
+
+    def test_atualizador_mostra_confirmacao_e_nao_abre_cmd(self):
+        source = (self.root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("Verificação da instalação concluída.", source)
+        self.assertNotIn("cmd.exe", source)
+        self.assertIn("SM_AUTOLAB_UPDATE_CLEANUP_DIR", source)
+        self.assertIn("def _agendar_limpeza_atualizacao", source)
+
+    def test_execucao_recria_automacao_e_libera_referencia_ao_final(self):
+        source = (self.root / "app.py").read_text(encoding="utf-8")
+        start = source.index("def principal_interno")
+        end = source.index("def principal(", start)
+        block = source[start:end]
+        self.assertIn("aplicativo._automacao_atual = auto", block)
+        self.assertIn("if aplicativo is not None and getattr(aplicativo, "_automacao_atual", None) is auto:", block)
+        self.assertIn("aplicativo._automacao_atual = None", block)
+
     def test_historico_tem_nove_colunas_com_espacador_de_metricas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn(
