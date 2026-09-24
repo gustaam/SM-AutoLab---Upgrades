@@ -157,6 +157,9 @@ def validate_workflow_security(root: Path) -> None:
     release = read_text(root, ".github/workflows/release.yml")
     if "\n  tag:\n" in validate:
         fail("validate-main.yml não deve manter um job tag concorrente com release.yml")
+    expected_validate_group = "group: sm-autolab-validate-main-${{ github.ref }}"
+    if expected_validate_group not in validate or "cancel-in-progress: true" not in validate:
+        fail("validate-main.yml deve cancelar execuções obsoletas da mesma referência")
     expected_group = "group: sm-autolab-release"
     if expected_group not in release:
         fail("release.yml deve serializar releases automáticas por um grupo único")
