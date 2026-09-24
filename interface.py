@@ -6971,13 +6971,7 @@ class App:
         self._set_stat(self.sucesso_card, sucessos)
         self._set_stat(self.erro_card, erros)
         self._set_stat(self.codigo_card, codigo)
-        self._sincronizar_estado_compacto(
-            processados=processados,
-            total=total,
-            sucessos=sucessos,
-            erros=erros,
-            codigo=codigo,
-        )
+
         self._atualizar_metricas_execucao()
         if getattr(self, "_visualizacao", "complete") == "compact":
             return
