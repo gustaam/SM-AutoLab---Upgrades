@@ -4,7 +4,7 @@
 
 Aplicativo Windows para automação de autorizações no Feegow, com execução de códigos a partir de planilhas, recuperação segura de execuções, histórico, atualização integrada e interface moderna.
 
-**Versão atual no código:** `2.99.64`  
+**Versão atual no código:** `2.99.92`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -27,9 +27,8 @@ Aplicativo Windows para automação de autorizações no Feegow, com execução 
 | `main.py` | Ponto de entrada, inicialização e splash |
 | `interface.py` | Interface desktop, planilha virtualizada, histórico, atualização e integração Windows 11 |
 | `app.py` | Automação Selenium, resultados, checkpoints, configuração e persistência |
-| `patch.py` | Camada histórica de compatibilidade ainda usada pelo runtime |
 
-A produção foi consolidada nesses quatro módulos. `patch.py` permanece separado deliberadamente para preservar compatibilidade; novos recursos devem ser implementados nos módulos canônicos.
+A produção foi consolidada nesses três módulos canônicos. Camadas de patch legadas foram removidas do runtime e do build.
 
 ### Validação, build e dependências
 
@@ -70,8 +69,7 @@ A separação atual é:
 
 `main.py` → inicialização e splash  
 `interface.py` → interface, planilha, histórico, atualização e Windows 11  
-`app.py` → automação, resultados, checkpoints e persistência  
-`patch.py` → compatibilidade histórica mantida por segurança
+`app.py` → automação, resultados, checkpoints e persistência
 
 A regra de manutenção é evitar implementações paralelas e consolidar novos ajustes na implementação canônica correspondente.
 
@@ -103,7 +101,7 @@ Essa proteção possui testes de regressão para alterações de conteúdo, pers
 
 ## Reexecução de erros
 
-A versão `2.99.64` permite reexecutar diretamente os códigos que falharam em uma execução histórica. A reexecução permanece vinculada à execução original e não cria uma nova pasta no histórico. Depois que os códigos forem reexecutados, o botão não reaparece para aqueles mesmos códigos naquela execução original.
+A versão `2.99.92` permite reexecutar diretamente os códigos que falharam em uma execução histórica. A reexecução permanece vinculada à execução original e não cria uma nova pasta no histórico. Depois que os códigos forem reexecutados, o botão não reaparece para aqueles mesmos códigos naquela execução original.
 
 ## Histórico de erros
 
