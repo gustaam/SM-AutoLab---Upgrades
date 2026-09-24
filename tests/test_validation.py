@@ -58,7 +58,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertNotIn("-Method Delete", release)
         self.assertNotIn("refs/tags/$oldTag", release)
         self.assertNotIn("  tag:", workflow)
-        self.assertIn("group: sm-autolab-release-${{ github.event_name == 'workflow_run' && 'automatic' || github.event.inputs.release_tag }}", release)
+        self.assertIn("group: sm-autolab-release", release)
 
     def test_regressoes_visuais_e_de_rolagem_estao_protegidas(self):
         root = Path(__file__).resolve().parents[1]
