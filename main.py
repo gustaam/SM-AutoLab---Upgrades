@@ -328,6 +328,7 @@ def _update_installer_mode():
             "SM_AUTOLAB_INSTALLER_EXPECTED","SM_AUTOLAB_INSTALLER_BACKUP",
             "SM_AUTOLAB_INSTALLER_FAILED","SM_AUTOLAB_INSTALLER_HEALTH",
             "SM_AUTOLAB_UPDATE_HEALTH","SM_AUTOLAB_UPDATE_EXPECTED_VERSION",
+            "SM_AUTOLAB_UPDATE_CLEANUP_DIR",
             "PYINSTALLER_RESET_ENVIRONMENT",
         ):
             env.pop(key, None)
@@ -344,16 +345,10 @@ def _update_installer_mode():
             return False
         return (not expected) or f"version={expected}" in lines
     def cleanup_later():
-        try: progress.stop()
-        except Exception: pass
-        if os.name=="nt":
-            try:
-                cmd=f'ping 127.0.0.1 -n 3 >nul & rmdir /s /q "{payload.parent}"'
-                subprocess.Popen(["cmd.exe","/d","/c",cmd],cwd=str(Path.home()),
-                    close_fds=True,creationflags=subprocess.CREATE_NO_WINDOW,
-                    env=clean_env(os.environ.copy()))
-            except OSError:
-                pass
+        try:
+            progress.stop()
+        except Exception:
+            pass
         root.destroy()
     def set_ui(title,status):
         root.after(0,lambda:(title_var.set(title),status_var.set(status)))
@@ -377,13 +372,17 @@ def _update_installer_mode():
             env["PYINSTALLER_RESET_ENVIRONMENT"]="1"
             env["SM_AUTOLAB_UPDATE_HEALTH"]=str(health)
             env["SM_AUTOLAB_UPDATE_EXPECTED_VERSION"]=expected
+            env["SM_AUTOLAB_UPDATE_CLEANUP_DIR"]=str(payload.parent)
             set_ui("Atualização do SM AutoLab","Iniciando e verificando a nova versão…")
             launch(target,env)
             deadline=time.time()+28
             while time.time()<deadline:
                 if health_ok():
-                    set_ui("Atualização concluída","Nova versão iniciada com sucesso.")
-                    root.after(0,lambda:root.after(700,cleanup_later))
+                    set_ui(
+                        "Atualização concluída",
+                        "Verificação da instalação concluída. A nova versão foi iniciada com sucesso.",
+                    )
+                    root.after(0,lambda:root.after(1600,cleanup_later))
                     return
                 time.sleep(0.25)
             raise RuntimeError("A nova versão não confirmou uma inicialização válida.")
