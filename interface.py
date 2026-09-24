@@ -4962,6 +4962,9 @@ class App:
         try:
             if not badge.winfo_exists() or not btn.winfo_exists():
                 return
+            if not self._historico_tem_erros_pendentes():
+                badge.place_forget()
+                return
             badge.place(
                 relx=1.0,
                 rely=0.0,
@@ -4980,6 +4983,9 @@ class App:
             return
         try:
             if not badge.winfo_exists() or not btn.winfo_exists():
+                return
+            if not self._historico_tem_erros_pendentes():
+                badge.place_forget()
                 return
             badge.place(
                 relx=1.0,
@@ -7082,10 +7088,10 @@ class App:
         self._planilha_drag_anchor = None
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
+        self._planilha_ultimo_clique = None
         tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
         tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
         tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
-        tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)
         tree.bind("<Return>", self._planilha_editar_selecao)
         tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
         tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
@@ -7332,12 +7338,70 @@ class App:
         return rectangle_selection(inicio, fim)
 
 
+    def _planilha_teclar_celula(self, event):
+        """Inicia a edição da célula ativa quando o usuário digita após um clique."""
+        if getattr(self, "_planilha_edit_entry", None) is not None:
+            return None
+
+        active = getattr(self, "_planilha_celula_ativa", None)
+        if not active:
+            return None
+
+        char = getattr(event, "char", "") or ""
+        keysym = str(getattr(event, "keysym", "") or "")
+
+        # Teclas de navegação/atalhos permanecem com seus próprios bindings.
+        if not char or not char.isprintable():
+            if keysym not in ("BackSpace", "Delete"):
+                return None
+
+        try:
+            row = str(active[0])
+            col = int(active[1])
+            self._planilha_editar_iid(row, col)
+            entry = getattr(self, "_planilha_edit_entry", None)
+            if entry is None:
+                return "break"
+
+            if char and char.isprintable():
+                entry.delete(0, "end")
+                entry.insert(0, char)
+            elif keysym in ("BackSpace", "Delete"):
+                entry.delete(0, "end")
+            return "break"
+        except Exception:
+            LOGGER.debug("Falha ao iniciar edição por teclado na planilha.", exc_info=True)
+            return "break"
+
+
     def _planilha_clicar_celula(self, event):
         tree = self._planilha_tree
         if tree is None:
             return "break"
         current = tree.identify_cell(event.x, event.y)
         if current is None:
+            return "break"
+
+        agora = time.monotonic()
+        anterior = getattr(self, "_planilha_ultimo_clique", None)
+        duplo_clique = False
+        if isinstance(anterior, tuple) and len(anterior) == 3:
+            anterior_cell, anterior_t, anterior_xy = anterior
+            duplo_clique = (
+                anterior_cell == current
+                and agora - float(anterior_t) <= 0.45
+                and abs(event.x - anterior_xy[0]) <= 8
+                and abs(event.y - anterior_xy[1]) <= 8
+            )
+        self._planilha_ultimo_clique = (
+            current,
+            agora,
+            (event.x, event.y),
+        )
+
+        if duplo_clique:
+            self._planilha_duplo_clique_celula(event)
+            self._planilha_ultimo_clique = None
             return "break"
 
         active = getattr(self, "_planilha_celula_ativa", None)
@@ -7419,7 +7483,7 @@ class App:
             return "break"
 
         row, col_index = current
-        self._planilha_definir_selecao({current}, active=current, ctrl_multiselect=False)
+        self._planilha_definir_selecao({current}, active=current)
         tree.focus(str(row))
         tree.focus_set()
         self._planilha_editar_iid(str(row), col_index)
