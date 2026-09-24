@@ -637,6 +637,50 @@ class CanonicalRuntimeTests(unittest.TestCase):
         for key in ("atividade", "histórico", "↶", "↷", "‹", "›"):
             self.assertIn(f'"{key}":', source)
 
+    def test_notificacao_do_historico_nao_aparece_sem_codigos_pendentes(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _historico_tem_erros_pendentes_reexecucao")
+        end = source.index("def _historico_tem_erros_pendentes", start)
+        block = source[start:end]
+        self.assertIn("if not codigos:", block)
+        self.assertIn("return False", block)
+
+    def test_modo_compacto_reflete_progresso_status_e_metricas_da_interface_completa(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _sincronizar_estado_compacto", source)
+        self.assertIn("def _aplicar_status_compacto", source)
+        progress_start = source.index("def _aplicar_progresso")
+        progress_end = source.index("def _registrar_codigo_erro_historico", progress_start)
+        block = source[progress_start:progress_end]
+        self.assertIn("self._sincronizar_estado_compacto(", block)
+        self.assertIn("processados=processados", block)
+        self.assertIn("sucessos=sucessos", block)
+        self.assertIn("erros=erros", block)
+        self.assertIn("codigo=codigo", block)
+
+    def test_menu_configuracoes_ancora_no_botao_na_visualizacao_compacta(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _reposicionar_menus")
+        end = source.index("def _reposicionar_badge_historico", start)
+        block = source[start:end]
+        self.assertIn("menu_x = bx", block)
+        self.assertIn("menu_y = max(0, by)", block)
+        self.assertNotIn('if getattr(self, "_visualizacao", "complete") == "compact":', block)
+
+    def test_janelas_secundarias_sao_centralizadas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _centralizar_janela", source)
+        for marker in (
+            "self._centralizar_janela(win, 700, 390)",
+            "self._centralizar_janela(janela, 430, 165)",
+            "self._centralizar_janela(dialog, 340, 160)",
+            "self._centralizar_janela(popup, 560, 420)",
+            "self._centralizar_janela(win, 680, 500)",
+            "self._centralizar_janela(win, 1080, 720)",
+            "self._centralizar_janela(win, 820, 650)",
+        ):
+            self.assertIn(marker, source)
+
     def test_reexecucao_nao_cria_novo_registro_no_historico(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _finalizar_historico_execucao")

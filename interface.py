@@ -2434,6 +2434,25 @@ class App:
             # Ícone é somente visual; falha aqui não deve impedir a abertura.
             pass
 
+    def _centralizar_janela(self, janela, largura=None, altura=None):
+        """Centraliza uma janela no monitor em que o Tk a posicionou."""
+        try:
+            janela.update_idletasks()
+            if largura is None or altura is None:
+                largura = max(1, int(janela.winfo_width()))
+                altura = max(1, int(janela.winfo_height()))
+            else:
+                largura = max(1, int(largura))
+                altura = max(1, int(altura))
+            tela_w = max(1, int(janela.winfo_screenwidth()))
+            tela_h = max(1, int(janela.winfo_screenheight()))
+            x = max((tela_w - largura) // 2, 0)
+            y = max((tela_h - altura) // 2, 0)
+            janela.geometry(f"{largura}x{altura}+{x}+{y}")
+            janela.update_idletasks()
+        except Exception:
+            pass
+
     def _agendar_estabilizacao_apos_retomada(self, _event=None):
         if self._closing:
             return
@@ -2850,10 +2869,60 @@ class App:
         self._agendar_verificacao_atualizacao()
 
 
+    def _criar_metrica_compacta(self, parent, titulo, valor, cor):
+        box = ctk.CTkFrame(
+            parent, fg_color=self.CARD, corner_radius=8,
+            border_width=1, border_color=self.BORDER
+        )
+        box.pack(side="left", fill="both", expand=True, padx=2)
+        ctk.CTkLabel(
+            box, text=titulo, text_color=cor,
+            font=("Segoe UI", 8, "bold"), anchor="w"
+        ).pack(anchor="w", padx=8, pady=(4, 0))
+        label = ctk.CTkLabel(
+            box, text=str(valor), text_color=self.TEXT,
+            font=("Segoe UI", 13, "bold"), anchor="w"
+        )
+        label.pack(anchor="w", padx=8, pady=(0, 3))
+        return label
+
+    def _sincronizar_estado_compacto(self, processados=None, total=None, sucessos=None, erros=None, codigo=None):
+        """Reflete no modo compacto o mesmo estado usado pela dashboard completa."""
+        if processados is not None and getattr(self, "_compact_processados_label", None) is not None:
+            self._compact_processados_label.configure(text=str(processados))
+        if sucessos is not None and getattr(self, "_compact_executados_label", None) is not None:
+            self._compact_executados_label.configure(text=str(sucessos))
+        if erros is not None and getattr(self, "_compact_erros_label", None) is not None:
+            self._compact_erros_label.configure(text=str(erros))
+        if codigo is not None and getattr(self, "_compact_codigo_label", None) is not None:
+            self._compact_codigo_label.configure(text=f"Código: {codigo}")
+        if total is not None and processados is not None and getattr(self, "progresso_label", None) is not None:
+            self.progresso_label.configure(text=f"{processados} / {total}")
+
+    def _aplicar_status_compacto(self, texto):
+        label = getattr(self, "_compact_status_label", None)
+        if label is None:
+            return
+        low = str(texto or "").lower()
+        if "process" in low and "erro" not in low:
+            base, cor = "Processando", self.INFO
+        elif "parando" in low:
+            base, cor = "Parando", self.WARNING
+        elif "erro" in low or "interromp" in low:
+            base, cor = "Atenção", self.ERROR
+        elif "finalizado" in low:
+            base, cor = "Finalizado", self.SUCCESS
+        else:
+            base, cor = "Pronto", self.SUCCESS
+        try:
+            label.configure(text=base, text_color=cor)
+        except Exception:
+            pass
+
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
-        largura, altura = 500, 280
+        largura, altura = 520, 360
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -2945,6 +3014,36 @@ class App:
             font=("Segoe UI", 12),
         )
         self.progresso_label.pack(anchor="w")
+
+        status_row = ctk.CTkFrame(progress_area, fg_color="transparent", height=24)
+        status_row.pack(fill="x", pady=(2, 0))
+        status_row.pack_propagate(False)
+
+        self._compact_status_label = ctk.CTkLabel(
+            status_row, text="Pronto", text_color=self.SUCCESS,
+            font=("Segoe UI", 10, "bold"), anchor="w"
+        )
+        self._compact_status_label.pack(side="left")
+
+        self._compact_codigo_label = ctk.CTkLabel(
+            status_row, text="Código: —", text_color=self.SUBTEXT,
+            font=("Segoe UI", 10), anchor="e"
+        )
+        self._compact_codigo_label.pack(side="right")
+
+        metric_row = ctk.CTkFrame(self.app, fg_color="transparent", height=48)
+        metric_row.pack(fill="x", padx=18, pady=(4, 0))
+        metric_row.pack_propagate(False)
+
+        self._compact_processados_label = self._criar_metrica_compacta(
+            metric_row, "Processados", "0", self.INFO
+        )
+        self._compact_executados_label = self._criar_metrica_compacta(
+            metric_row, "Executados", "0", self.SUCCESS
+        )
+        self._compact_erros_label = self._criar_metrica_compacta(
+            metric_row, "Erros", "0", self.ERROR
+        )
 
         self._execucao_progresso_card = None
 
@@ -3051,6 +3150,13 @@ class App:
         self.app.after_idle(self._sincronizar_pontos_notificacao)
         self._atualizar_badge_historico()
 
+        self._sincronizar_estado_compacto(
+            processados=int(getattr(self, "_checkpoint_indice_seguro", 0)),
+            total=int((getattr(self, "_execucao_atual", None) or {}).get("total", 0) or 0),
+            sucessos=int((getattr(self, "_execucao_atual", None) or {}).get("sucessos", 0) or 0),
+            erros=int((getattr(self, "_execucao_atual", None) or {}).get("erros", 0) or 0),
+            codigo=str((getattr(self, "_execucao_atual", None) or {}).get("ultimo_codigo", "") or "—"),
+        )
         _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
         self.app.after(350, self._verificar_retomada_pendente)
@@ -3075,6 +3181,7 @@ class App:
         win.minsize(620, 330)
         win.resizable(True, True)
         win.transient(self.app)
+        self._centralizar_janela(win, 700, 390)
 
         header = ctk.CTkFrame(
             win, fg_color=self.CARD, corner_radius=0, height=52
@@ -3310,18 +3417,13 @@ class App:
                 app_width = max(1, self.app.winfo_width())
                 app_height = max(1, self.app.winfo_height())
 
-                if getattr(self, "_visualizacao", "complete") == "compact":
-                    # A janela compacta tem altura suficiente para exibir o
-                    # menu inteiro abaixo do cabeçalho, sem cobrir o botão.
+                # O menu é sempre ancorado ao botão Configurações.
+                # Assim, a posição não muda incorretamente ao alternar entre
+                # a visualização Completa e a Compacta.
+                menu_x = bx
+                if menu_x + menu_width > app_width - 6:
                     menu_x = max(6, app_width - menu_width - 6)
-                    menu_y = 58
-                    menu_y = min(menu_y, max(6, app_height - menu_height - 6))
-                else:
-                    # O menu nasce no mesmo eixo X do botão Configurações.
-                    menu_x = bx
-                    if menu_x + menu_width > app_width - 6:
-                        menu_x = max(6, app_width - menu_width - 6)
-                    menu_y = max(0, by)
+                menu_y = max(0, by)
 
                 self._menu_config.place_configure(
                     x=int(menu_x),
@@ -3711,6 +3813,7 @@ class App:
         janela.resizable(False, False)
         janela.transient(self.app)
         janela.grab_set()
+        self._centralizar_janela(janela, 430, 165)
         try:
             janela.attributes("-topmost", True)
         except Exception:
@@ -4286,6 +4389,7 @@ class App:
         dialog.resizable(False, False)
         dialog.transient(self.app)
         dialog.grab_set()
+        self._centralizar_janela(dialog, 340, 160)
         dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
 
         body = ctk.CTkFrame(dialog, fg_color=self.BG)
@@ -4592,6 +4696,7 @@ class App:
         popup.transient(self.app)
         popup.grab_set()
         popup.configure(fg_color=self.BG)
+        self._centralizar_janela(popup, 560, 420)
         try:
             aplicar_backdrop_sistema(
                 popup, "acrylic",
@@ -4817,7 +4922,9 @@ class App:
             return False
         codigos = self._historico_codigos_de_erro(execucao)
         if not codigos:
-            return True
+            # Contador de erros sem códigos concretos não representa nada que
+            # o usuário possa reexecutar; portanto, não gera notificação.
+            return False
         reexecutados = {
             str(c).strip()
             for c in (execucao.get("codigos_erros_reexecutados") or [])
@@ -6285,6 +6392,7 @@ class App:
         win.minsize(560, 400)
         win.resizable(True, True)
         win.transient(self.app)
+        self._centralizar_janela(win, 680, 500)
         try:
             aplicar_backdrop_sistema(
                 win, "acrylic",
@@ -6861,6 +6969,7 @@ class App:
         win.minsize(900, 600)
         win.configure(fg_color=self.BG)
         win.transient(self.app)
+        self._centralizar_janela(win, 1080, 720)
         try:
             aplicar_backdrop_sistema(
                 win, "mica_alt",
@@ -8661,13 +8770,7 @@ class App:
         except Exception:
             pass
         win.protocol("WM_DELETE_WINDOW", self._fechar_historico_planilha)
-        try:
-            self.app.update_idletasks()
-            px = self.app.winfo_rootx() + max(0, (self.app.winfo_width() - 820) // 2)
-            py = self.app.winfo_rooty() + max(0, (self.app.winfo_height() - 650) // 2)
-            win.geometry(f"820x650+{px}+{py}")
-        except Exception:
-            pass
+        self._centralizar_janela(win, 820, 650)
 
         header = ctk.CTkFrame(win, fg_color="transparent")
         header.pack(fill="x", padx=18, pady=(16, 8))
@@ -9045,6 +9148,7 @@ class App:
 
     def _aplicar_status(self, texto):
         if getattr(self, "_visualizacao", "complete") == "compact":
+            self._aplicar_status_compacto(texto)
             return
         self.status_label.configure(text=texto.replace("Status:", "").strip())
         low = texto.lower()
@@ -9156,6 +9260,13 @@ class App:
         self._set_stat(self.sucesso_card, sucessos)
         self._set_stat(self.erro_card, erros)
         self._set_stat(self.codigo_card, codigo)
+        self._sincronizar_estado_compacto(
+            processados=processados,
+            total=total,
+            sucessos=sucessos,
+            erros=erros,
+            codigo=codigo,
+        )
         self._atualizar_metricas_execucao()
         if getattr(self, "_visualizacao", "complete") == "compact":
             return
