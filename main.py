@@ -2,6 +2,7 @@
 from __future__ import annotations
 import ctypes
 import os
+import shutil
 import sys
 import threading
 import time
@@ -209,7 +210,7 @@ class StartupSplash:
         self.root.after(0, self._tick)
         self.root.mainloop()
 def _sinalizar_inicializacao_atualizacao_sucesso():
-    """Sinaliza ao mecanismo de atualização que a nova versão inicializou."""
+    """Sinaliza somente depois que o loop Tk já estiver ativo."""
     caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_HEALTH", "")).strip()
     if not caminho:
         return
@@ -224,11 +225,39 @@ def _sinalizar_inicializacao_atualizacao_sucesso():
             lines.append(f"version={expected}")
         lines.append(f"pid={os.getpid()}")
         destino.write_text(
-            "\n".join(lines) + "\n",
+            "
+".join(lines) + "
+",
             encoding="utf-8",
         )
     except OSError:
         pass
+
+
+def _agendar_limpeza_atualizacao():
+    """Remove a pasta temporária da atualização sem abrir CMD."""
+    caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_CLEANUP_DIR", "")).strip()
+    if not caminho:
+        return
+
+    diretorio = Path(caminho)
+
+    def worker():
+        time.sleep(2.0)
+        for _ in range(30):
+            try:
+                shutil.rmtree(diretorio, ignore_errors=False)
+                if not diretorio.exists():
+                    return
+            except OSError:
+                time.sleep(0.5)
+
+    threading.Thread(
+        target=worker,
+        name="SM-AutoLab-Update-Cleanup",
+        daemon=True,
+    ).start()
+
 def run_splash(ready_event=None):
     StartupSplash(ready_event=ready_event).run()
 SM_AUTOLAB_CANONICAL_UI = "SM-AUTOLAB-CANONICAL-UI"
@@ -400,6 +429,7 @@ def install_ui(App):
 if __name__ == "__main__":
     if _update_installer_mode():
         raise SystemExit(0)
+    _agendar_limpeza_atualizacao()
     install_ui(App)
     _validar_base_aplicacao()
     startup_update = {"info": None}
@@ -421,5 +451,6 @@ if __name__ == "__main__":
         startup_update_info=startup_update["info"],
         startup_update_checked=update_ready.is_set(),
     )
-    _sinalizar_inicializacao_atualizacao_sucesso()
+    # Confirma a atualização apenas após o Tk entrar no event loop.
+    app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)
     app.app.mainloop()
