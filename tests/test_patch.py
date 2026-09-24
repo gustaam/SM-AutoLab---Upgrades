@@ -24,14 +24,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("aplicar_patch_ui", source)
         self.assertNotIn("bind_all", source)
 
-    def test_appearance_submenu_owns_hover_events(self):
+    def test_appearance_submenu_uses_canonical_hover_and_monitoring(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("def _configurar_hover_menu", source)
+        self.assertNotIn("def _configurar_hover_menu", source)
+        self.assertIn('command=self._mostrar_menu_aparencia', source)
         self.assertIn('aparencia.bind("<Enter>", self._mostrar_menu_aparencia', source)
         self.assertIn('aparencia.bind("<Leave>", self._agendar_fechar_aparencia', source)
         self.assertIn("def _monitorar_menus", source)
-        self.assertIn("for widget in self._iterar_descendentes_ui(aparencia):", source)
-        self.assertIn('widget.bind("<Enter>", self._mostrar_menu_aparencia', source)
+        self.assertIn("self._ativar_clique_fora_menus()", source)
+        self.assertIn("self._pointer_em_area_dos_menus", source)
 
     def test_planilha_mouse_events_use_one_hit_test(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
