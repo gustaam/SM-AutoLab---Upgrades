@@ -4,7 +4,7 @@
 
 Aplicativo Windows para automação de autorizações no Feegow, com execução de códigos a partir de planilhas, recuperação segura de execuções, histórico, atualização integrada e interface moderna.
 
-**Versão atual no código:** `2.99.93`  
+**Versão atual no código:** `2.99.94`  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -101,7 +101,7 @@ Essa proteção possui testes de regressão para alterações de conteúdo, pers
 
 ## Reexecução de erros
 
-A versão `2.99.93` permite reexecutar diretamente os códigos que falharam em uma execução histórica. A reexecução permanece vinculada à execução original e não cria uma nova pasta no histórico. Depois que os códigos forem reexecutados, o botão não reaparece para aqueles mesmos códigos naquela execução original.
+A versão `2.99.94` permite reexecutar diretamente os códigos que falharam em uma execução histórica. A reexecução permanece vinculada à execução original e não cria uma nova pasta no histórico. Depois que os códigos forem reexecutados, o botão não reaparece para aqueles mesmos códigos naquela execução original.
 
 ## Histórico de erros
 
