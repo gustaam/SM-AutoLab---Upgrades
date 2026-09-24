@@ -659,6 +659,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
             self.assertNotIn(marker, block)
         self.assertIn('text="Progresso"', block)
         self.assertIn("self.progresso", block)
+        self.assertNotIn("_compact_status_label", block)
+        self.assertNotIn("_aplicar_status_compacto", source)
 
 
     def test_menu_configuracoes_ancora_no_botao_na_visualizacao_compacta(self):
