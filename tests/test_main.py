@@ -1085,6 +1085,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("Salvando…",source)
         self.assertIn("def _planilha_salvar_rascunho",source)
 
+    def test_historico_compacto_recalcula_badge_ao_abrir(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _abrir_historico_compacto")
+        end = source.index("def _reposicionar_menus", start)
+        block = source[start:end]
+        self.assertIn("self._atualizar_badge_historico()", block)
+        self.assertIn("itens = self._historico_execucoes_visiveis()", block)
+
     def test_historico_compacto_renderiza_erros_e_clica_na_linha(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         start=source.index("def _abrir_historico_compacto")
