@@ -56,6 +56,29 @@ class ExecucaoPerformanceStage10Tests(unittest.TestCase):
 
 # tests/test_storage_safe.py
 
+class ExecutionLifecycleTests(unittest.TestCase):
+    def test_principal_interno_libera_referencia_de_automacao(self):
+        source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
+            encoding="utf-8"
+        )
+        start = source.index("def principal_interno")
+        end = source.index("def principal(", start)
+        block = source[start:end]
+        self.assertIn("aplicativo._automacao_atual = auto", block)
+        self.assertIn("auto.fechar()", block)
+        self.assertIn('aplicativo._automacao_atual = None', block)
+
+    def test_principal_planilha_libera_referencia_de_automacao(self):
+        source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
+            encoding="utf-8"
+        )
+        start = source.index("def principal(planilha_path")
+        block = source[start:]
+        self.assertIn("aplicativo._automacao_atual = auto", block)
+        self.assertIn("auto.fechar()", block)
+        self.assertIn('aplicativo._automacao_atual = None', block)
+
+
 class SeleniumWindowBehaviorTests(unittest.TestCase):
     def test_driver_e_executa_com_janela_minimizada(self):
         source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
