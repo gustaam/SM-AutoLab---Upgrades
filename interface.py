@@ -2847,30 +2847,10 @@ class App:
         self._agendar_verificacao_atualizacao()
 
 
-    def _aplicar_status_compacto(self, texto):
-        label = getattr(self, "_compact_status_label", None)
-        if label is None:
-            return
-        low = str(texto or "").lower()
-        if "process" in low and "erro" not in low:
-            base, cor = "Processando", self.INFO
-        elif "parando" in low:
-            base, cor = "Parando", self.WARNING
-        elif "erro" in low or "interromp" in low:
-            base, cor = "Atenção", self.ERROR
-        elif "finalizado" in low:
-            base, cor = "Finalizado", self.SUCCESS
-        else:
-            base, cor = "Pronto", self.SUCCESS
-        try:
-            label.configure(text=base, text_color=cor)
-        except Exception:
-            pass
-
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
-        largura, altura = 520, 300
+        largura, altura = 520, 240
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -2963,16 +2943,6 @@ class App:
         )
         self.progresso_label.pack(anchor="w")
 
-        status_row = ctk.CTkFrame(progress_area, fg_color="transparent", height=24)
-        status_row.pack(fill="x", pady=(2, 0))
-        status_row.pack_propagate(False)
-
-        self._compact_status_label = ctk.CTkLabel(
-            status_row, text="Pronto", text_color=self.SUCCESS,
-            font=("Segoe UI", 10, "bold"), anchor="w"
-        )
-        self._compact_status_label.pack(side="left")
-
         self._execucao_progresso_card = None
 
         # Elementos opcionais do dashboard completo não existem no modo compacto.
@@ -2986,7 +2956,7 @@ class App:
         self.status_indicator = None
 
         actions = ctk.CTkFrame(self.app, fg_color="transparent")
-        actions.pack(fill="x", padx=18, pady=(27, 10))
+        actions.pack(fill="x", padx=18, pady=(18, 10))
 
         # Mantém os três botões como um único grupo centralizado.
         # 3 x 130 px + 2 x 6 px de espaçamento interno + 6 px de margem
@@ -6890,7 +6860,6 @@ class App:
 
     def _aplicar_status(self, texto):
         if getattr(self, "_visualizacao", "complete") == "compact":
-            self._aplicar_status_compacto(texto)
             return
         self.status_label.configure(text=texto.replace("Status:", "").strip())
         low = texto.lower()

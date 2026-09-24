@@ -644,18 +644,23 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("if not codigos:", block)
         self.assertIn("return False", block)
 
-    def test_modo_compacto_nao_exibe_metricas_nem_codigo_atual(self):
+    def test_modo_compacto_nao_exibe_dashboard_de_metricas_nem_codigo(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _configurar_dashboard_compacto")
         end = source.index("def _abrir_historico_compacto", start)
         block = source[start:end]
-        self.assertNotIn("_compact_processados_label", block)
-        self.assertNotIn("_compact_executados_label", block)
-        self.assertNotIn("_compact_erros_label", block)
-        self.assertNotIn("_compact_codigo_label", block)
-        self.assertNotIn("Código: —", block)
+        for marker in (
+            "_compact_processados_label",
+            "_compact_executados_label",
+            "_compact_erros_label",
+            "_compact_codigo_label",
+            "Código: —",
+            "status_row",
+            "Pronto",
+        ):
+            self.assertNotIn(marker, block)
         self.assertIn('text="Progresso"', block)
-        self.assertIn("self._compact_status_label", block)
+        self.assertIn("self.progresso", block)
 
     def test_menu_configuracoes_ancora_no_botao_na_visualizacao_compacta(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
