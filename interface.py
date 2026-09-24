@@ -4853,13 +4853,10 @@ class App:
         return any(codigo not in reexecutados for codigo in codigos)
 
     def _historico_tem_erros_pendentes(self):
-        return any(
-            self._historico_tem_erros_pendentes_reexecucao(item)
-            for item in self._historico_execucoes_visiveis()
-        )
+        return bool(self._historico_execucoes_visiveis())
 
-    def _historico_execucoes_visiveis(self):
-        """Retorna as execuções com não executados para as duas interfaces."""
+    def _historico_execucoes_com_erros(self):
+        """Retorna todas as execuções históricas que ainda possuem erro registrado."""
         fontes = list(getattr(self, "_historico_execucoes", []))
         atual = getattr(self, "_execucao_atual", None)
         if isinstance(atual, dict):
@@ -4873,6 +4870,14 @@ class App:
                 continue
             unicos[self._id_historico_execucao(item)] = item
         return list(unicos.values())
+
+    def _historico_execucoes_visiveis(self):
+        """Retorna somente as execuções que ainda possuem códigos reexecutáveis."""
+        return [
+            item
+            for item in self._historico_execucoes_com_erros()
+            if self._historico_tem_erros_pendentes_reexecucao(item)
+        ]
 
     @staticmethod
     def _cor(valor):
