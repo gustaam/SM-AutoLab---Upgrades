@@ -2734,9 +2734,9 @@ class App:
         self._historico_notificacao_badge = ctk.CTkLabel(
             self.tab_buttons["Histórico"],
             text="",
-            width=8,
-            height=8,
-            corner_radius=4,
+            width=6,
+            height=6,
+            corner_radius=3,
             fg_color=self.ERROR,
         )
         self._historico_notificacao_badge.place_forget()
@@ -3033,9 +3033,9 @@ class App:
         self._historico_compacto_notificacao_badge = ctk.CTkLabel(
             self.botao_historico_compacto,
             text="",
-            width=8,
-            height=8,
-            corner_radius=4,
+            width=6,
+            height=6,
+            corner_radius=3,
             fg_color=self.ERROR,
         )
         self._historico_compacto_notificacao_badge.place_forget()
@@ -4844,8 +4844,8 @@ class App:
             badge.place(
                 relx=1.0,
                 rely=0.0,
-                x=-4,
-                y=4,
+                x=0,
+                y=1,
                 anchor="ne",
             )
             badge.lift()
@@ -4863,8 +4863,8 @@ class App:
             badge.place(
                 relx=1.0,
                 rely=0.0,
-                x=-4,
-                y=4,
+                x=0,
+                y=1,
                 anchor="ne",
             )
             badge.lift()
