@@ -1031,7 +1031,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         helper_start = source.index("def _remover_erros_resolvidos_por_reexecucao")
         helper_end = source.index("def _finalizar_historico_execucao", helper_start)
         block = source[helper_start:helper_end]
-        self.assertIn("estado in {"sucesso", "executado", "processado"}", block)
+        self.assertIn('estado in {"sucesso", "executado", "processado"}', block)
         self.assertIn('str(detalhe.get("codigo", "")).strip() not in resolvidos', block)
         self.assertIn("self._historico_execucoes = [", block)
         self.assertIn("self._erros_codigos = [", block)
