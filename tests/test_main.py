@@ -644,6 +644,51 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("if not codigos:", block)
         self.assertIn("return False", block)
 
+    def test_historico_compacto_exibe_apenas_erros_ainda_reexecutaveis(self):
+        import interface
+
+        obj = object.__new__(interface.App)
+        obj._historico_execucoes = [
+            {
+                "id": "resolvido",
+                "erros": 1,
+                "codigos_erros": ["100"],
+                "codigos_erros_reexecutados": ["100"],
+            },
+            {
+                "id": "pendente",
+                "erros": 1,
+                "codigos_erros": ["200", "300"],
+                "codigos_erros_reexecutados": ["200"],
+            },
+            {
+                "id": "sem_codigo",
+                "erros": 1,
+                "codigos_erros": [],
+            },
+        ]
+        obj._execucao_atual = None
+
+        visiveis = obj._historico_execucoes_visiveis()
+
+        self.assertEqual([item["id"] for item in visiveis], ["pendente"])
+        self.assertTrue(
+            obj._historico_tem_erros_pendentes_reexecucao(
+                obj._historico_execucoes[1]
+            )
+        )
+        self.assertFalse(
+            obj._historico_tem_erros_pendentes_reexecucao(
+                obj._historico_execucoes[0]
+            )
+        )
+        self.assertFalse(
+            obj._historico_tem_erros_pendentes_reexecucao(
+                obj._historico_execucoes[2]
+            )
+        )
+        self.assertTrue(obj._historico_tem_erros_pendentes())
+
     def test_modo_compacto_nao_exibe_dashboard_de_metricas_nem_codigo(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _configurar_dashboard_compacto")
