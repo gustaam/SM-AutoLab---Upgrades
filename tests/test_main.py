@@ -786,12 +786,13 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_notificacao_do_historico_e_um_ponto_redondo_e_mais_a_direita(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('width=8,', source)
-        self.assertIn('height=8,', source)
-        self.assertIn('corner_radius=4,', source)
+        self.assertIn('width=6,', source)
+        self.assertIn('height=6,', source)
+        self.assertIn('corner_radius=3,', source)
         self.assertIn('relx=1.0', source)
         self.assertIn('anchor="ne"', source)
-        self.assertGreaterEqual(source.count('x=-4'), 2)
+        self.assertGreaterEqual(source.count('x=0'), 2)
+        self.assertGreaterEqual(source.count('y=1'), 2)
 
     def test_salvar_da_planilha_nao_fecha_a_janela(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
