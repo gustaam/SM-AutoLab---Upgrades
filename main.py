@@ -2,6 +2,7 @@
 from __future__ import annotations
 import ctypes
 import os
+import shutil
 import sys
 import threading
 import time
@@ -209,7 +210,7 @@ class StartupSplash:
         self.root.after(0, self._tick)
         self.root.mainloop()
 def _sinalizar_inicializacao_atualizacao_sucesso():
-    """Sinaliza ao mecanismo de atualização que a nova versão inicializou."""
+    """Sinaliza somente depois que o loop Tk já estiver ativo."""
     caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_HEALTH", "")).strip()
     if not caminho:
         return
@@ -229,6 +230,32 @@ def _sinalizar_inicializacao_atualizacao_sucesso():
         )
     except OSError:
         pass
+
+
+def _agendar_limpeza_atualizacao():
+    """Remove a pasta temporária da atualização sem abrir CMD."""
+    caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_CLEANUP_DIR", "")).strip()
+    if not caminho:
+        return
+
+    diretorio = Path(caminho)
+
+    def worker():
+        time.sleep(2.0)
+        for _ in range(30):
+            try:
+                shutil.rmtree(diretorio, ignore_errors=False)
+                if not diretorio.exists():
+                    return
+            except OSError:
+                time.sleep(0.5)
+
+    threading.Thread(
+        target=worker,
+        name="SM-AutoLab-Update-Cleanup",
+        daemon=True,
+    ).start()
+
 def run_splash(ready_event=None):
     StartupSplash(ready_event=ready_event).run()
 SM_AUTOLAB_CANONICAL_UI = "SM-AUTOLAB-CANONICAL-UI"
@@ -283,6 +310,11 @@ def _update_installer_mode():
         f"{max((root.winfo_screenwidth()-width)//2,0)}+"
         f"{max((root.winfo_screenheight()-height)//2,0)}"
     )
+    # Exibe a janela do instalador explicitamente antes de iniciar a troca.
+    root.deiconify()
+    root.lift()
+    root.focus_force()
+    root.update_idletasks()
     title_var = tk.StringVar(value="Atualização do SM AutoLab")
     status_var = tk.StringVar(value=f"Preparando a instalação da v{expected or 'nova versão'}…")
     tk.Label(root,textvariable=title_var,bg="#F5F5F5",fg="#242424",
@@ -299,6 +331,7 @@ def _update_installer_mode():
             "SM_AUTOLAB_INSTALLER_EXPECTED","SM_AUTOLAB_INSTALLER_BACKUP",
             "SM_AUTOLAB_INSTALLER_FAILED","SM_AUTOLAB_INSTALLER_HEALTH",
             "SM_AUTOLAB_UPDATE_HEALTH","SM_AUTOLAB_UPDATE_EXPECTED_VERSION",
+            "SM_AUTOLAB_UPDATE_CLEANUP_DIR",
             "PYINSTALLER_RESET_ENVIRONMENT",
         ):
             env.pop(key, None)
@@ -315,16 +348,10 @@ def _update_installer_mode():
             return False
         return (not expected) or f"version={expected}" in lines
     def cleanup_later():
-        try: progress.stop()
-        except Exception: pass
-        if os.name=="nt":
-            try:
-                cmd=f'ping 127.0.0.1 -n 3 >nul & rmdir /s /q "{payload.parent}"'
-                subprocess.Popen(["cmd.exe","/d","/c",cmd],cwd=str(Path.home()),
-                    close_fds=True,creationflags=subprocess.CREATE_NO_WINDOW,
-                    env=clean_env(os.environ.copy()))
-            except OSError:
-                pass
+        try:
+            progress.stop()
+        except Exception:
+            pass
         root.destroy()
     def set_ui(title,status):
         root.after(0,lambda:(title_var.set(title),status_var.set(status)))
@@ -348,13 +375,17 @@ def _update_installer_mode():
             env["PYINSTALLER_RESET_ENVIRONMENT"]="1"
             env["SM_AUTOLAB_UPDATE_HEALTH"]=str(health)
             env["SM_AUTOLAB_UPDATE_EXPECTED_VERSION"]=expected
+            env["SM_AUTOLAB_UPDATE_CLEANUP_DIR"]=str(payload.parent)
             set_ui("Atualização do SM AutoLab","Iniciando e verificando a nova versão…")
             launch(target,env)
             deadline=time.time()+28
             while time.time()<deadline:
                 if health_ok():
-                    set_ui("Atualização concluída","Nova versão iniciada com sucesso.")
-                    root.after(0,lambda:root.after(700,cleanup_later))
+                    set_ui(
+                        "Atualização concluída",
+                        "Verificação da instalação concluída. A nova versão foi iniciada com sucesso.",
+                    )
+                    root.after(0,lambda:root.after(1600,cleanup_later))
                     return
                 time.sleep(0.25)
             raise RuntimeError("A nova versão não confirmou uma inicialização válida.")
@@ -400,6 +431,7 @@ def install_ui(App):
 if __name__ == "__main__":
     if _update_installer_mode():
         raise SystemExit(0)
+    _agendar_limpeza_atualizacao()
     install_ui(App)
     _validar_base_aplicacao()
     startup_update = {"info": None}
@@ -421,5 +453,6 @@ if __name__ == "__main__":
         startup_update_info=startup_update["info"],
         startup_update_checked=update_ready.is_set(),
     )
-    _sinalizar_inicializacao_atualizacao_sucesso()
+    # Confirma a atualização apenas após o Tk entrar no event loop.
+    app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)
     app.app.mainloop()

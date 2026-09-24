@@ -145,6 +145,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("SM_AUTOLAB_INSTALLER",block)
         self.assertIn("SM_AUTOLAB_INSTALLER_PAYLOAD",block)
         self.assertIn("CREATE_NO_WINDOW",block)
+        self.assertIn("SM_AUTOLAB_UPDATE_CLEANUP_DIR",block)
         self.assertNotIn("tasklist /FI",block)
         self.assertNotIn("taskkill /PID",block)
         self.assertNotIn("powershell",block.lower())
@@ -153,6 +154,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('if _update_installer_mode():',main_source)
         self.assertIn("Instalando a v",main_source)
         self.assertIn("Restaurando a versão anterior",main_source)
+        self.assertNotIn("cmd.exe",main_source)
+        self.assertIn("_agendar_limpeza_atualizacao",main_source)
 
     def test_atualizador_exibe_barra_de_download(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -195,10 +198,16 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso",source)
         self.assertIn("SM_AUTOLAB_UPDATE_EXPECTED_VERSION",source)
         self.assertIn("version=",source)
+        self.assertIn(
+            "app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)",
+            source,
+        )
         self.assertLess(
-            source.index("_sinalizar_inicializacao_atualizacao_sucesso()"),
+            source.index("app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)"),
             source.index("app.app.mainloop()"),
         )
+        self.assertIn("def _agendar_limpeza_atualizacao", source)
+        self.assertIn("SM_AUTOLAB_UPDATE_CLEANUP_DIR", source)
 
     def test_dashboard_retorna_ao_layout_base_com_tempos_no_card_de_progresso(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -783,6 +792,61 @@ class CanonicalRuntimeTests(unittest.TestCase):
         )
         self.assertIn('headers=("Data","Hora","","Processados","Executados","Erros","Status","","")', source)
         self.assertIn("columnspan=9", source)
+
+    def test_historico_aplica_cores_dos_numeros_por_status(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _criar_pasta_historico")
+        block = source[start:]
+        self.assertIn("if col == 3:       # Processados", block)
+        self.assertIn("cor = self.INFO", block)
+        self.assertIn("elif col == 4:     # Executados", block)
+        self.assertIn("cor = self.SUCCESS", block)
+        self.assertIn("elif col == 5:     # Erros", block)
+        self.assertIn("cor = self.ERROR", block)
+        self.assertIn("text_color=cor", block)
+
+    def test_historico_compacto_aplica_mesmas_cores(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _abrir_historico_compacto")
+        end = source.index("def _historico_tem_erros_pendentes", start)
+        block = source[start:end]
+        self.assertIn("if col == 3:       # Processados", block)
+        self.assertIn("elif col == 4:     # Executados", block)
+        self.assertIn("elif col == 5:     # Erros", block)
+        self.assertIn("text_color=cor", block)
+
+    def test_atualizador_mostra_confirmacao_e_nao_abre_cmd(self):
+        source = (self.root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("Verificação da instalação concluída.", source)
+        self.assertNotIn("cmd.exe", source)
+        self.assertIn("SM_AUTOLAB_UPDATE_CLEANUP_DIR", source)
+        self.assertIn("def _agendar_limpeza_atualizacao", source)
+
+    def test_execucao_recria_automacao_e_libera_referencia_ao_final(self):
+        source = (self.root / "app.py").read_text(encoding="utf-8")
+        start = source.index("def principal_interno")
+        end = source.index("def principal(", start)
+        block = source[start:end]
+        self.assertIn("aplicativo._automacao_atual = auto", block)
+        self.assertIn(
+            'if aplicativo is not None and getattr(aplicativo, "_automacao_atual", None) is auto:',
+            block,
+        )
+        self.assertIn("aplicativo._automacao_atual = None", block)
+
+    def test_historico_usa_cores_padrao_nos_numeros(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        for method_name in ("_criar_pasta_historico", "_abrir_historico_compacto"):
+            start = source.index("def " + method_name)
+            end = source.find("\ndef ", start + 4)
+            block = source[start:] if end < 0 else source[start:end]
+            self.assertIn("if col == 3:       # Processados", block)
+            self.assertIn("cor = self.INFO", block)
+            self.assertIn("elif col == 4:     # Executados", block)
+            self.assertIn("cor = self.SUCCESS", block)
+            self.assertIn("elif col == 5:     # Erros", block)
+            self.assertIn("cor = self.ERROR", block)
+            self.assertIn("text_color=cor", block)
 
     def test_historico_tem_nove_colunas_com_espacador_de_metricas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
