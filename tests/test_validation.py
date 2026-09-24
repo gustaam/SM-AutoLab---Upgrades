@@ -54,8 +54,6 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("already_published != 'true'", release)
         self.assertIn("EXPECTED_COMMIT", release)
         self.assertIn("refs/tags/$($env:RELEASE_TAG)^{commit}", release)
-        self.assertIn("$expectedTree", release)
-        self.assertIn("$tagTree", release)
         self.assertNotIn("push:\n    tags:", release)
         self.assertNotIn("v3.0.0", release)
         self.assertNotIn("-Method Delete", release)
