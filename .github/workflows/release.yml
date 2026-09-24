@@ -17,9 +17,9 @@ on:
 permissions: {}
 
 concurrency:
-  # Serializa releases automáticas para impedir que builds concorrentes
-  # movam a mesma tag enquanto outro build ainda está validando artefatos.
-  group: sm-autolab-release-${{ github.event_name == 'workflow_run' && 'automatic' || github.event.inputs.release_tag }}
+  # Serializa toda publicação para impedir que execuções automáticas e manuais
+  # concorram pela mesma tag ou substituam os assets enquanto outra release valida.
+  group: sm-autolab-release
   cancel-in-progress: false
 
 jobs:
