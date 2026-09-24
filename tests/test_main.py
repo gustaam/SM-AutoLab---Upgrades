@@ -238,7 +238,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("row = ctk.CTkFrame(",block)
         self.assertIn("HISTORICO_COL_PESOS",block)
         self.assertIn("HISTORICO_COL_MINS",block)
-        self.assertIn('columnspan=8',block)
+        self.assertIn('columnspan=9',block)
         self.assertIn('sticky="ew"',block)
         self.assertNotIn('text="Detalhes"',block)
 
