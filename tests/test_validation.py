@@ -49,7 +49,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn('- "Validate main for release"', release)
         self.assertIn('"${{ github.event.workflow_run.conclusion }}" -eq "success"', release)
         self.assertIn('"${{ github.event.workflow_run.event }}" -eq "push"', release)
-        self.assertIn('"${{ github.event.workflow_run.head_sha }}" -eq "${{ github.sha }}" ', release)
+        self.assertIn('"${{ github.event.workflow_run.head_sha }}" -eq "${{ github.sha }}"', release)
         self.assertIn("releases/tags/$tag", release)
         self.assertIn("id: release_state", release)
         self.assertIn("already_published != 'true'", release)
