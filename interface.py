@@ -2281,11 +2281,12 @@ APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
 # Histórico: Data, Hora, Processados, Executados, Erros, Status e indicador.
 # Não exibe mais o nome da planilha nem a duração na listagem.
-# Grid responsivo: as colunas acompanham a largura disponível da janela.
-# Há um espaço final proporcional para preservar o posicionamento visual
-# das métricas sem sacrificar a responsividade em janelas menores.
-HISTORICO_COL_PESOS = (6, 5, 4, 9, 9, 6, 7, 2, 8)
-HISTORICO_COL_MINS = (55, 48, 10, 65, 65, 48, 60, 14, 20)
+# Grid responsivo: Data/Hora ficam ancorados à esquerda e o conjunto
+# Processados/Executados/Erros/Status + indicador é "empurrado" ao máximo
+# para a direita. O espaço intermediário absorve a largura excedente e as
+# larguras mínimas garantem que nada saia da área visível em janelas menores.
+HISTORICO_COL_PESOS = (0, 0, 1, 4, 4, 3, 5, 1, 0)
+HISTORICO_COL_MINS = (72, 60, 8, 70, 70, 52, 68, 16, 0)
 
 class App:
     INICIAR_LABEL = "Iniciar"
