@@ -65,7 +65,7 @@ WORKFLOW_PATHS = (
 TEST_MARKERS = (
     "class CanonicalRuntimeTests",
     "test_main_bootstrap_uses_only_canonical_ui",
-    "test_appearance_submenu_owns_hover_events",
+    "test_appearance_submenu_uses_canonical_hover_and_monitoring",
     "test_planilha_mouse_events_use_one_hit_test",
     "test_legacy_patch_module_is_absent",
 )
