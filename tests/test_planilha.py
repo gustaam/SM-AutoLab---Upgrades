@@ -153,6 +153,47 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         app.app = Clipboard()
         return app
 
+    def test_um_clique_e_digito_iniciam_edicao_da_celula_ativa(self):
+        app = self._app()
+        app._planilha_celula_ativa = ("0", 1)
+
+        class Entry:
+            def __init__(self):
+                self.value = "antigo"
+            def delete(self, *_args):
+                self.value = ""
+            def insert(self, _index, value):
+                self.value += value
+
+        entry = Entry()
+        app._planilha_editar_iid = lambda _row, _col: setattr(
+            app, "_planilha_edit_entry", entry
+        )
+
+        event = SimpleNamespace(char="X", keysym="x")
+        self.assertEqual(App._planilha_teclar_celula(app, event), "break")
+        self.assertEqual(entry.value, "X")
+
+    def test_duplo_clique_manual_edita_a_mesma_celula(self):
+        app = self._app()
+
+        class MouseTree:
+            def identify_cell(self, _x, _y):
+                return (0, 1)
+            def focus(self, _iid=None):
+                return None
+            def focus_set(self):
+                return None
+
+        app._planilha_tree = MouseTree()
+        calls = []
+        app._planilha_duplo_clique_celula = lambda _event: calls.append(True)
+
+        event = SimpleNamespace(x=10, y=10, state=0)
+        self.assertEqual(App._planilha_clicar_celula(app, event), "break")
+        self.assertEqual(App._planilha_clicar_celula(app, event), "break")
+        self.assertEqual(calls, [True])
+
     def test_selecao_retangular_executa_operacao_real(self):
         app = self._app()
         self.assertEqual(
