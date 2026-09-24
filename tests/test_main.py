@@ -234,11 +234,11 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("SM_AUTOLAB_UPDATE_EXPECTED_VERSION",source)
         self.assertIn("version=",source)
         self.assertIn(
-            "app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)",
+            "app.app.after_idle(_sinalizar_inicializacao_atualizacao_sucesso)",
             source,
         )
         self.assertLess(
-            source.index("app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)"),
+            source.index("app.app.after_idle(_sinalizar_inicializacao_atualizacao_sucesso)"),
             source.index("app.app.mainloop()"),
         )
         self.assertIn("def _agendar_limpeza_atualizacao", source)
@@ -643,7 +643,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _registrar_falha_historico", start)
         block = source[start:end]
 
-        self.assertIn('eh_reexecucao = bool(self._execucao_atual.get("reexecucao_de"))', block)
+        self.assertIn('origem_reexecucao = self._execucao_atual.get("reexecucao_de")', block)
+        self.assertIn("eh_reexecucao = bool(origem_reexecucao)", block)
+        self.assertIn("self._remover_erros_resolvidos_por_reexecucao(", block)
         self.assertIn(
             'if not eh_reexecucao and self._historico_execucao_tem_erros(self._execucao_atual):',
             block,
@@ -1021,7 +1023,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("ARQUIVOS_DIAS",source)
         self.assertNotIn("HISTORICO_DIAS",source)
         self.assertNotIn("_filtrar_historico_execucoes_60_dias",source)
-        self.assertIn("sem limite de quantidade",source)
+        self.assertIn("não possui limite de quantidade",source)
         self.assertIn("validos = [item for item in itens if isinstance(item, dict)]",source)
         self.assertIn("Retorna todo o histórico válido de Arquivos, sem limite de idade.",source)
 
