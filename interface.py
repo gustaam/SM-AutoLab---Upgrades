@@ -7092,6 +7092,7 @@ class App:
         tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
         tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
         tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
+        tree.bind("<KeyPress>", self._planilha_teclar_celula, add="+")
         tree.bind("<Return>", self._planilha_editar_selecao)
         tree.bind("<Tab>", self._planilha_tabular)
         tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
@@ -7352,6 +7353,10 @@ class App:
         keysym = str(getattr(event, "keysym", "") or "")
 
         # Teclas de navegação/atalhos permanecem com seus próprios bindings.
+        state = int(getattr(event, "state", 0) or 0)
+        if state & 0x0004 or state & 0x0008 or state & 0x0001:
+            return None
+
         if not char or not char.isprintable():
             if keysym not in ("BackSpace", "Delete"):
                 return None
