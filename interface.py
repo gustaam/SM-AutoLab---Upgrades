@@ -4986,6 +4986,7 @@ class App:
                 text_color=self.ACCENT if ativo else self.TEXT,
                 font=("Segoe UI", 11, "bold"),
             )
+        self._sincronizar_pontos_notificacao()
         self._atualizar_badge_historico()
 
     def _card(self, parent):
