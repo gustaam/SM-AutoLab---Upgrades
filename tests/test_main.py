@@ -795,7 +795,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
             source,
         )
         self.assertIn(
-            'headers=("Data","Hora","","Processados","Executados","Erros","Status","")',
+            'headers=("Data","Hora","","Processados","Executados","Erros","Status","","")',
             source,
         )
         self.assertIn("columnspan=9", source)
