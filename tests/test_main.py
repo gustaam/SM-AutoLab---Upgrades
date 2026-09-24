@@ -170,6 +170,41 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("Baixando atualização v", source)
         self.assertIn("def _atualizacao_atualizar_progresso", source)
 
+    def test_atualizador_espera_confirmacao_antes_de_limpar_a_pasta_temporaria(self):
+        source = (self.root / "main.py").read_text(encoding="utf-8")
+        start = source.index("def _agendar_limpeza_atualizacao")
+        end = source.index("def run_splash", start)
+        block = source[start:end]
+        self.assertIn("SM_AUTOLAB_UPDATE_HEALTH", block)
+        self.assertIn("health.exists()", block)
+        self.assertIn("deadline = time.time() + 60.0", block)
+        self.assertIn("time.sleep(1.5)", block)
+
+    def test_atualizador_inicia_a_nova_versao_sem_console_visivel(self):
+        for filename, start_marker, end_marker in (
+            ("main.py", "def launch(path, env):", "def health_ok"),
+            ("interface.py", "def _schedule_replace_after_exit", "def launch_updater"),
+        ):
+            source = (self.root / filename).read_text(encoding="utf-8")
+            start = source.index(start_marker)
+            end = source.index(end_marker, start)
+            block = source[start:end]
+            self.assertIn("STARTF_USESHOWWINDOW", block)
+            self.assertIn("SW_HIDE", block)
+            self.assertIn("CREATE_NO_WINDOW", block)
+            self.assertNotIn("DETACHED_PROCESS", block)
+
+    def test_confirmacao_da_atualizacao_ocorre_no_event_loop(self):
+        source = (self.root / "main.py").read_text(encoding="utf-8")
+        self.assertIn(
+            "app.app.after_idle(_sinalizar_inicializacao_atualizacao_sucesso)",
+            source,
+        )
+        self.assertNotIn(
+            "app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)",
+            source,
+        )
+
     def test_restore_desabilita_transicoes_dwm_por_janela(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("DWMWA_TRANSITIONS_FORCEDISABLED = 3", source)
