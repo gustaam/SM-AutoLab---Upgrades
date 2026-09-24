@@ -7093,6 +7093,7 @@ class App:
         tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
         tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
         tree.bind("<Return>", self._planilha_editar_selecao)
+        tree.bind("<Tab>", self._planilha_tabular)
         tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
         tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
         tree.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")
@@ -7515,6 +7516,41 @@ class App:
         self._planilha_undo.append(self._planilha_snapshot())
         self._planilha_undo=self._planilha_undo[-50:]
 
+    def _planilha_tabular(self, event=None):
+        """Avança uma célula à direita e, no fim da linha, para a primeira da próxima."""
+        tree = self._planilha_tree
+        active = getattr(self, "_planilha_celula_ativa", None)
+        if tree is None or not active:
+            return "break"
+
+        try:
+            row = int(active[0])
+            col = int(active[1])
+        except (TypeError, ValueError, IndexError):
+            return "break"
+
+        # Ctrl/Shift+Tab ficam reservados ao comportamento nativo de navegação.
+        state = int(getattr(event, "state", 0) or 0) if event is not None else 0
+        if state & 0x0004:
+            return "break"
+
+        if col + 1 < MAX_COLS:
+            next_row, next_col = row, col + 1
+        elif row + 1 < MAX_ROWS:
+            next_row, next_col = row + 1, 0
+        else:
+            # Não existe uma linha seguinte além do limite lógico da planilha.
+            next_row, next_col = row, col
+
+        self._planilha_fechar_edicao()
+        current = (next_row, next_col)
+        self._planilha_definir_selecao({current}, active=current)
+        tree.focus(str(next_row))
+        tree.focus_set()
+        tree.see(str(next_row))
+        self._planilha_desenhar_borda()
+        return "break"
+
     def _planilha_editar_selecao(self,event=None):
         if self._planilha_tree:
             alvo = getattr(self, "_planilha_celula_ativa", None)
@@ -7556,6 +7592,7 @@ class App:
         def finish(save=True):
             self._planilha_commit_edit(save)
         entry.bind("<Return>",lambda e:(finish(True),"break")[1])
+        entry.bind("<Tab>",lambda e:(finish(True), self._planilha_tabular(e))[1])
         entry.bind("<Escape>",lambda e:(finish(False),"break")[1])
         entry.bind("<FocusOut>",lambda e:finish(True))
 
