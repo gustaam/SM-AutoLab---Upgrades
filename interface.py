@@ -2741,7 +2741,7 @@ class App:
             highlightthickness=0,
             bd=0,
             relief="flat",
-            bg=self.CARD,
+            bg=self._cor(self.CARD),
         )
         self._historico_notificacao_badge.create_oval(
             1, 1, 6, 6,
@@ -3046,7 +3046,7 @@ class App:
             highlightthickness=0,
             bd=0,
             relief="flat",
-            bg=self.CARD,
+            bg=self._cor(self.CARD),
         )
         self._historico_compacto_notificacao_badge.create_oval(
             1, 1, 6, 6,
@@ -4847,6 +4847,14 @@ class App:
                 continue
             unicos[self._id_historico_execucao(item)] = item
         return list(unicos.values())
+
+    @staticmethod
+    def _cor(valor):
+        """Retorna uma cor única para widgets Tk que não aceitam tuplas."""
+        if isinstance(valor, (tuple, list)):
+            indice = 1 if str(ctk.get_appearance_mode()).lower() == "dark" else 0
+            return str(valor[min(indice, len(valor) - 1)])
+        return str(valor)
 
     def _reposicionar_badge_historico(self, _event=None):
         badge = getattr(self, "_historico_notificacao_badge", None)
