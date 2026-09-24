@@ -796,7 +796,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_historico_aplica_cores_dos_numeros_por_status(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _criar_pasta_historico")
-        end = source.index("def _atualizar_visual_selecao_historico", start)
+        end = source.index("def _abrir_historico_compacto", start)
         block = source[start:end]
         self.assertIn("if col == 3:       # Processados", block)
         self.assertIn("cor = self.INFO", block)
