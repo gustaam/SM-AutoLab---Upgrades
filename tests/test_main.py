@@ -1039,7 +1039,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         final_start = source.index("def _finalizar_historico_execucao")
         final_end = source.index("def _registrar_falha_historico", final_start)
         final_block = source[final_start:final_end]
-        self.assertIn("origem_reexecucao = self._execucao_atual.get("reexecucao_de")", final_block)
+        self.assertIn('origem_reexecucao = self._execucao_atual.get("reexecucao_de")', final_block)
         self.assertIn("self._remover_erros_resolvidos_por_reexecucao(", final_block)
 
     def test_atualizador_sinaliza_inicio_saudavel_e_reseta_ambiente(self):
