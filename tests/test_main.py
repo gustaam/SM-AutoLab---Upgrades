@@ -767,8 +767,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block=source[start:end]
         self.assertIn("row = ctk.CTkFrame(",block)
         self.assertIn('text=""',block)
-        self.assertIn('width=6',block)
-        self.assertIn('height=6',block)
+        self.assertIn('width=7',block)
+        self.assertIn('height=7',block)
         self.assertNotIn('text="Detalhes"',block)
 
     def test_historico_tem_oito_colunas_com_espacador_de_metricas(self):
