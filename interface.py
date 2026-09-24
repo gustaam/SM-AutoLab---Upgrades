@@ -7357,9 +7357,10 @@ class App:
         if state & 0x0004 or state & 0x0008 or state & 0x0001:
             return None
 
+        if keysym in ("BackSpace", "Delete"):
+            return None
         if not char or not char.isprintable():
-            if keysym not in ("BackSpace", "Delete"):
-                return None
+            return None
 
         try:
             row = str(active[0])
