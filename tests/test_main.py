@@ -820,7 +820,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('win.bind("<Control-Return>", self._atalho_iniciar, add="+")', plan_block)
 
         files_start = source.index("def abrir_historico_planilha")
-        files_end = source.index("def _desenhar_calendario_arquivos", files_start)
+        files_end = source.index("def _mostrar_planilhas_do_dia", files_start)
         files_block = source[files_start:files_end]
         self.assertIn('win.bind("<Control-KeyPress-f>", self._abrir_busca_arquivos, add="+")', files_block)
 
