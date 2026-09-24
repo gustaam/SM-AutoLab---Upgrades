@@ -783,7 +783,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
             source,
         )
         self.assertIn("columnspan=8", source)
-        self.assertIn('indicator.grid(row=0, column=7', source.replace(" ", ""))
+        self.assertIn('indicador.grid(row=0,column=7', source.replace(" ", ""))
 
     def test_notificacao_do_historico_e_um_ponto_redondo_e_mais_a_direita(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
