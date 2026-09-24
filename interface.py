@@ -2871,26 +2871,6 @@ class App:
 
 
 
-    def _aplicar_status_compacto(self, texto):
-        label = getattr(self, "_compact_status_label", None)
-        if label is None:
-            return
-        low = str(texto or "").lower()
-        if "process" in low and "erro" not in low:
-            base, cor = "Processando", self.INFO
-        elif "parando" in low:
-            base, cor = "Parando", self.WARNING
-        elif "erro" in low or "interromp" in low:
-            base, cor = "Atenção", self.ERROR
-        elif "finalizado" in low:
-            base, cor = "Finalizado", self.SUCCESS
-        else:
-            base, cor = "Pronto", self.SUCCESS
-        try:
-            label.configure(text=base, text_color=cor)
-        except Exception:
-            pass
-
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
@@ -9098,7 +9078,6 @@ class App:
 
     def _aplicar_status(self, texto):
         if getattr(self, "_visualizacao", "complete") == "compact":
-            self._aplicar_status_compacto(texto)
             return
         self.status_label.configure(text=texto.replace("Status:", "").strip())
         low = texto.lower()
