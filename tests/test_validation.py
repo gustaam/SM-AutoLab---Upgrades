@@ -40,8 +40,10 @@ class ConsolidatedValidationTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         workflow = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
         self.assertNotIn("gh workflow run release.yml", workflow)
-        self.assertIn("github.event_name == 'push'", workflow)
-        self.assertIn("github.ref == 'refs/heads/main'", workflow)
+        self.assertIn("  push:
+    branches:
+      - main", workflow)
+        self.assertNotIn("gh workflow run release.yml", workflow)
         release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         self.assertIn("workflow_run:", release)
         self.assertIn('- "Validate main for release"', release)
