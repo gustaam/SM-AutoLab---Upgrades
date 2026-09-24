@@ -17,7 +17,7 @@ import time
 import tkinter as tk
 import urllib.request
 from ctypes import wintypes
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
@@ -2284,7 +2284,6 @@ def _ler_versao_aplicativo():
 
 
 APP_VERSION = _ler_versao_aplicativo()
-HISTORICO_DIAS = 60
 # Histórico: Data, Hora, Processados, Executados, Erros, Status e indicador.
 # Não exibe mais o nome da planilha nem a duração na listagem.
 # Data/Hora ficam ancorados à esquerda. O grande espaçador absorve a
@@ -5354,22 +5353,6 @@ class App:
         atividade.see("end")
         atividade.configure(state="disabled")
 
-    def _filtrar_historico_execucoes_60_dias(self, execucoes):
-        """Limita apenas a exibição do histórico aos últimos 60 dias."""
-        agora = datetime.now()
-        limite = agora - timedelta(days=HISTORICO_DIAS)
-        validas = []
-        for execucao in execucoes or []:
-            if not isinstance(execucao, dict):
-                continue
-            try:
-                inicio = datetime.fromisoformat(str(execucao.get("inicio", "")))
-            except Exception:
-                continue
-            if limite <= inicio <= agora:
-                validas.append(execucao)
-        return validas
-
     def _carregar_estado_persistente(self):
         try:
             registros = []
@@ -5725,6 +5708,82 @@ class App:
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
 
+    def _remover_erros_resolvidos_por_reexecucao(self, resultado, origem_id):
+        """Retira do histórico os códigos que passaram a ser executados com sucesso."""
+        if not origem_id or not isinstance(resultado, object):
+            return
+
+        execucao_original = next(
+            (
+                item
+                for item in self._historico_execucoes
+                if self._id_historico_execucao(item) == str(origem_id)
+            ),
+            None,
+        )
+        if not isinstance(execucao_original, dict):
+            return
+
+        resolvidos = set()
+        for item in getattr(resultado, "itens", []) or []:
+            if isinstance(item, dict):
+                codigo = str(item.get("codigo") or item.get("code") or "").strip()
+                estado = str(item.get("status", "")).strip().casefold()
+            else:
+                codigo = str(getattr(item, "codigo", "")).strip()
+                estado = str(getattr(item, "status", "")).strip().casefold()
+            if codigo and estado in {"sucesso", "executado", "processado"}:
+                resolvidos.add(codigo)
+
+        if not resolvidos:
+            return
+
+        codigos_originais = self._historico_codigos_de_erro(execucao_original)
+        restantes = [codigo for codigo in codigos_originais if codigo not in resolvidos]
+
+        detalhes = execucao_original.get("erros_detalhes") or []
+        if isinstance(detalhes, list):
+            detalhes = [
+                detalhe
+                for detalhe in detalhes
+                if not isinstance(detalhe, dict)
+                or str(detalhe.get("codigo", "")).strip() not in resolvidos
+            ]
+
+        execucao_original["codigos_erros"] = restantes
+        execucao_original["erros_detalhes"] = detalhes
+        execucao_original["erros"] = max(
+            0,
+            len(restantes),
+            len(
+                [
+                    detalhe
+                    for detalhe in detalhes
+                    if isinstance(detalhe, dict)
+                    and str(detalhe.get("codigo", "")).strip()
+                ]
+            ),
+        )
+        execucao_original["codigos_erros_reexecutados"] = [
+            codigo
+            for codigo in (execucao_original.get("codigos_erros_reexecutados") or [])
+            if str(codigo).strip() not in resolvidos
+        ]
+
+        if not restantes and execucao_original.get("erros", 0) <= 0:
+            self._historico_execucoes = [
+                item
+                for item in self._historico_execucoes
+                if self._id_historico_execucao(item) != str(origem_id)
+            ]
+
+        self._erros_codigos = [
+            codigo
+            for codigo in self._erros_codigos
+            if codigo not in resolvidos
+        ]
+        self._salvar_erros_persistentes()
+
     def _finalizar_historico_execucao(self, resultado, status="Concluída"):
         if not self._execucao_atual:
             return
@@ -5815,10 +5874,15 @@ class App:
             len(detalhes_erros),
         )
 
-        # Uma reexecução pertence à execução original e não cria uma
-        # nova pasta/registro no histórico. A execução original já recebeu
-        # a marcação "codigos_erros_reexecutados" antes de ser iniciada.
-        eh_reexecucao = bool(self._execucao_atual.get("reexecucao_de"))
+        # Uma reexecução pertence à execução original. Códigos que voltaram
+        # a ser processados com sucesso deixam de aparecer no histórico de erros.
+        origem_reexecucao = self._execucao_atual.get("reexecucao_de")
+        eh_reexecucao = bool(origem_reexecucao)
+        if eh_reexecucao:
+            self._remover_erros_resolvidos_por_reexecucao(
+                resultado,
+                origem_reexecucao,
+            )
 
         # O histórico de erros nunca recebe uma execução totalmente bem-sucedida.
         # Uma execução normal só é arquivada aqui quando houve pelo menos um erro real.
@@ -8176,7 +8240,7 @@ class App:
         ).pack(anchor="w")
         ctk.CTkLabel(
             intro,
-            text="Os dias com planilhas salvas ficam destacados. O histórico de arquivos é mantido sem limite de idade.",
+            text="Os dias com planilhas salvas ficam destacados. O histórico de arquivos não possui limite de quantidade.",
             text_color=self.SUBTEXT, font=("Segoe UI", 9)
         ).pack(anchor="w", pady=(2, 0))
 
