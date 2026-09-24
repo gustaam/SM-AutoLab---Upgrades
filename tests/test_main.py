@@ -1102,6 +1102,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('indicador.bind("<Button-1>", abrir_detalhe, add="+")',block)
         self.assertIn('for child in (row, *labels)',block)
 
+    def test_badge_compacto_nao_e_reposicionado_sem_pendencia(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _reposicionar_badge_historico_compacto")
+        end = source.index("def _atualizar_badge_historico", start)
+        block = source[start:end]
+        self.assertIn("if not self._historico_tem_erros_pendentes():", block)
+        self.assertIn("badge.place_forget()", block)
+
     def test_badge_historico_indica_erros_pendentes(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _historico_tem_erros_pendentes_reexecucao",source)
