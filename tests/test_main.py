@@ -145,6 +145,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("SM_AUTOLAB_INSTALLER",block)
         self.assertIn("SM_AUTOLAB_INSTALLER_PAYLOAD",block)
         self.assertIn("CREATE_NO_WINDOW",block)
+        self.assertIn("SM_AUTOLAB_UPDATE_CLEANUP_DIR",block)
         self.assertNotIn("tasklist /FI",block)
         self.assertNotIn("taskkill /PID",block)
         self.assertNotIn("powershell",block.lower())
@@ -153,6 +154,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('if _update_installer_mode():',main_source)
         self.assertIn("Instalando a v",main_source)
         self.assertIn("Restaurando a versão anterior",main_source)
+        self.assertNotIn("cmd.exe",main_source)
+        self.assertIn("_agendar_limpeza_atualizacao",main_source)
 
     def test_atualizador_exibe_barra_de_download(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -195,8 +198,12 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _sinalizar_inicializacao_atualizacao_sucesso",source)
         self.assertIn("SM_AUTOLAB_UPDATE_EXPECTED_VERSION",source)
         self.assertIn("version=",source)
+        self.assertIn(
+            "app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)",
+            source,
+        )
         self.assertLess(
-            source.index("_sinalizar_inicializacao_atualizacao_sucesso()"),
+            source.index("app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)"),
             source.index("app.app.mainloop()"),
         )
 
