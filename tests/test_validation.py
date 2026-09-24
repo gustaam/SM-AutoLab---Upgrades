@@ -49,6 +49,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn('- "Validate main for release"', release)
         self.assertIn("github.event.workflow_run.conclusion == 'success'", release)
         self.assertIn("github.event.workflow_run.event == 'push'", release)
+        self.assertIn("github.event.workflow_run.head_sha == github.sha", release)
         self.assertIn("releases/tags/$tag", release)
         self.assertIn("id: release_state", release)
         self.assertIn("already_published != 'true'", release)
