@@ -7467,6 +7467,8 @@ class App:
             self._planilha_definir_selecao(cells, active=current)
             tree.focus(str(current[0]))
 
+        if getattr(self, "_planilha_dragging", False):
+            self._planilha_ultimo_clique = None
         self._planilha_drag_anchor = None
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
