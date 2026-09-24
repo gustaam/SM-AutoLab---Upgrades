@@ -225,9 +225,7 @@ def _sinalizar_inicializacao_atualizacao_sucesso():
             lines.append(f"version={expected}")
         lines.append(f"pid={os.getpid()}")
         destino.write_text(
-            "
-".join(lines) + "
-",
+            "\n".join(lines) + "\n",
             encoding="utf-8",
         )
     except OSError:
