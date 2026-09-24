@@ -1136,18 +1136,6 @@ def download_file(
         except OSError:
             pass
         raise RuntimeError("A verificação SHA-256 da atualização falhou.")
-def _escape_cmd_path(value: str) -> str:
-    """Escapa caracteres especiais para uso em arquivo .cmd sem expansão de variáveis."""
-    return (
-        str(value)
-        .replace("^", "^^")
-        .replace("&", "^&")
-        .replace("|", "^|")
-        .replace("<", "^<")
-        .replace(">", "^>")
-        .replace("%", "%%")
-        .replace("!", "^^!")
-    )
 
 def _sanitize_pyinstaller_environment(environ: dict[str, str] | None = None) -> dict[str, str]:
     """Remove o estado interno herdado do PyInstaller antes do reinício."""
@@ -2363,7 +2351,6 @@ class App:
         self._menu_visualizacao = None
         self._menu_visualizacao_btn = None
         self._menu_visualizacao_close_job = None
-        self._menu_close_job = None
         self._menu_reposition_job = None
         self._menu_reposition_binding = None
         self._menu_aparencia_close_job = None
@@ -2375,7 +2362,6 @@ class App:
         self._planilha_historico_window = None
         self._historico_compacto_window = None
         self._historico_notificacao_badge = None
-        self._historico_notificacao_reposition_job = None
         self._historico_compacto_notificacao_badge = None
         self._visualizacao_reinicio_dialog = None
         self._arquivos_body = None
@@ -2385,9 +2371,7 @@ class App:
         self._arquivos_calendar_widget = None
         self.arquivos_contador_label = None
         self._status_blink_job = None
-        self._status_blink_visible = True
         self._status_blink_fast = False
-        self._status_finalizado_job = None
         self._execucao_inicio_monotonic = None
         self._execucao_timer_job = None
         self._execucao_inicio_indice = 0
@@ -2416,11 +2400,7 @@ class App:
         ctk.set_default_color_theme("blue")
         self.config_app()
         self._instalar_atalhos_teclado()
-        self._sinalizar_inicio_atualizacao()
 
-    def _sinalizar_inicio_atualizacao(self):
-        """Compatibilidade: o health-check agora é sinalizado pelo bootstrap."""
-        return
 
     def _configurar_icone_janela(self, janela=None):
         """Aplica o ícone oficial do aplicativo à barra de título da janela."""
@@ -2463,8 +2443,6 @@ class App:
         except Exception:
             pass
 
-    def _estabilizar_apos_retomada(self):
-        return
 
     def _preparar_minimizacao(self, _event=None):
         if self._closing:
@@ -4023,7 +4001,6 @@ class App:
             return
         for widget in self._iterar_descendentes_ui(root):
             try:
-                widget.bind("<Enter>", self._cancelar_fechar_menus, add="+")
             except Exception:
                 pass
 
@@ -4079,9 +4056,6 @@ class App:
             except Exception:
                 pass
 
-    def _clique_fora_menus(self, _event=None):
-        if not self._pointer_em_area_dos_menus():
-            self._fechar_menus()
 
     def _monitorar_menus(self):
         self._menu_monitor_job = None
@@ -4177,7 +4151,6 @@ class App:
 
     def _mostrar_menu_configuracoes(self, _event=None):
         """Abre o menu principal de configurações sem bindings concorrentes."""
-        self._cancelar_fechar_menus()
 
         if self._menu_config is not None:
             try:
@@ -4296,14 +4269,6 @@ class App:
         self.app.update_idletasks()
         self._reposicionar_menus()
 
-    def _garantir_menu_aparencia_aberto_se_hover(self, event=None):
-        return self._mostrar_menu_aparencia(event)
-
-    def _garantir_menu_aparencia_aberto(self):
-        if self._menu_config is None or not self._menu_config.winfo_exists():
-            self._mostrar_menu_configuracoes()
-        if self._menu_aparencia is None or not self._menu_aparencia.winfo_exists():
-            self._mostrar_menu_aparencia()
 
 
     def _mostrar_menu_visualizacao(self, _event=None):
@@ -4479,19 +4444,24 @@ class App:
 
             env = _prepare_independent_restart_environment()
             flags = 0
+            startupinfo = None
             if os.name == "nt":
-                flags = (
-                    subprocess.CREATE_NEW_PROCESS_GROUP
-                    | subprocess.DETACHED_PROCESS
-                    | subprocess.CREATE_NO_WINDOW
-                )
+                flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
 
             subprocess.Popen(
                 [str(executable), *sys.argv[1:]],
                 cwd=str(executable.parent),
                 close_fds=True,
                 creationflags=flags,
+                startupinfo=startupinfo,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 env=env,
+                shell=False,
             )
         except Exception as exc:
             messagebox.showerror(
@@ -4573,25 +4543,6 @@ class App:
 
         self.app.update_idletasks()
         self._reposicionar_menus()
-    def _cancelar_fechar_menus(self, _event=None):
-        if self._menu_close_job is not None:
-            try:
-                self.app.after_cancel(self._menu_close_job)
-            except Exception:
-                pass
-            self._menu_close_job = None
-
-    def _agendar_fechar_menus(self, _event=None):
-        self._cancelar_fechar_menus()
-        try:
-            self._menu_close_job = self.app.after(180, self._fechar_menus_se_fora)
-        except Exception:
-            self._menu_close_job = None
-
-    def _fechar_menus_se_fora(self):
-        self._menu_close_job = None
-        if not self._pointer_em_area_dos_menus():
-            self._fechar_menus()
 
     def _fechar_menus(self):
         self._menu_close_job = None
@@ -8302,7 +8253,7 @@ class App:
         return datetime(agora.year, agora.month, 1)
 
     def _historico_planilhas_visiveis(self):
-        """Retorna todo o histórico válido de Arquivos, sem limite de idade."""
+        """Retorna todo o histórico válido de Arquivos, sem limite artificial de quantidade."""
         agora = datetime.now()
         visiveis = []
         for item in self._carregar_historico_planilhas():
@@ -9130,21 +9081,6 @@ class App:
         except Exception:
             self._status_blink_job = None
 
-    def _parar_pisca_status(self, manter_estado=True):
-        try:
-            job = getattr(self, "_status_blink_job", None)
-            if job is not None:
-                self.app.after_cancel(job)
-            self._status_blink_job = None
-
-            if manter_estado and getattr(self, "status_indicator", None) is not None:
-                modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
-                self.status_indicator.configure(bg=canvas_bg)
-                self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
-                self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
-        except Exception:
-            self._status_blink_job = None
 
     def _aplicar_status(self, texto):
         if getattr(self, "_visualizacao", "complete") == "compact":
@@ -9347,15 +9283,9 @@ class App:
             except Exception:
                 pass
             self._status_blink_job = None
-        if self._status_finalizado_job is not None:
-            try:self.app.after_cancel(self._status_finalizado_job)
-            except Exception:pass
-            self._status_finalizado_job=None
 
         for job_attr in (
-            "_fluent_accent_job",
             "_progress_anim_job",
-            "_micro_dashboard_complete_job",
             "_execucao_timer_job",
         ):
             job = getattr(self, job_attr, None)

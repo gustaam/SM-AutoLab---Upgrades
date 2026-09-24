@@ -58,15 +58,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("command=self._mostrar_menu_aparencia", block)
         self.assertIn("self._ativar_clique_fora_menus()", block)
         self.assertIn("def _pointer_em_area_dos_menus", source)
-        self.assertIn("def _clique_fora_menus", source)
         self.assertNotIn('self.app.bind_all("<Button-1>"', source)
-
-    def test_appearance_hover_compatibility_method_is_real(self):
-        source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _garantir_menu_aparencia_aberto_se_hover")
-        end = source.index("def _garantir_menu_aparencia_aberto(self)", start)
-        block = source[start:end]
-        self.assertIn("return self._mostrar_menu_aparencia(event)", block)
 
     def test_iniciar_footer_does_not_create_a_white_strip(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -160,7 +152,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_atualizador_exibe_barra_de_download(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def download_file(")
-        end = source.index("def _escape_cmd_path", start)
+        end = source.index("def _sanitize_pyinstaller_environment", start)
         block = source[start:end]
         self.assertIn("Content-Length", block)
         self.assertIn("progress_callback", block)
@@ -179,6 +171,16 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("health.exists()", block)
         self.assertIn("deadline = time.time() + 60.0", block)
         self.assertIn("time.sleep(1.5)", block)
+
+    def test_reinicio_da_visualizacao_usa_processo_oculto(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _reiniciar_aplicativo")
+        end = source.index("def _mostrar_menu_aparencia", start)
+        block = source[start:end]
+        self.assertIn("STARTF_USESHOWWINDOW", block)
+        self.assertIn("SW_HIDE", block)
+        self.assertIn("CREATE_NO_WINDOW", block)
+        self.assertNotIn("DETACHED_PROCESS", block)
 
     def test_atualizador_inicia_a_nova_versao_sem_console_visivel(self):
         for filename, start_marker, end_marker in (
@@ -216,7 +218,6 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def config_app", start)
         block = source[start:end]
         self.assertIn("desabilitar_transicoes_dwm(self.app)", block)
-        self.assertIn("def _estabilizar_apos_retomada", block)
         self.assertNotIn("_redraw_window_now", source)
         self.assertNotIn("WM_SETREDRAW = 0x000B", source)
 
@@ -307,7 +308,6 @@ class CanonicalRuntimeTests(unittest.TestCase):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada', source)
         self.assertIn('self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")', source)
-        self.assertIn("def _estabilizar_apos_retomada", source)
         start = source.index("def _agendar_estabilizacao_apos_retomada")
         end = source.index("def config_app", start)
         block = source[start:end]
@@ -776,7 +776,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_menus_configuracoes_trocam_ordem_aparencia_atualizacoes(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _mostrar_menu_configuracoes")
-        end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
+        end = source.index("def _mostrar_menu_visualizacao", start)
         block = source[start:end]
         self.assertLess(block.index('text="Aparência  ›"'), block.index('text="Visualização  ›"'))
         self.assertLess(block.index('text="Visualização  ›"'), block.index('text="Ajustes do Feegow"'))
@@ -1068,7 +1068,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("_filtrar_historico_execucoes_60_dias",source)
         self.assertIn("não possui limite de quantidade",source)
         self.assertIn("validos = [item for item in itens if isinstance(item, dict)]",source)
-        self.assertIn("Retorna todo o histórico válido de Arquivos, sem limite de idade.",source)
+        self.assertIn("Retorna todo o histórico válido de Arquivos, sem limite artificial de quantidade.",source)
 
     def test_reexecucao_remove_do_historico_os_codigos_resolvidos(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
@@ -1160,7 +1160,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_menus_nao_sao_criados_visiveis_em_00(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _mostrar_menu_configuracoes")
-        end = source.index("def _garantir_menu_aparencia_aberto_se_hover", start)
+        end = source.index("def _mostrar_menu_visualizacao", start)
         block = source[start:end]
         self.assertIn("menu.place_forget()", block)
         self.assertNotIn("menu.place(x=0, y=0)", block)

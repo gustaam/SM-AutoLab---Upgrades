@@ -194,20 +194,6 @@ def read_json_with_backup(path: Path, default: Any = None) -> Any:
     return default
 
 
-def restore_backup(path: Path) -> bool:
-    path = Path(path)
-    backup = backup_path(path)
-    if not backup.exists():
-        return False
-    try:
-        shutil.copy2(backup, path)
-        return True
-    except OSError:
-        return False
-
-# As configurações do portal podem ser alteradas pela interface.
-# Recarregamos antes de iniciar ou recuperar o navegador.
-
 
 def _recarregar_configuracao_runtime():
     dados = carregar_configuracoes()
