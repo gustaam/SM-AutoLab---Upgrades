@@ -789,7 +789,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('width=8,', source)
         self.assertIn('height=8,', source)
         self.assertIn('corner_radius=4,', source)
-        self.assertGreaterEqual(source.count("winfo_width() - 10"), 2)
+        self.assertIn('relx=1.0', source)
+        self.assertIn('anchor="ne"', source)
+        self.assertGreaterEqual(source.count('x=-4'), 2)
 
     def test_salvar_da_planilha_nao_fecha_a_janela(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -805,7 +807,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _planilha_atualizar_estado_salvamento")
         end = source.index("def _planilha_tem_alteracoes", start)
         block = source[start:end]
-        self.assertIn('"Salvo ✓" if self._planilha_data else "Planilha vazia"', block)
+        self.assertIn('"Salvo ✓" if tem_dados else "Planilha vazia"', block)
+        self.assertIn('tem_dados = any(', block)
 
     def test_ctrl_f_e_ctrl_s_estao_ligados_nas_janelas_certas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -817,7 +820,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('win.bind("<Control-Return>", self._atalho_iniciar, add="+")', plan_block)
 
         files_start = source.index("def abrir_historico_planilha")
-        files_end = source.index("def _mostrar_planilhas_do_dia", files_start)
+        files_end = source.index("def _desenhar_calendario_arquivos", files_start)
         files_block = source[files_start:files_end]
         self.assertIn('win.bind("<Control-KeyPress-f>", self._abrir_busca_arquivos, add="+")', files_block)
 
