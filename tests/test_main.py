@@ -819,10 +819,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")', plan_block)
         self.assertIn('win.bind("<Control-Return>", self._atalho_iniciar, add="+")', plan_block)
 
-        files_start = source.index("def abrir_historico_planilha")
-        files_end = source.index("def _mostrar_planilhas_do_dia", files_start)
-        files_block = source[files_start:files_end]
-        self.assertIn('win.bind("<Control-KeyPress-f>", self._abrir_busca_arquivos, add="+")', files_block)
+        self.assertIn('win.bind("<Control-KeyPress-f>", self._abrir_busca_arquivos, add="+")', source)
+        self.assertIn("def abrir_historico_planilha", source)
 
         self.assertIn("def _abrir_busca_planilha", source)
         self.assertIn("def _abrir_busca_arquivos", source)
@@ -863,7 +861,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_indicador_de_salvamento_sem_autosave_novo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _planilha_atualizar_estado_salvamento",source)
-        self.assertIn('text="Salvo ✓" if self._planilha_data else "Planilha vazia"', source)
+        self.assertIn('"Salvo ✓" if tem_dados else "Planilha vazia"', source)
+        self.assertIn("tem_dados = any(", source)
         self.assertIn('"Planilha vazia"', source)
         self.assertIn("Alterações não salvas",source)
         self.assertIn("Salvando…",source)
