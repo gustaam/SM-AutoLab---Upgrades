@@ -650,7 +650,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _sincronizar_estado_compacto", source)
         self.assertIn("def _aplicar_status_compacto", source)
         progress_start = source.index("def _aplicar_progresso")
-        progress_end = source.index("def _finalizar_historico_execucao", progress_start)
+        progress_end = source.index("def _falha_geral", progress_start)
         block = source[progress_start:progress_end]
         self.assertIn("self._sincronizar_estado_compacto(", block)
         self.assertIn("processados=processados", block)
