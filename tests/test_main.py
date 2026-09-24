@@ -771,10 +771,25 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('height=7',block)
         self.assertNotIn('text="Detalhes"',block)
 
+    def test_historico_usa_posicoes_fixas_de_referencia(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn(
+            "HISTORICO_COL_MINS = (139, 121, 196, 116, 114, 112, 112, 74)",
+            source,
+        )
+        self.assertIn(
+            "HISTORICO_COL_PESOS = (0, 0, 0, 0, 0, 0, 0, 0)",
+            source,
+        )
+
     def test_historico_tem_oito_colunas_com_espacador_de_metricas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn(
-            'HISTORICO_COL_PESOS = (9, 8, 3, 12, 12, 8, 13, 3)',
+            'HISTORICO_COL_PESOS = (0, 0, 0, 0, 0, 0, 0, 0)',
+            source,
+        )
+        self.assertIn(
+            'HISTORICO_COL_MINS = (139, 121, 196, 116, 114, 112, 112, 74)',
             source,
         )
         self.assertIn(

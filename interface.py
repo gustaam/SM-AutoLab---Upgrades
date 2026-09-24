@@ -2281,9 +2281,11 @@ APP_VERSION = _ler_versao_aplicativo()
 HISTORICO_DIAS = 60
 # Histórico: Data, Hora, Processados, Executados, Erros, Status e indicador.
 # Não exibe mais o nome da planilha nem a duração na listagem.
-# Espaço após Hora desloca o conjunto de métricas para a direita.
-HISTORICO_COL_PESOS = (9, 8, 3, 12, 12, 8, 13, 3)
-HISTORICO_COL_MINS = (68, 58, 26, 72, 72, 50, 84, 18)
+# Posições fixas do histórico para manter Processados, Executados, Erros
+# e Status nos mesmos eixos visuais do layout de referência.
+# A tabela foi dimensionada para a largura padrão da janela (aprox. 986 px úteis).
+HISTORICO_COL_PESOS = (0, 0, 0, 0, 0, 0, 0, 0)
+HISTORICO_COL_MINS = (139, 121, 196, 116, 114, 112, 112, 74)
 
 class App:
     INICIAR_LABEL = "Iniciar"
