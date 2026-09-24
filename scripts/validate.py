@@ -169,6 +169,8 @@ def validate_workflow_security(root: Path) -> None:
         fail("release.yml deve começar com permissões vazias por padrão")
     if "jobs:\n  release:\n    permissions:\n      contents: write" not in release:
         fail("release.yml deve conceder contents: write somente ao job de release")
+    if "github.event.workflow_run.head_sha == github.sha" not in release:
+        fail("release.yml não deve publicar a partir de uma validação obsoleta da main")
     if "RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}" not in release:
         fail("release.yml não centraliza a tag recebida em RELEASE_TAG")
     for relative in WORKFLOW_PATHS:
