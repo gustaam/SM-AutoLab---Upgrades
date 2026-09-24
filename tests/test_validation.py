@@ -52,9 +52,9 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("EXPECTED_COMMIT", release)
         self.assertIn("refs/tags/$($env:RELEASE_TAG)^{commit}", release)
         self.assertNotIn("push:\n    tags:", release)
-        self.assertIn("v3.0.0", release)
-        self.assertIn("-Method Delete", release)
-        self.assertIn("refs/tags/$oldTag", release)
+        self.assertNotIn("v3.0.0", release)
+        self.assertNotIn("-Method Delete", release)
+        self.assertNotIn("refs/tags/$oldTag", release)
 
     def test_regressoes_visuais_e_de_rolagem_estao_protegidas(self):
         root = Path(__file__).resolve().parents[1]
