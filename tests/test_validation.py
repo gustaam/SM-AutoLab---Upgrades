@@ -42,6 +42,8 @@ class ConsolidatedValidationTests(unittest.TestCase):
         workflow = (root / ".github" / "workflows" / "validate-main.yml").read_text(encoding="utf-8")
         self.assertNotIn("gh workflow run release.yml", workflow)
         self.assertIn("  push:\n    branches:\n      - main", workflow)
+        self.assertIn("group: sm-autolab-validate-main-${{ github.ref }}", workflow)
+        self.assertIn("cancel-in-progress: true", workflow)
         release = (root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         self.assertIn("workflow_run:", release)
         self.assertIn('- "Validate main for release"', release)
