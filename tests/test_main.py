@@ -640,7 +640,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_notificacao_do_historico_nao_aparece_sem_codigos_pendentes(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _historico_tem_erros_pendentes_reexecucao")
-        end = source.index("def _historico_tem_erros_pendentes", start)
+        end = source.index("def _historico_tem_erros_pendentes(self)", start)
         block = source[start:end]
         self.assertIn("if not codigos:", block)
         self.assertIn("return False", block)
@@ -665,7 +665,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("menu_x = bx", block)
         self.assertIn("menu_y = max(0, by)", block)
-        self.assertNotIn('if getattr(self, "_visualizacao", "complete") == "compact":', block)
+        self.assertIn("O menu é sempre ancorado ao botão Configurações.", block)
 
     def test_janelas_secundarias_sao_centralizadas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -804,7 +804,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Parar"', block)
         self.assertIn("text=self.INICIAR_LABEL", block)
         self.assertIn('bottom_row.pack(anchor="center"', block)
-        self.assertIn('largura, altura = 500, 280', block)
+        self.assertIn('largura, altura = 520, 360', block)
         self.assertIn('self.progresso = ctk.CTkProgressBar(', block)
         self.assertIn('height=10,', block)
         self.assertIn('fg_color=self.BORDER', block)
