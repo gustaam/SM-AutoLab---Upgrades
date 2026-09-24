@@ -2732,14 +2732,21 @@ class App:
             btn._fluent_no_focus_ring = True
             self.tab_buttons[name] = btn
 
-        # Ponto vermelho discreto, alinhado ao canto direito da aba.
-        self._historico_notificacao_badge = ctk.CTkLabel(
+        # Ponto vermelho real: Canvas + oval evita o efeito de "cilindro"
+        # do CTkLabel em dimensões muito pequenas.
+        self._historico_notificacao_badge = Canvas(
             self.tab_buttons["Histórico"],
-            text="",
-            width=6,
-            height=6,
-            corner_radius=3,
-            fg_color=self.ERROR,
+            width=7,
+            height=7,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            bg=self._cor(self.CARD),
+        )
+        self._historico_notificacao_badge.create_oval(
+            1, 1, 6, 6,
+            fill=self._cor(self.ERROR),
+            outline=self._cor(self.ERROR),
         )
         self._historico_notificacao_badge.place_forget()
         self._historico_notificacao_badge.bind(
@@ -3031,14 +3038,20 @@ class App:
         self.botao_historico_planilha = top_buttons[1]
         self.botao_historico_compacto = top_buttons[2]
 
-        # Mesmo indicador do modo normal: um ponto vermelho pequeno.
-        self._historico_compacto_notificacao_badge = ctk.CTkLabel(
+        # Mesmo ponto vermelho real no modo compacto.
+        self._historico_compacto_notificacao_badge = Canvas(
             self.botao_historico_compacto,
-            text="",
-            width=6,
-            height=6,
-            corner_radius=3,
-            fg_color=self.ERROR,
+            width=7,
+            height=7,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            bg=self._cor(self.CARD),
+        )
+        self._historico_compacto_notificacao_badge.create_oval(
+            1, 1, 6, 6,
+            fill=self._cor(self.ERROR),
+            outline=self._cor(self.ERROR),
         )
         self._historico_compacto_notificacao_badge.place_forget()
         self.botao_historico_compacto.bind(
@@ -4835,6 +4848,14 @@ class App:
             unicos[self._id_historico_execucao(item)] = item
         return list(unicos.values())
 
+    @staticmethod
+    def _cor(valor):
+        """Retorna uma cor única para widgets Tk que não aceitam tuplas."""
+        if isinstance(valor, (tuple, list)):
+            indice = 1 if str(ctk.get_appearance_mode()).lower() == "dark" else 0
+            return str(valor[min(indice, len(valor) - 1)])
+        return str(valor)
+
     def _reposicionar_badge_historico(self, _event=None):
         badge = getattr(self, "_historico_notificacao_badge", None)
         btn = getattr(self, "tab_buttons", {}).get("Histórico")
@@ -4846,8 +4867,8 @@ class App:
             badge.place(
                 relx=1.0,
                 rely=0.0,
-                x=0,
-                y=1,
+                x=-2,
+                y=2,
                 anchor="ne",
             )
             badge.lift()
@@ -4865,8 +4886,8 @@ class App:
             badge.place(
                 relx=1.0,
                 rely=0.0,
-                x=0,
-                y=1,
+                x=-2,
+                y=2,
                 anchor="ne",
             )
             badge.lift()
