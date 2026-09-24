@@ -2745,8 +2745,8 @@ class App:
         )
         self._historico_notificacao_badge.create_oval(
             1, 1, 6, 6,
-            fill=self.ERROR,
-            outline=self.ERROR,
+            fill=self._cor(self.ERROR),
+            outline=self._cor(self.ERROR),
         )
         self._historico_notificacao_badge.place_forget()
         self._historico_notificacao_badge.bind(
@@ -3050,8 +3050,8 @@ class App:
         )
         self._historico_compacto_notificacao_badge.create_oval(
             1, 1, 6, 6,
-            fill=self.ERROR,
-            outline=self.ERROR,
+            fill=self._cor(self.ERROR),
+            outline=self._cor(self.ERROR),
         )
         self._historico_compacto_notificacao_badge.place_forget()
         self.botao_historico_compacto.bind(
