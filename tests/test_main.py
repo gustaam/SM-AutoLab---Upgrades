@@ -644,17 +644,18 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("if not codigos:", block)
         self.assertIn("return False", block)
 
-    def test_modo_compacto_reflete_progresso_status_e_metricas_da_interface_completa(self):
+    def test_modo_compacto_nao_exibe_metricas_nem_codigo_atual(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("def _sincronizar_estado_compacto", source)
-        self.assertIn("def _aplicar_status_compacto", source)
-        progress_start = source.index("def _aplicar_progresso")
-        block = source[progress_start:]
-        self.assertIn("self._sincronizar_estado_compacto(", block)
-        self.assertIn("processados=processados", block)
-        self.assertIn("sucessos=sucessos", block)
-        self.assertIn("erros=erros", block)
-        self.assertIn("codigo=codigo", block)
+        start = source.index("def _configurar_dashboard_compacto")
+        end = source.index("def _abrir_historico_compacto", start)
+        block = source[start:end]
+        self.assertNotIn("_compact_processados_label", block)
+        self.assertNotIn("_compact_executados_label", block)
+        self.assertNotIn("_compact_erros_label", block)
+        self.assertNotIn("_compact_codigo_label", block)
+        self.assertNotIn("Código: —", block)
+        self.assertIn('text="Progresso"', block)
+        self.assertIn("self._compact_status_label", block)
 
     def test_menu_configuracoes_ancora_no_botao_na_visualizacao_compacta(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
