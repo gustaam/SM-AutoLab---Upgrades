@@ -1194,18 +1194,23 @@ def _schedule_replace_after_exit(
             "SM_AUTOLAB_UPDATE_CLEANUP_DIR": str(downloaded.parent),
         })
         flags = 0
+        startupinfo = None
         if os.name == "nt":
-            flags = (
-                subprocess.CREATE_NEW_PROCESS_GROUP
-                | subprocess.DETACHED_PROCESS
-                | subprocess.CREATE_NO_WINDOW
-            )
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
         subprocess.Popen(
             [str(installer)],
             cwd=str(downloaded.parent),
             close_fds=True,
             creationflags=flags,
+            startupinfo=startupinfo,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             env=env,
+            shell=False,
         )
         return True, ""
     except (OSError, shutil.Error) as exc:
