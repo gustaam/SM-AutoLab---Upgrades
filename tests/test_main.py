@@ -813,7 +813,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('height=44,', block)
         self.assertIn('top_row.pack(anchor="center")', block)
         self.assertIn('actions.pack(fill="x", padx=18, pady=(27, 10))', block)
-        self.assertIn("menu_y = 58", source)
+        self.assertIn("menu_y = max(0, by)", source)
 
     def test_atualizacao_usa_mesma_versao_da_interface(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
