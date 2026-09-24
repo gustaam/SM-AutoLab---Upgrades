@@ -409,9 +409,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
         self.assertIn("row = ctk.CTkFrame(",block)
-        self.assertIn('text=""',block)
-        self.assertIn('width=7',block)
-        self.assertIn('height=7',block)
+        self.assertIn("self._criar_ponto_notificacao(",block)
+        self.assertIn("relx=1.0",block)
+        self.assertIn("rely=0.5",block)
         self.assertNotIn('text="Detalhes"',block)
         self.assertIn('widget.bind("<Button-1>", clicar)',block)
 
@@ -766,9 +766,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
         self.assertIn("row = ctk.CTkFrame(",block)
-        self.assertIn('text=""',block)
-        self.assertIn('width=7',block)
-        self.assertIn('height=7',block)
+        self.assertIn("self._criar_ponto_notificacao(",block)
+        self.assertIn("relx=1.0",block)
+        self.assertIn("rely=0.5",block)
         self.assertNotIn('text="Detalhes"',block)
 
     def test_historico_usa_grid_responsivo(self):
@@ -799,7 +799,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
             source,
         )
         self.assertIn("columnspan=9", source)
-        self.assertIn('indicador.grid(row=0,column=7', source.replace(" ", ""))
+        self.assertIn('indicador.place(', source)
 
     def test_notificacao_do_historico_e_um_ponto_redondo_e_mais_a_direita(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -912,10 +912,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start=source.index("def _criar_pasta_historico")
         end=source.index("def _atualizar_visual_selecao_historico",start)
         block=source[start:end]
-        self.assertIn('text=""',block)
-        self.assertIn("width=7",block)
-        self.assertIn("height=7",block)
-        self.assertIn("fg_color=self.ERROR if pendente else",block)
+        self.assertIn("self._criar_ponto_notificacao(",block)
+        self.assertIn("relx=1.0",block)
+        self.assertIn("rely=0.5",block)
+        self.assertNotIn("fg_color=self.ERROR if pendente else",block)
 
     def test_arquivos_nao_tem_limite_de_idade(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
