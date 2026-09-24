@@ -37,8 +37,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _sinalizar_inicializacao_atualizacao_sucesso")
         end = source.index("def run_splash", start)
         block = source[start:end]
-        self.assertIn('"
-".join(lines)', block)
+        self.assertIn('\"\\n\".join(lines)', block)
         self.assertNotIn('"\\\\n".join(lines)', block)
 
     def test_main_build_keeps_single_bootstrap_entry(self):
@@ -239,7 +238,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("row = ctk.CTkFrame(",block)
         self.assertIn("HISTORICO_COL_PESOS",block)
         self.assertIn("HISTORICO_COL_MINS",block)
-        self.assertIn('columnspan=7',block)
+        self.assertIn('columnspan=8',block)
         self.assertIn('sticky="ew"',block)
         self.assertNotIn('text="Detalhes"',block)
 
@@ -772,6 +771,77 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('height=7',block)
         self.assertNotIn('text="Detalhes"',block)
 
+    def test_historico_tem_oito_colunas_com_espacador_de_metricas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn(
+            'HISTORICO_COL_PESOS = (9, 8, 3, 12, 12, 8, 13, 3)',
+            source,
+        )
+        self.assertIn(
+            'headers=("Data","Hora","","Processados","Executados","Erros","Status","")',
+            source,
+        )
+        self.assertIn("columnspan=8", source)
+        self.assertIn('indicador.grid(row=0,column=7', source.replace(" ", ""))
+
+    def test_notificacao_do_historico_e_um_ponto_redondo_e_mais_a_direita(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('width=8,', source)
+        self.assertIn('height=8,', source)
+        self.assertIn('corner_radius=4,', source)
+        self.assertIn('relx=1.0', source)
+        self.assertIn('anchor="ne"', source)
+        self.assertGreaterEqual(source.count('x=-4'), 2)
+
+    def test_salvar_da_planilha_nao_fecha_a_janela(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('text="Salvar",command=self._planilha_salvar', source)
+        self.assertIn("def _planilha_salvar(self):", source)
+        self.assertIn("def _planilha_salvar_e_sair(self):", source)
+        self.assertNotIn('text="Salvar e Sair"', source)
+        self.assertIn("if not self._planilha_salvar():", source)
+
+    def test_planilha_vazia_nao_fica_com_status_salvo(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('"Planilha vazia"', source)
+        start = source.index("def _planilha_atualizar_estado_salvamento")
+        end = source.index("def _planilha_tem_alteracoes", start)
+        block = source[start:end]
+        self.assertIn('"Salvo ✓" if tem_dados else "Planilha vazia"', block)
+        self.assertIn('tem_dados = any(', block)
+
+    def test_ctrl_f_e_ctrl_s_estao_ligados_nas_janelas_certas(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        plan_start = source.index("def abrir_planilha")
+        plan_end = source.index("def _planilha_atualizar_grade", plan_start)
+        plan_block = source[plan_start:plan_end]
+        self.assertIn('win.bind("<Control-KeyPress-f>", self._abrir_busca_planilha, add="+")', plan_block)
+        self.assertIn('win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")', plan_block)
+        self.assertIn('win.bind("<Control-Return>", self._atalho_iniciar, add="+")', plan_block)
+
+        self.assertIn('win.bind("<Control-KeyPress-f>", self._abrir_busca_arquivos, add="+")', source)
+        self.assertIn("def abrir_historico_planilha", source)
+
+        self.assertIn("def _abrir_busca_planilha", source)
+        self.assertIn("def _abrir_busca_arquivos", source)
+        self.assertIn("def _atalho_buscar_contexto", source)
+        self.assertNotIn("bind_all", source)
+
+    def test_atalhos_da_planilha_mantem_as_operacoes_existentes(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        for marker in (
+            "<Control-KeyPress-z>",
+            "<Control-KeyPress-y>",
+            "<Control-KeyPress-a>",
+            "<Control-KeyPress-c>",
+            "<Control-KeyPress-x>",
+            "<Control-KeyPress-v>",
+            "<Delete>",
+            "<BackSpace>",
+            "<Shift-Insert>",
+        ):
+            self.assertIn(marker, source)
+
     def test_atalhos_principais_estao_instalados_sem_bind_all(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         for marker in ("<Control-KeyPress-o>","<Control-Return>","<Escape>","<Control-KeyPress-h>"):
@@ -791,7 +861,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_indicador_de_salvamento_sem_autosave_novo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _planilha_atualizar_estado_salvamento",source)
-        self.assertIn('text="Salvo ✓"',source)
+        self.assertIn('"Salvo ✓" if tem_dados else "Planilha vazia"', source)
+        self.assertIn("tem_dados = any(", source)
+        self.assertIn('"Planilha vazia"', source)
         self.assertIn("Alterações não salvas",source)
         self.assertIn("Salvando…",source)
         self.assertIn("def _planilha_salvar_rascunho",source)
