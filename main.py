@@ -233,15 +233,35 @@ def _sinalizar_inicializacao_atualizacao_sucesso():
 
 
 def _agendar_limpeza_atualizacao():
-    """Remove a pasta temporária da atualização sem abrir CMD."""
+    """Remove a pasta temporária somente após a confirmação da nova versão."""
     caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_CLEANUP_DIR", "")).strip()
-    if not caminho:
+    health_caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_HEALTH", "")).strip()
+    if not caminho or not health_caminho:
         return
 
     diretorio = Path(caminho)
+    health = Path(health_caminho)
 
     def worker():
-        time.sleep(2.0)
+        # O health file está dentro da pasta temporária. Nunca remova a pasta
+        # antes de ele existir, pois o instalador usa esse arquivo para confirmar
+        # que a nova versão inicializou de fato.
+        deadline = time.time() + 60.0
+        while time.time() < deadline:
+            try:
+                if health.exists():
+                    break
+            except OSError:
+                pass
+            time.sleep(0.25)
+        else:
+            # Sem confirmação, deixe os arquivos disponíveis para diagnóstico
+            # ou reversão da atualização.
+            return
+
+        # Pequena margem para o processo instalador terminar de ler o marcador.
+        time.sleep(1.5)
+
         for _ in range(30):
             try:
                 shutil.rmtree(diretorio, ignore_errors=False)
@@ -337,10 +357,25 @@ def _update_installer_mode():
             env.pop(key, None)
         return env
     def launch(path, env):
-        flags=0
-        if os.name=="nt":
-            flags=subprocess.CREATE_NEW_PROCESS_GROUP|subprocess.DETACHED_PROCESS|subprocess.CREATE_NO_WINDOW
-        return subprocess.Popen([str(path)],cwd=str(path.parent),close_fds=True,creationflags=flags,env=env)
+        flags = 0
+        startupinfo = None
+        if os.name == "nt":
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        return subprocess.Popen(
+            [str(path)],
+            cwd=str(path.parent),
+            close_fds=True,
+            creationflags=flags,
+            startupinfo=startupinfo,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=env,
+            shell=False,
+        )
     def health_ok():
         try:
             lines=health.read_text(encoding="utf-8",errors="ignore").splitlines()
@@ -453,6 +488,7 @@ if __name__ == "__main__":
         startup_update_info=startup_update["info"],
         startup_update_checked=update_ready.is_set(),
     )
-    # Confirma a atualização apenas após o Tk entrar no event loop.
-    app.app.after(0, _sinalizar_inicializacao_atualizacao_sucesso)
+    # Confirma somente com o Tk já entregue ao event loop.
+    # A limpeza temporária aguarda este marcador antes de executar.
+    app.app.after_idle(_sinalizar_inicializacao_atualizacao_sucesso)
     app.app.mainloop()
