@@ -3214,10 +3214,19 @@ class App:
                 )
                 labels = []
                 for col, (valor, anchor) in enumerate(valores):
+                    if col == 3:       # Processados
+                        cor = self.INFO
+                    elif col == 4:     # Executados
+                        cor = self.SUCCESS
+                    elif col == 5:     # Erros
+                        cor = self.ERROR
+                    else:
+                        cor = self.TEXT
+
                     label = ctk.CTkLabel(
                         row,
                         text=valor,
-                        text_color=self.TEXT,
+                        text_color=cor,
                         font=("Segoe UI", 9, "normal"),
                         anchor=anchor,
                     )
@@ -6049,10 +6058,19 @@ class App:
         )
         labels = []
         for col, (valor, anchor) in enumerate(valores):
+            if col == 3:       # Processados
+                cor = self.INFO
+            elif col == 4:     # Executados
+                cor = self.SUCCESS
+            elif col == 5:     # Erros
+                cor = self.ERROR
+            else:
+                cor = self.TEXT
+
             label = ctk.CTkLabel(
                 row,
                 text=valor,
-                text_color=self.TEXT,
+                text_color=cor,
                 font=("Segoe UI", 9, "normal"),
                 anchor=anchor,
             )
