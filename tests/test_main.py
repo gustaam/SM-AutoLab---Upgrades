@@ -854,7 +854,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Parar"', block)
         self.assertIn("text=self.INICIAR_LABEL", block)
         self.assertIn('bottom_row.pack(anchor="center"', block)
-        self.assertIn('largura, altura = 520, 250', block)
+        self.assertIn('largura, altura = 520, 285', block)
         self.assertIn('self.progresso = ctk.CTkProgressBar(', block)
         self.assertIn('height=10,', block)
         self.assertIn('fg_color=self.BORDER', block)
