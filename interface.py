@@ -2874,6 +2874,7 @@ class App:
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
+        # Proporção ajustada: ligeiramente mais alta e menos larga.
         largura, altura = 500, 270
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
