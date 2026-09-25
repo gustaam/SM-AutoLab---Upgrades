@@ -1095,7 +1095,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('options.add_argument("--no-first-run")', source)
         self.assertNotIn('--start-minimized', source)
         self.assertNotIn('driver.minimize_window()', source)
-        self.assertIn('driver = webdriver.Chrome(options=options)', source)
+        self.assertIn('driver = webdriver.Chrome(service=service, options=options)', source)
         self.assertIn('Não foi possível abrir o Chrome para a automação.', source)
 
     def test_indicador_de_salvamento_sem_autosave_novo(self):
