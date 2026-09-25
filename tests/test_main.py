@@ -1111,19 +1111,16 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('texto_status.lower().startswith("selenium:")', block)
         self.assertIn('self._add_activity(mensagem, self.INFO)', block)
 
-    def test_selenium_abre_chrome_com_runtime_exatamente_anterior_ao_CFT(self):
+    def test_selenium_usa_cft_embutido_com_service_explicito(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
-        self.assertNotIn('options.browser_version = "stable"', source)
-        self.assertIn('options.add_argument("--disable-extensions")', source)
-        self.assertIn('options.add_argument("--disable-notifications")', source)
-        self.assertIn('options.add_argument("--disable-default-apps")', source)
-        self.assertIn('options.add_argument("--no-first-run")', source)
+        self.assertIn('def _bundle_cft()', source)
+        self.assertIn('def _cache_cft(root, version)', source)
+        self.assertIn('options.binary_location = str(browser_path)', source)
+        self.assertIn('Service(executable_path=str(driver_path))', source)
+        self.assertIn('driver = webdriver.Chrome(service=service, options=options)', source)
         self.assertIn('options.add_argument("--start-minimized")', source)
-        self.assertIn('driver.minimize_window()', source)
-        self.assertIn('driver = webdriver.Chrome(options=options)', source)
-        self.assertNotIn('driver = webdriver.Chrome(service=service, options=options)', source)
-        self.assertNotIn('SeleniumManager()', source)
-
+        self.assertIn('def _diagnostico_path()', source)
+        self.assertIn('selenium_runtime.log', source)
     def test_indicador_de_salvamento_sem_autosave_novo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _planilha_atualizar_estado_salvamento",source)
