@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -21,8 +20,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.selenium_manager import SeleniumManager
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, StaleElementReferenceException, ElementClickInterceptedException, NoAlertPresentException
 # O endereço pode permanecer como padrão público; credenciais nunca ficam no código.
 DEFAULT_SITE_URL = "https://franchising.feegow.com/pre-v8.1/extranet/?P=Login&Licenca=15003"
@@ -218,198 +215,28 @@ class Automacao:
     def _status(self,t):
         if self.status_callback: self.status_callback(t)
 
-    @staticmethod
-    def _selenium_cache_path():
-        if os.name == "nt":
-            raiz = os.environ.get("LOCALAPPDATA") or str(Path.home() / ".cache")
-            return Path(raiz) / "SM AutoLab" / "Selenium"
-        return Path.home() / ".cache" / "SM AutoLab" / "selenium"
-
-    @staticmethod
-    def _bundled_chrome_paths():
-        """Localiza Chrome for Testing + ChromeDriver distribuídos com o AutoLab."""
-        candidatos = []
-
-        # No build --onefile, o PyInstaller extrai os arquivos para _MEIPASS.
-        # Este é o caminho principal: o EXE funciona sem Chrome instalado e sem
-        # precisar baixar o navegador ou o driver.
-        bundle_root = getattr(sys, "_MEIPASS", None)
-        if bundle_root:
-            candidatos.append(Path(bundle_root) / "chrome_for_testing")
-
-        # Compatibilidade com a antiga distribuição portátil externa.
-        if getattr(sys, "frozen", False):
-            candidatos.append(Path(sys.executable).resolve().parent / "navegador")
-        else:
-            candidatos.append(Path(__file__).resolve().parent / "navegador")
-
-        vistos = set()
-        for root in candidatos:
-            try:
-                chave = str(root.resolve()).casefold()
-            except Exception:
-                chave = str(root).casefold()
-            if chave in vistos:
-                continue
-            vistos.add(chave)
-
-            browser = root / "chrome-win64" / "chrome.exe"
-            driver = root / "chromedriver-win64" / "chromedriver.exe"
-            if browser.is_file() and driver.is_file():
-                return browser, driver
-
-        return None, None
-
     def _criar_driver(self):
         options = webdriver.ChromeOptions()
+        # Esta é a implementação do runtime que existia antes das alterações
+        # de gerenciamento explícito do Selenium Manager e que utilizava o
+        # fluxo padrão do Selenium para Chrome/ChromeDriver.
+        options.browser_version = "stable"
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-default-apps")
         options.add_argument("--no-first-run")
         # O navegador deve permanecer visível durante os testes manuais.
-        options.add_argument("--disable-popup-blocking")
-
-        # A versão empacotada traz navegador e driver correspondentes,
-        # eliminando o download no primeiro uso.
-        bundled_browser, bundled_driver = self._bundled_chrome_paths()
-        if bundled_browser is not None and bundled_driver is not None:
-            self._status("Selenium: usando Chrome for Testing integrado. Iniciando navegador...")
-            try:
-                options.binary_location = str(bundled_browser)
-                service = Service(executable_path=str(bundled_driver))
-                driver = webdriver.Chrome(service=service, options=options)
-            except Exception as exc:
-                raise AutomacaoError(
-                    "O Chrome for Testing integrado está disponível, mas não foi possível iniciar o navegador.",
-                    "navegador",
-                ) from exc
-            driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
-            self._status("Selenium: navegador integrado iniciado.")
-            return driver
-
-        # Desenvolvimento/instalação antiga sem o bundle: Selenium Manager
-        # continua disponível como fallback.
-        options.browser_version = "stable"
-        cache_path = self._selenium_cache_path()
-        cache_path.mkdir(parents=True, exist_ok=True)
-        manager = SeleniumManager()
-
-        self._status("Selenium: verificando Chrome for Testing...")
-
-        bundle_root = getattr(sys, "_MEIPASS", None)
-        bundled_manager = (
-            Path(bundle_root)
-            / "selenium"
-            / "webdriver"
-            / "common"
-            / "windows"
-            / "selenium-manager.exe"
-            if bundle_root
-            else None
-        )
-
-        manager_binary = None
-        if bundled_manager is not None and bundled_manager.is_file():
-            manager_binary = bundled_manager
-
-        if manager_binary is None:
-            try:
-                manager_binary = manager._get_binary()
-            except Exception as exc:
-                raise AutomacaoError(
-                    "O executável do Selenium Manager não está disponível no SM AutoLab. "
-                    "A versão empacotada precisa incluir o binário selenium-manager.",
-                    "navegador",
-                ) from exc
-
-        manager_binary = Path(manager_binary)
-        if not manager_binary.is_file():
-            raise AutomacaoError(
-                f"Selenium Manager não encontrado em: {manager_binary}",
-                "navegador",
-            )
-
-        os.environ["SE_MANAGER_PATH"] = str(manager_binary)
-        comando = [
-            str(manager_binary),
-            "--browser", "chrome",
-            "--browser-version", "stable",
-            "--cache-path", str(cache_path),
-            "--avoid-stats",
-            "--output", "LOGGER",
-            "--language-binding", "python",
-        ]
-
-        linhas_log = []
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        # Não usar --headless nem minimizar a janela aqui.
         try:
-            processo = subprocess.Popen(
-                comando,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                bufsize=1,
-                creationflags=creationflags,
-            )
-            assert processo.stdout is not None
-            for linha in processo.stdout:
-                linha = linha.strip()
-                if not linha:
-                    continue
-                linhas_log.append(linha)
-                low = linha.casefold()
-                if "download" in low:
-                    self._status("Selenium: baixando Chrome for Testing...")
-                elif "unpack" in low or "extract" in low:
-                    self._status("Selenium: preparando Chrome for Testing...")
-                elif "chromedriver" in low:
-                    self._status("Selenium: preparando ChromeDriver...")
-                elif "discover" in low or "browser" in low:
-                    self._status("Selenium: localizando componentes do Chrome")
-            retorno = processo.wait()
-        except Exception as exc:
+            driver = webdriver.Chrome(options=options)
+        except WebDriverException as exc:
             raise AutomacaoError(
-                "Não foi possível executar o Selenium Manager para preparar o Chrome for Testing.",
+                "Não foi possível abrir o Chrome para a automação. "
+                "O Selenium tentou usar/baixar o Chrome for Testing. "
+                "Verifique a conexão com a internet e tente novamente.",
                 "navegador",
             ) from exc
-
-        if retorno != 0:
-            detalhes = " | ".join(linhas_log[-6:])
-            raise AutomacaoError(
-                "O Selenium Manager não conseguiu preparar o Chrome for Testing."
-                + (f" Detalhes: {detalhes}" if detalhes else ""),
-                "navegador",
-            )
-
-        self._status("Selenium: Chrome for Testing pronto. Iniciando navegador...")
-        try:
-            caminhos = manager.binary_paths([
-                "--browser", "chrome",
-                "--browser-version", "stable",
-                "--cache-path", str(cache_path),
-                "--avoid-stats",
-            ])
-            browser_path = str(caminhos.get("browser_path", "")).strip()
-            driver_path = str(caminhos.get("driver_path", "")).strip()
-            if not browser_path or not Path(browser_path).is_file():
-                raise FileNotFoundError(f"Chrome for Testing não encontrado: {browser_path}")
-            if not driver_path or not Path(driver_path).is_file():
-                raise FileNotFoundError(f"ChromeDriver não encontrado: {driver_path}")
-
-            options.binary_location = browser_path
-            service = Service(executable_path=driver_path)
-            self._status("Selenium: iniciando Chrome for Testing...")
-            driver = webdriver.Chrome(service=service, options=options)
-        except Exception as exc:
-            raise AutomacaoError(
-                "O Chrome for Testing foi preparado, mas não foi possível iniciar o navegador.",
-                "navegador",
-            ) from exc
-
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
-        self._status("Selenium: navegador iniciado.")
         return driver
 
     def iniciar_navegador(self):

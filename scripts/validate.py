@@ -219,7 +219,6 @@ def validate_architecture(root: Path) -> None:
     require_markers("app.py", app, (
         "class Resultados",
         "def carregar_codigos",
-        "def _bundled_chrome_paths",
     ))
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
 
