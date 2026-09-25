@@ -2874,7 +2874,7 @@ class App:
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
-        largura, altura = 520, 285
+        largura, altura = 520, 300
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -3017,7 +3017,8 @@ class App:
             button.pack(side="left", padx=3, pady=3)
             top_buttons.append(button)
 
-        # Grupo inferior com exatamente as mesmas dimensões do modo completo.
+        # Grupo inferior com exatamente as mesmas dimensões do modo completo:
+        # Parar 140x46 + 7 px + Iniciar 150x46 = 297x52.
         bottom_row = ctk.CTkFrame(
             actions,
             fg_color="transparent",
@@ -7429,20 +7430,22 @@ class App:
         return None
 
     def _planilha_foco_na_grade(self):
-        """Garante foco real no Toplevel e depois no Canvas da grade."""
+        """Fixa o foco imediatamente na grade, sem depender do ciclo ocioso do Tk."""
         tree = getattr(self, "_planilha_tree", None)
         canvas = getattr(tree, "_canvas", None) if tree is not None else None
         win = getattr(self, "_planilha_window", None)
         if canvas is None:
             return False
         try:
+            # O Toplevel é ativado primeiro para garantir que a janela da
+            # planilha seja a dona do teclado. Em seguida o Canvas recebe o
+            # foco real. Tudo ocorre de forma síncrona para que a primeira
+            # tecla digitada após um único clique não seja perdida.
             if win is not None:
                 win.lift()
                 win.focus_force()
             canvas.focus_force()
             canvas.focus_set()
-            if win is not None:
-                win.after_idle(canvas.focus_force)
             return True
         except tk.TclError:
             return False
@@ -7522,10 +7525,21 @@ class App:
         tree = self._planilha_tree
         if tree is None:
             return "break"
-        self._planilha_teclado_na_grade = False
+
         current = tree.identify_cell(event.x, event.y)
         if current is None:
             return "break"
+
+        # O próprio widget do clique recebe foco antes de qualquer seleção.
+        # Isso evita que o foco permaneça em outro controle da janela.
+        widget = getattr(event, "widget", None)
+        try:
+            if widget is not None:
+                widget.focus_force()
+        except Exception:
+            pass
+
+        self._planilha_teclado_na_grade = False
 
         agora = time.monotonic()
         anterior = getattr(self, "_planilha_ultimo_clique", None)
@@ -7566,13 +7580,11 @@ class App:
         self._planilha_fechar_edicao()
         tree.focus(str(current[0]))
         self._planilha_foco_na_grade()
-        try:
-            # O clique deve continuar a propagação normal do Tk para que o
-            # Toplevel e o Canvas possam consolidar o foco após a seleção.
-            self.app.after_idle(self._planilha_foco_na_grade)
-        except Exception:
-            pass
-        return None
+
+        # Interrompe o binding padrão do Canvas. A seleção e o foco já foram
+        # resolvidos acima; deixar o binding de classe continuar pode transferir
+        # o foco para outro widget e fazer a primeira tecla ser perdida.
+        return "break"
 
 
     def _planilha_arrastar_selecao(self, event):
@@ -7624,6 +7636,9 @@ class App:
         self._planilha_drag_anchor = None
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
+        if getattr(self, "_planilha_edit_entry", None) is None:
+            self._planilha_teclado_na_grade = True
+            self._planilha_foco_na_grade()
         return "break"
 
 
