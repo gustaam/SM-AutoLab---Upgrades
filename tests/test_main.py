@@ -755,6 +755,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_fluxo_de_retomada_usa_os_codigos_do_arquivo_salvo(self):
         app = App.__new__(App)
+        app.app = object()
         app._closing = False
         app._retomada_dialogo_aberto = False
         app._execucao_atual = {
