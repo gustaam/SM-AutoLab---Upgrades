@@ -69,7 +69,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("Selenium Manager não encontrado no ambiente de build", release)
         self.assertIn("Preparar Chrome for Testing integrado", release)
         self.assertIn("scripts/prepare_chrome_for_testing.py", release)
-        self.assertIn('build_resources\\\\chrome_for_testing;chrome_for_testing', release)
+        self.assertIn('build_resources\\chrome_for_testing;chrome_for_testing', release)
         self.assertIn("Chrome for Testing não foi encontrado no bundle do executável", release)
         interface = (root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("def _vincular_enter_confirmacao", interface)
