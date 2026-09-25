@@ -7377,6 +7377,89 @@ class App:
         return rectangle_selection(inicio, fim)
 
 
+    def _planilha_clique_janela(self, event=None):
+        """Marca a grade como alvo de teclado quando o clique ocorreu nela."""
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        if canvas is None or event is None:
+            return None
+        try:
+            alvo = self.app.winfo_containing(event.x_root, event.y_root)
+            dentro = self._planilha_widget_na_grade(alvo)
+        except (tk.TclError, AttributeError):
+            dentro = False
+
+        self._planilha_teclado_na_grade = bool(dentro)
+        if dentro:
+            try:
+                self.app.after(0, self._planilha_foco_na_grade)
+            except Exception:
+                self._planilha_foco_na_grade()
+        return None
+
+    def _planilha_widget_na_grade(self, widget):
+        """Retorna True quando o widget está dentro do Canvas da grade."""
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        if canvas is None or widget is None:
+            return False
+        try:
+            if widget is canvas:
+                return True
+            return str(widget).startswith(str(canvas) + ".")
+        except Exception:
+            return False
+
+    def _planilha_foco_entrou_na_grade(self, event=None):
+        """Sincroniza o estado de teclado com o foco real do Tk."""
+        widget = getattr(event, "widget", None)
+        self._planilha_teclado_na_grade = self._planilha_widget_na_grade(widget)
+        return None
+
+    def _planilha_reafirmar_foco_grade(self):
+        """Reafirma o foco após o clique sem roubar foco de outro controle."""
+        if getattr(self, "_planilha_edit_entry", None) is not None:
+            return
+        if not getattr(self, "_planilha_teclado_na_grade", False):
+            return
+        self._planilha_foco_na_grade()
+
+    def _planilha_foco_na_grade(self):
+        """Fixa o foco do teclado no Canvas da grade."""
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        win = getattr(self, "_planilha_window", None)
+        if canvas is None:
+            return False
+        try:
+            if win is not None:
+                win.lift()
+                win.focus_force()
+            canvas.focus_force()
+            canvas.focus_set()
+            return True
+        except tk.TclError:
+            return False
+
+    def _planilha_teclar_janela(self, event=None):
+        """Captura teclado no Toplevel quando o Canvas não recebeu o evento."""
+        if getattr(self, "_planilha_edit_entry", None) is not None:
+            return None
+        if not getattr(self, "_planilha_teclado_na_grade", False):
+            return None
+        keysym = str(getattr(event, "keysym", "") or "")
+        if keysym in ("Return", "KP_Enter"):
+            return self._planilha_editar_selecao(event)
+        return self._planilha_teclar_celula(event)
+
+    def _planilha_tabular_janela(self, event=None):
+        """Executa TAB estilo Excel quando a grade está selecionada."""
+        if getattr(self, "_planilha_edit_entry", None) is not None:
+            return None
+        if not getattr(self, "_planilha_teclado_na_grade", False):
+            return None
+        return self._planilha_tabular(event)
+
     def _planilha_teclar_celula(self, event):
         """Inicia a edição da célula ativa quando o usuário digita após um clique."""
         if getattr(self, "_planilha_edit_entry", None) is not None:
@@ -7386,18 +7469,20 @@ class App:
         if not active:
             return None
 
-        char = getattr(event, "char", "") or ""
-        keysym = str(getattr(event, "keysym", "") or "")
-
-        # Ctrl e Alt indicam atalhos: deixam o comando seguir para seus
-        # bindings específicos. Shift, por outro lado, faz parte da digitação
-        # normal (por exemplo, letras maiúsculas e símbolos) e deve ser aceito.
         state = int(getattr(event, "state", 0) or 0)
         if state & 0x0004 or state & 0x0008:
             return None
 
-        if keysym in ("BackSpace", "Delete"):
+        keysym = str(getattr(event, "keysym", "") or "")
+        if keysym in (
+            "Return", "KP_Enter", "Tab", "Left", "Right", "Up", "Down",
+            "Home", "End", "Prior", "Next", "Escape", "BackSpace", "Delete",
+        ):
             return None
+
+        char = getattr(event, "char", "") or ""
+        if not char and len(keysym) == 1 and keysym.isprintable():
+            char = keysym
         if not char or not char.isprintable():
             return None
 
@@ -7462,10 +7547,16 @@ class App:
 
         self._planilha_drag_anchor = current
         self._planilha_drag_start_xy = (event.x, event.y)
+        # Um clique apenas seleciona. A próxima tecla inicia a edição.
         self._planilha_dragging = False
+        self._planilha_teclado_na_grade = True
         self._planilha_fechar_edicao()
         tree.focus(str(current[0]))
-        tree.focus_set()
+        self._planilha_foco_na_grade()
+        try:
+            self.app.after(0, self._planilha_reafirmar_foco_grade)
+        except Exception:
+            pass
         return "break"
 
 
@@ -7518,6 +7609,9 @@ class App:
         self._planilha_drag_anchor = None
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
+        if getattr(self, "_planilha_edit_entry", None) is None:
+            self._planilha_teclado_na_grade = True
+            self._planilha_foco_na_grade()
         return "break"
 
 
@@ -7533,7 +7627,8 @@ class App:
         row, col_index = current
         self._planilha_definir_selecao({current}, active=current)
         tree.focus(str(row))
-        tree.focus_set()
+        self._planilha_teclado_na_grade = True
+        self._planilha_foco_na_grade()
         self._planilha_editar_iid(str(row), col_index)
         return "break"
 
@@ -7971,6 +8066,12 @@ class App:
                 pass
             self._planilha_edit_entry=None
         self._planilha_edit_context=None
+        try:
+            if win is not None:
+                win.unbind_class(PLANILHA_KEY_BINDTAG, "<KeyPress>")
+                win.unbind_class(PLANILHA_KEY_BINDTAG, "<KeyRelease>")
+        except (AttributeError, tk.TclError):
+            pass
         if self._planilha_context_menu is not None:
             try:
                 self._planilha_context_menu.destroy()
