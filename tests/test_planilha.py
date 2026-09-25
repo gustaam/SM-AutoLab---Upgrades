@@ -257,8 +257,10 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         self.assertIn('canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', source)
         self.assertIn('canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")', source)
+        self.assertIn('win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")', source)
         self.assertIn('win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")', source)
         self.assertIn('win.bind("<Tab>", self._planilha_tabular_janela, add="+")', source)
+        self.assertIn("win.focus_force()", source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
 
     def test_duplo_clique_manual_edita_a_mesma_celula(self):
@@ -277,7 +279,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         app._planilha_duplo_clique_celula = lambda _event: calls.append(True)
 
         event = SimpleNamespace(x=10, y=10, state=0)
-        self.assertEqual(App._planilha_clicar_celula(app, event), "break")
+        self.assertIsNone(App._planilha_clicar_celula(app, event))
         self.assertEqual(App._planilha_clicar_celula(app, event), "break")
         self.assertEqual(calls, [True])
 
