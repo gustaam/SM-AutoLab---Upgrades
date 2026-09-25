@@ -6914,6 +6914,8 @@ class App:
         win.protocol("WM_DELETE_WINDOW", self._planilha_fechar_pela_janela)
         win.bind("<Control-KeyPress-f>", self._abrir_busca_planilha, add="+")
         win.bind("<Control-KeyPress-F>", self._abrir_busca_planilha, add="+")
+        win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")
+        win.bind("<Tab>", self._planilha_tabular_janela, add="+")
         win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-KeyPress-S>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-Return>", self._atalho_iniciar, add="+")
@@ -7092,9 +7094,7 @@ class App:
         tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
         tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
         tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
-        tree.bind("<KeyPress>", self._planilha_teclar_celula, add="+")
         tree.bind("<Return>", self._planilha_editar_selecao)
-        tree.bind("<Tab>", self._planilha_tabular)
         tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
         tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
         tree.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")
@@ -7340,6 +7340,51 @@ class App:
         return rectangle_selection(inicio, fim)
 
 
+    def _planilha_foco_na_grade(self):
+        """Garante que o Canvas virtual receba o teclado após um clique."""
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        if canvas is None:
+            return False
+        try:
+            canvas.focus_force()
+            canvas.focus_set()
+            return True
+        except tk.TclError:
+            return False
+
+    def _planilha_teclar_janela(self, event=None):
+        """Captura digitação no nível da janela sem interferir em outros controles."""
+        if getattr(self, "_planilha_edit_entry", None) is not None:
+            return None
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        win = getattr(self, "_planilha_window", None)
+        if canvas is None or win is None:
+            return None
+        try:
+            if win.focus_get() is not canvas:
+                return None
+        except tk.TclError:
+            return None
+        return self._planilha_teclar_celula(event)
+
+    def _planilha_tabular_janela(self, event=None):
+        """Executa o TAB estilo Excel quando a grade está com foco."""
+        if getattr(self, "_planilha_edit_entry", None) is not None:
+            return None
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        win = getattr(self, "_planilha_window", None)
+        if canvas is None or win is None:
+            return None
+        try:
+            if win.focus_get() is not canvas:
+                return None
+        except tk.TclError:
+            return None
+        return self._planilha_tabular(event)
+
     def _planilha_teclar_celula(self, event):
         """Inicia a edição da célula ativa quando o usuário digita após um clique."""
         if getattr(self, "_planilha_edit_entry", None) is not None:
@@ -7426,7 +7471,7 @@ class App:
         self._planilha_dragging = False
         self._planilha_fechar_edicao()
         tree.focus(str(current[0]))
-        tree.focus_set()
+        self._planilha_foco_na_grade()
         return "break"
 
 
@@ -7494,7 +7539,7 @@ class App:
         row, col_index = current
         self._planilha_definir_selecao({current}, active=current)
         tree.focus(str(row))
-        tree.focus_set()
+        self._planilha_foco_na_grade()
         self._planilha_editar_iid(str(row), col_index)
         return "break"
 
@@ -7552,7 +7597,7 @@ class App:
         current = (next_row, next_col)
         self._planilha_definir_selecao({current}, active=current)
         tree.focus(str(next_row))
-        tree.focus_set()
+        self._planilha_foco_na_grade()
         tree.see(str(next_row))
         self._planilha_desenhar_borda()
         return "break"
