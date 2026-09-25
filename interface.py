@@ -9135,6 +9135,10 @@ class App:
         if self._closing:
             return
         self.app.after(0, lambda: self._aplicar_status(texto))
+        texto_status = str(texto or "").strip()
+        if texto_status.lower().startswith("selenium:"):
+            mensagem = texto_status.split(":", 1)[1].strip()
+            self.app.after(0, lambda: self._add_activity(mensagem, self.INFO))
 
     def _iniciar_pisca_status(self, rapido=None):
         if rapido is not None:
@@ -9229,8 +9233,76 @@ class App:
             self._status_blink_job = None
 
     def _aplicar_status(self, texto):
+        low = str(texto or "").lower()
         if getattr(self, "_visualizacao", "complete") == "compact":
+            if self.status_text is None or self.status_pill is None:
+                return
+
+            if "baixando chrome" in low:
+                display = "Baixando Chrome"
+                cor_texto = self.INFO
+                cor_pill = ("#E5F1FB", "#183B54")
+                cor_borda = ("#B7D7EF", "#2C5E7A")
+                self._status_blink_fast = True
+            elif "verificando chrome" in low or "localizando componentes" in low:
+                display = "Verificando Chrome"
+                cor_texto = self.INFO
+                cor_pill = ("#E5F1FB", "#183B54")
+                cor_borda = ("#B7D7EF", "#2C5E7A")
+                self._status_blink_fast = True
+            elif "preparando chrome" in low or "preparando chromedriver" in low:
+                display = "Preparando Chrome"
+                cor_texto = self.INFO
+                cor_pill = ("#E5F1FB", "#183B54")
+                cor_borda = ("#B7D7EF", "#2C5E7A")
+                self._status_blink_fast = True
+            elif "iniciando chrome" in low or "navegador iniciado" in low:
+                display = "Iniciando"
+                cor_texto = self.INFO
+                cor_pill = ("#E5F1FB", "#183B54")
+                cor_borda = ("#B7D7EF", "#2C5E7A")
+                self._status_blink_fast = True
+            elif "erro" in low or "atenção" in low or "não foi possível" in low:
+                display = "Atenção"
+                cor_texto = self.ERROR
+                cor_pill = ("#FDE7E9", "#4B2529")
+                cor_borda = ("#F1A6AA", "#7A3D42")
+                self._status_blink_fast = True
+            elif "process" in low or "em andamento" in low:
+                display = "Processando"
+                cor_texto = self.INFO
+                cor_pill = ("#E5F1FB", "#183B54")
+                cor_borda = ("#B7D7EF", "#2C5E7A")
+                self._status_blink_fast = True
+            elif "finalizado" in low or "conclu" in low:
+                display = "Concluído"
+                cor_texto = self.SUCCESS
+                cor_pill = ("#E7F5E7", "#21482A")
+                cor_borda = ("#C5E4C8", "#37653E")
+                self._status_blink_fast = False
+            else:
+                display = "Pronto"
+                cor_texto = self.SUCCESS
+                cor_pill = ("#E7F5E7", "#21482A")
+                cor_borda = ("#C5E4C8", "#37653E")
+                self._status_blink_fast = False
+
+            self._status_text_base = display
+            self.status_pill.configure(
+                fg_color=cor_pill,
+                border_color=cor_borda,
+            )
+            self.status_text.configure(
+                text=display,
+                text_color=cor_texto,
+                font=("Segoe UI", 13, "bold"),
+            )
+            modo = ctk.get_appearance_mode().lower()
+            canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
+            self.status_indicator.configure(bg=canvas_bg)
+            self._iniciar_pisca_status()
             return
+
         self.status_label.configure(text=texto.replace("Status:", "").strip())
         low = texto.lower()
 
