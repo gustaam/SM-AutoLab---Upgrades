@@ -212,6 +212,35 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertGreaterEqual(canvas.focus_calls, 2)
         self.assertGreaterEqual(win.focus_calls, 1)
 
+    def test_tecla_com_keysym_sem_char_tambem_inicia_edicao(self):
+        app = self._app()
+        app._planilha_celula_ativa = ("0", 1)
+
+        class Entry:
+            def __init__(self):
+                self.value = "antigo"
+            def delete(self, *_args):
+                self.value = ""
+            def insert(self, _index, value):
+                self.value += value
+
+        entry = Entry()
+        app._planilha_editar_iid = lambda _row, _col: setattr(
+            app, "_planilha_edit_entry", entry
+        )
+
+        event = SimpleNamespace(char="", keysym="x", state=0)
+        self.assertEqual(App._planilha_teclar_celula(app, event), "break")
+        self.assertEqual(entry.value, "x")
+
+    def test_foco_da_grade_e_sincronizado_com_focusin_e_reentrada(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")', source)
+        self.assertIn("def _planilha_widget_na_grade", source)
+        self.assertIn("def _planilha_foco_entrou_na_grade", source)
+        self.assertIn("def _planilha_reafirmar_foco_grade", source)
+        self.assertIn("self.app.after(0, self._planilha_reafirmar_foco_grade)", source)
+
     def test_um_clique_e_digito_iniciam_edicao_da_celula_ativa(self):
         app = self._app()
         app._planilha_celula_ativa = ("0", 1)
@@ -311,6 +340,8 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertIn('win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")', source)
         self.assertIn('win.bind("<Tab>", self._planilha_tabular_janela, add="+")', source)
         self.assertIn("win.focus_force()", source)
+        self.assertIn('win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")', source)
+        self.assertIn("if not char and len(keysym) == 1 and keysym.isprintable():", source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
 
     def test_duplo_clique_manual_edita_a_mesma_celula(self):
