@@ -7091,8 +7091,6 @@ class App:
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
         self._planilha_ultimo_clique = None
-        # A grade virtual continua recebendo mouse diretamente pelo Tree API.
-        # Não há interceptação adicional de teclado para digitação por um clique.
         tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
         tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
         tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
