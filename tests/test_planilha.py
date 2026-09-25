@@ -225,7 +225,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
     def test_planilha_instala_tecla_de_edicao_apos_clique(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)', source)
-        self.assertIn('tree.bind("<KeyPress>", self._planilha_teclar_celula, add="+")', source)
+        self.assertIn('win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")', source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
 
     def test_duplo_clique_manual_edita_a_mesma_celula(self):
