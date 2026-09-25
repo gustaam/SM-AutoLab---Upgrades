@@ -2874,7 +2874,7 @@ class App:
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
-        largura, altura = 520, 240
+        largura, altura = 520, 250
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -3024,8 +3024,8 @@ class App:
             bottom_row,
             text="Parar",
             command=self.parar,
-            width=115,
-            height=38,
+            width=140,
+            height=46,
             corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#FDECEC", "#3A2424"),
@@ -3041,8 +3041,8 @@ class App:
             bottom_row,
             text=self.INICIAR_LABEL,
             command=self.iniciar_thread,
-            width=115,
-            height=38,
+            width=150,
+            height=46,
             corner_radius=8,
             fg_color=self.ACCENT,
             hover_color=self.ACCENT_HOVER,
@@ -3434,6 +3434,47 @@ class App:
                 self.app.after(250, lambda data=info: self._mostrar_resultado_atualizacao(data))
             return
         self.app.after(700, self._verificar_atualizacao_automatica)
+
+    def _vincular_enter_confirmacao(self, janela, comando, widget_padrao=None):
+        """Faz ENTER e ENTER numérico executarem a ação positiva da janela."""
+        if janela is None or not callable(comando):
+            return
+
+        def confirmar(_event=None):
+            if widget_padrao is not None:
+                try:
+                    if str(widget_padrao.cget("state")) == "disabled":
+                        return "break"
+                except Exception:
+                    pass
+            try:
+                comando()
+            except Exception:
+                LOGGER.debug(
+                    "Falha ao executar a confirmação via ENTER.",
+                    exc_info=True,
+                )
+            return "break"
+
+        # Instala o binding no Toplevel e nos descendentes para não depender
+        # de qual botão ou Entry está atualmente com foco.
+        for widget in self._iterar_descendentes_ui(janela):
+            try:
+                widget.bind("<Return>", confirmar, add="+")
+                widget.bind("<KP_Enter>", confirmar, add="+")
+            except Exception:
+                pass
+        try:
+            janela.bind("<Return>", confirmar, add="+")
+            janela.bind("<KP_Enter>", confirmar, add="+")
+        except Exception:
+            pass
+
+        if widget_padrao is not None:
+            try:
+                widget_padrao.focus_set()
+            except Exception:
+                pass
 
     def _instalar_atalhos_teclado(self):
         try:
@@ -4370,7 +4411,7 @@ class App:
             font=("Segoe UI", 11, "bold"),
         ).pack(side="right")
 
-        ctk.CTkButton(
+        reiniciar_btn = ctk.CTkButton(
             actions,
             text="Reiniciar",
             command=reiniciar,
@@ -4381,8 +4422,10 @@ class App:
             hover_color=self.ACCENT_HOVER,
             text_color="#FFFFFF",
             font=("Segoe UI", 11, "bold"),
-        ).pack(side="right", padx=(0, 8))
+        )
+        reiniciar_btn.pack(side="right", padx=(0, 8))
 
+        self._vincular_enter_confirmacao(dialog, reiniciar, reiniciar_btn)
         _ui_scan_tooltips(dialog)
 
     def _reiniciar_aplicativo(self):
@@ -4811,6 +4854,7 @@ class App:
         )
         salvar_btn.pack(side="left")
         atualizar_estado_salvar()
+        self._vincular_enter_confirmacao(popup, salvar, salvar_btn)
         _ui_scan_tooltips(popup)
 
     def _historico_codigos_de_erro(self, execucao):
@@ -6914,9 +6958,6 @@ class App:
         win.protocol("WM_DELETE_WINDOW", self._planilha_fechar_pela_janela)
         win.bind("<Control-KeyPress-f>", self._abrir_busca_planilha, add="+")
         win.bind("<Control-KeyPress-F>", self._abrir_busca_planilha, add="+")
-        win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")
-        win.bind("<Tab>", self._planilha_tabular_janela, add="+")
-        win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")
         win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-KeyPress-S>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-Return>", self._atalho_iniciar, add="+")
@@ -7086,6 +7127,7 @@ class App:
         row_header.bind("<Button-1>", _clicar_cabecalho)
 
         tree.focus("")
+        canvas = tree._canvas
         # Etapa 13: virtualização real; não há inserção gradual de 10.000 itens.
         self._planilha_celulas_selecionadas = set()
         self._planilha_drag_anchor = None
@@ -7093,27 +7135,36 @@ class App:
         self._planilha_dragging = False
         self._planilha_ultimo_clique = None
         self._planilha_teclado_na_grade = False
-        tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
-        tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
-        tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
-        tree.bind("<Return>", self._planilha_editar_selecao)
-        tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
-        tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
-        tree.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")
-        tree.bind("<Control-KeyPress-c>", self._planilha_atalho_copiar, add="+")
-        tree.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")
-        tree.bind("<Delete>", self._planilha_atalho_excluir, add="+")
-        tree.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")
-        tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")
-        tree.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")
-        tree.bind("<<Paste>>", self._planilha_atalho_colar, add="+")
+
+        # O Frame da grade contém o Canvas que realmente recebe os eventos.
+        # Os bindings funcionais ficam diretamente no Canvas para que um único
+        # clique selecione a célula e o próximo caractere já inicie a edição.
+        canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")
+        canvas.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")
+        canvas.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")
+        canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")
+        canvas.bind("<Return>", self._planilha_editar_selecao, add="+")
+        canvas.bind("<KP_Enter>", self._planilha_editar_selecao, add="+")
+        canvas.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
+        canvas.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
+        canvas.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")
+        canvas.bind("<Control-KeyPress-c>", self._planilha_atalho_copiar, add="+")
+        canvas.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")
+        canvas.bind("<Delete>", self._planilha_atalho_excluir, add="+")
+        canvas.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")
+        canvas.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")
+        canvas.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")
+        canvas.bind("<<Paste>>", self._planilha_atalho_colar, add="+")
+        canvas.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
+
         def _planilha_botao_direito(event):
             current = tree.identify_cell(event.x, event.y)
             if current is not None:
                 row, col = current
                 self._planilha_definir_selecao({current}, active=current)
                 tree.focus(str(row))
-                tree.focus_set()
+                self._planilha_teclado_na_grade = True
+                self._planilha_foco_na_grade()
             try:
                 self._planilha_fechar_edicao()
                 self._atualizar_menu_contexto_planilha()
@@ -7126,9 +7177,8 @@ class App:
                 except Exception:
                     pass
             return "break"
-        tree.bind("<Button-3>", _planilha_botao_direito)
-        tree._canvas.bind("<Button-3>", _planilha_botao_direito, add="+")
-        tree.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
+
+        canvas.bind("<Button-3>", _planilha_botao_direito, add="+")
         self._planilha_tree=tree
         self._planilha_row_header=row_header
         self._planilha_context_menu = self._criar_menu_contexto_planilha(tree)
@@ -7452,6 +7502,7 @@ class App:
         tree = self._planilha_tree
         if tree is None:
             return "break"
+        self._planilha_teclado_na_grade = False
         current = tree.identify_cell(event.x, event.y)
         if current is None:
             return "break"
@@ -9265,7 +9316,13 @@ class App:
             if self.status_text is None or self.status_pill is None:
                 return
 
-            if "baixando chrome" in low:
+            if "chrome for testing integrado" in low:
+                display = "Chrome integrado"
+                cor_texto = self.INFO
+                cor_pill = ("#E5F1FB", "#183B54")
+                cor_borda = ("#B7D7EF", "#2C5E7A")
+                self._status_blink_fast = True
+            elif "baixando chrome" in low:
                 display = "Baixando Chrome"
                 cor_texto = self.INFO
                 cor_pill = ("#E5F1FB", "#183B54")
