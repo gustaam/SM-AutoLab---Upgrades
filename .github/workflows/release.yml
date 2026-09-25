@@ -297,14 +297,23 @@ jobs:
           if (-not (Test-Path $seleniumManager)) {
             throw "Selenium Manager não encontrado no ambiente de build: $seleniumManager"
           }
+          $hook = "hooks\hook-selenium.webdriver.common.selenium_manager.py"
+          if (-not (Test-Path $hook)) {
+            throw "Hook do Selenium Manager não encontrado: $hook"
+          }
+          $hookManager = (python -c "from pathlib import Path; from PyInstaller.utils.hooks import get_package_dir; print(Path(get_package_dir('selenium')) / 'webdriver' / 'common' / 'windows' / 'selenium-manager.exe')").Trim()
+          if ($hookManager -ne $seleniumManager) {
+            throw "O hook aponta para Selenium Manager diferente do pacote: $hookManager"
+          }
           "SELENIUM_MANAGER_PATH=$seleniumManager" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Selenium Manager: $seleniumManager"
+          Write-Host "Hook PyInstaller: $hook"
 
       - name: Build SM AutoLab
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --add-binary "$env:SELENIUM_MANAGER_PATH;selenium\webdriver\common\windows" --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
       - name: Validar Selenium Manager dentro do executável
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
@@ -312,12 +321,20 @@ jobs:
         run: |
           $exe = "dist\SM AutoLab.exe"
           if (-not (Test-Path $exe)) { throw "Executável não encontrado para inspeção do Selenium Manager." }
-          $archive = & pyi-archive_viewer --brief --recursive $exe
-          if ($LASTEXITCODE -ne 0) { throw "Não foi possível inspecionar o executável com pyi-archive_viewer." }
+          $archive = & pyi-archive_viewer --brief --recursive $exe 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { throw ("Não foi possível inspecionar o executável com pyi-archive_viewer." + [Environment]::NewLine + $archive) }
+          Write-Host "=== Conteúdo do bundle ==="
+          Write-Host $archive
           if ($archive -notmatch "selenium-manager\.exe") {
             throw "Selenium Manager não foi encontrado no bundle do executável."
           }
           Write-Host "Selenium Manager encontrado no bundle PyInstaller."
+          $archiveEntries = @($archive -split "\r?\n" | Where-Object { $_ -match "selenium-manager(\.exe)?|selenium\\webdriver\\common\\windows" })
+          if ($archiveEntries.Count -eq 0) {
+            throw "A inspeção do CArchive não encontrou nenhuma entrada do Selenium Manager."
+          }
+          Write-Host "=== Entradas do Selenium Manager ==="
+          $archiveEntries | ForEach-Object { Write-Host $_ }
 
       - name: Validar estrutura e metadados do executável
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
