@@ -406,7 +406,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         for label in ("Editar", "Desfazer", "Refazer", "Cortar", "Copiar", "Colar", "Excluir", "Selecionar tudo"):
             self.assertIn(f'label="{label}"', block)
-        self.assertIn('tree.bind("<Button-3>", _planilha_botao_direito)', source)
+        self.assertIn('canvas.bind("<Button-3>", _planilha_botao_direito, add="+")', source)
         self.assertIn("self._planilha_context_menu.tk_popup(event.x_root, event.y_root)", source)
 
     def test_ajustes_do_feegow_e_janela_normal_por_padrao(self):
@@ -552,8 +552,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_planilha_botao_direito_esta_ligado_ao_canvas_interno(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('tree.bind("<Button-3>", _planilha_botao_direito)', source)
-        self.assertIn('tree._canvas.bind("<Button-3>", _planilha_botao_direito, add="+")', source)
+        self.assertIn('canvas.bind("<Button-3>", _planilha_botao_direito, add="+")', source)
+        self.assertIn("canvas = tree._canvas", source)
         self.assertIn("def _criar_menu_contexto_planilha", source)
         for label in ("Editar", "Copiar", "Colar", "Excluir", "Selecionar tudo"):
             self.assertIn(f'label="{label}"', source[source.index("def _criar_menu_contexto_planilha"):])
