@@ -162,6 +162,56 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertIn("def _planilha_foco_na_grade", source)
         self.assertIn('win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")', source)
 
+    def test_clique_unico_fixa_foco_no_canvas_antes_da_primeira_tecla(self):
+        app = self._app()
+
+        class FakeCanvas:
+            def __init__(self):
+                self.focus_calls = 0
+            def focus_force(self):
+                self.focus_calls += 1
+            def focus_set(self):
+                self.focus_calls += 1
+
+        class FakeWindow:
+            def __init__(self):
+                self.lift_calls = 0
+                self.focus_calls = 0
+            def lift(self):
+                self.lift_calls += 1
+            def focus_force(self):
+                self.focus_calls += 1
+
+        class MouseTree:
+            def __init__(self, canvas):
+                self._canvas = canvas
+                self.focused = None
+            def identify_cell(self, _x, _y):
+                return (0, 1)
+            def focus(self, iid=None):
+                if iid is not None:
+                    self.focused = str(iid)
+
+        canvas = FakeCanvas()
+        win = FakeWindow()
+        app._planilha_tree = MouseTree(canvas)
+        app._planilha_window = win
+        event = SimpleNamespace(
+            x=10,
+            y=10,
+            x_root=10,
+            y_root=10,
+            state=0,
+            widget=canvas,
+        )
+
+        self.assertEqual(App._planilha_clicar_celula(app, event), "break")
+        self.assertTrue(app._planilha_teclado_na_grade)
+        self.assertEqual(app._planilha_celula_ativa, ("0", 1))
+        self.assertEqual(app._planilha_tree.focused, "0")
+        self.assertGreaterEqual(canvas.focus_calls, 2)
+        self.assertGreaterEqual(win.focus_calls, 1)
+
     def test_um_clique_e_digito_iniciam_edicao_da_celula_ativa(self):
         app = self._app()
         app._planilha_celula_ativa = ("0", 1)
@@ -279,7 +329,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         app._planilha_duplo_clique_celula = lambda _event: calls.append(True)
 
         event = SimpleNamespace(x=10, y=10, state=0)
-        self.assertIsNone(App._planilha_clicar_celula(app, event))
+        self.assertEqual(App._planilha_clicar_celula(app, event), "break")
         self.assertEqual(App._planilha_clicar_celula(app, event), "break")
         self.assertEqual(calls, [True])
 
