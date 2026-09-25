@@ -2,6 +2,9 @@
 
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from interface import App
 
 
 class CanonicalRuntimeTests(unittest.TestCase):
@@ -749,6 +752,51 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _restaurar_historico_na_tela", start)
         fail_block = source[start:end]
         self.assertIn('if not self._execucao_atual.get("reexecucao_de"):', fail_block)
+
+    def test_fluxo_de_retomada_usa_os_codigos_do_arquivo_salvo(self):
+        app = App.__new__(App)
+        app._closing = False
+        app._retomada_dialogo_aberto = False
+        app._execucao_atual = {
+            "status": "Interrompida — ponto salvo",
+            "planilha": "",
+            "pagina": 0,
+            "checkpoint": 2,
+            "origem": "planilha_interna",
+            "planilha_fingerprint": "",
+        }
+        app._planilha_data = {}
+        app._planilha_salva_data = {}
+        app._planilha_efetuou_alteracao = False
+
+        salvo = {
+            "0,0": "1",
+            "0,1": "AAA",
+            "0,2": "Item A",
+            "1,0": "1",
+            "1,1": "BBB",
+            "1,2": "Item B",
+            "2,0": "1",
+            "2,1": "CCC",
+        }
+        app._carregar_planilha_interna = lambda: dict(salvo)
+        app._carregar_historico_planilhas = lambda: []
+        app._salvar_estado_persistente = lambda: None
+        app._add_activity = lambda *_args, **_kwargs: None
+
+        chamada = {}
+        app._iniciar_automacao_interna = lambda codigos, **kwargs: chamada.update(
+            codigos=list(codigos), kwargs=dict(kwargs)
+        )
+
+        with patch("interface.messagebox.askyesno", return_value=True):
+            App._verificar_retomada_pendente(app)
+
+        self.assertEqual(chamada["codigos"], ["AAA", "BBB", "CCC"])
+        self.assertEqual(chamada["kwargs"]["inicio_forcado"], 2)
+        self.assertTrue(chamada["kwargs"]["ignorar_checkpoint"])
+        self.assertEqual(app._planilha_data, salvo)
+        self.assertEqual(app._planilha_salva_data, salvo)
 
     def test_retomada_planilha_carrega_dados_salvos_antes_de_iniciar(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
