@@ -112,7 +112,7 @@ echo Chrome for Testing integrado: OK
 echo.
 
 echo Gerando SM AutoLab v!APP_VERSION!...
-%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." --add-data "build_resources\chrome_for_testing;chrome_for_testing" main.py
+%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 if errorlevel 1 goto :erro
 
 if not exist "dist\SM AutoLab.exe" (
@@ -120,12 +120,38 @@ if not exist "dist\SM AutoLab.exe" (
     goto :erro
 )
 
+echo.
+echo Copiando navegador externo para dist\\navegador...
+if exist "dist\navegador" rmdir /s /q "dist\navegador"
+robocopy "build_resources\chrome_for_testing" "dist\navegador" /E /NFL /NDL /NJH /NJS /NP >nul
+if errorlevel 8 (
+    echo ERRO: falha ao copiar o navegador para a distribuicao.
+    goto :erro
+)
+if not exist "dist\navegador\chrome-win64\chrome.exe" goto :erro
+if not exist "dist\navegador\chromedriver-win64\chromedriver.exe" goto :erro
+if not exist "dist\navegador\version.txt" goto :erro
+
+%PYTHON% -c "from pathlib import Path; import sys; expected=Path('CHROME_FOR_TESTING_VERSION').read_text(encoding='utf-8').strip(); actual=Path(r'dist\\navegador\\version.txt').read_text(encoding='utf-8').strip(); raise SystemExit(0 if actual == expected else 1)"
+if errorlevel 1 (
+    echo ERRO: a versao do navegador distribuido nao corresponde ao lock.
+    goto :erro
+)
+echo Navegador externo preparado: dist\navegador
+
 %PYTHON% scripts\validate.py executable "dist\SM AutoLab.exe"
 if errorlevel 1 goto :erro
 
 echo.
+echo Criando pacote distribuivel...
+powershell -NoProfile -Command "$v=(Get-Content VERSION -Raw).Trim(); $dest=Join-Path 'dist' ('SM AutoLab Windows.zip'); if(Test-Path $dest){Remove-Item $dest -Force}; Compress-Archive -Path 'dist\SM AutoLab.exe','dist\navegador' -DestinationPath $dest -CompressionLevel Optimal"
+if errorlevel 1 goto :erro
+if not exist "dist\SM AutoLab Windows.zip" goto :erro
+
+echo.
 echo BUILD CONCLUIDO:
 echo dist\SM AutoLab.exe
+echo dist\SM AutoLab Windows.zip
 echo.
 pause
 exit /b 0
