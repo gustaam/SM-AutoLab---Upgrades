@@ -368,7 +368,9 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertIn('win.bind("<Tab>", self._planilha_tabular_janela, add="+")', source)
         self.assertIn("win.focus_force()", source)
         self.assertIn('win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")', source)
-        self.assertIn("if not char and len(keysym) == 1 and keysym.isprintable():", source)
+        self.assertIn("def _planilha_caractere_do_evento", source)
+        self.assertIn('"semicolon": ";"', source)
+        self.assertIn('"<KeyRelease>"', source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
 
     def test_duplo_clique_manual_edita_a_mesma_celula(self):
