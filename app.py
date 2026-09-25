@@ -20,6 +20,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException, StaleElementReferenceException, ElementClickInterceptedException, NoAlertPresentException
 # O endereço pode permanecer como padrão público; credenciais nunca ficam no código.
 DEFAULT_SITE_URL = "https://franchising.feegow.com/pre-v8.1/extranet/?P=Login&Licenca=15003"
@@ -215,25 +216,164 @@ class Automacao:
     def _status(self,t):
         if self.status_callback: self.status_callback(t)
 
+    @staticmethod
+    def _diagnostico_path():
+        return Path.home() / "SM AutoLab" / "selenium_runtime.log"
+
+    def _registrar_diagnostico(self, mensagem):
+        """Registra diagnóstico técnico sem credenciais nem códigos."""
+        try:
+            caminho = self._diagnostico_path()
+            caminho.parent.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with caminho.open("a", encoding="utf-8") as handle:
+                handle.write(f"[{stamp}] {mensagem}\n")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _bundle_cft():
+        bundle_root = getattr(sys, "_MEIPASS", None)
+        if not bundle_root:
+            return None
+
+        root = Path(bundle_root) / "chrome_for_testing"
+        browser = root / "chrome-win64" / "chrome.exe"
+        driver = root / "chromedriver-win64" / "chromedriver.exe"
+        version_file = root / "version.txt"
+
+        if not browser.is_file() or not driver.is_file():
+            return None
+
+        try:
+            version = version_file.read_text(encoding="utf-8").strip() or "unknown"
+        except OSError:
+            version = "unknown"
+
+        return root, browser, driver, version
+
+    @staticmethod
+    def _cache_cft(root, version):
+        """Copia o navegador embutido para uma pasta estável antes de executá-lo."""
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "SM AutoLab" / "ChromeForTesting"
+        destination = base / version
+
+        browser = destination / "chrome-win64" / "chrome.exe"
+        driver = destination / "chromedriver-win64" / "chromedriver.exe"
+        if browser.is_file() and driver.is_file():
+            return destination, browser, driver
+
+        base.mkdir(parents=True, exist_ok=True)
+        temporary = base / f".{version}.tmp-{os.getpid()}"
+        if temporary.exists():
+            shutil.rmtree(temporary, ignore_errors=True)
+
+        shutil.copytree(root, temporary)
+        if destination.exists():
+            shutil.rmtree(destination, ignore_errors=True)
+        temporary.replace(destination)
+
+        if not browser.is_file() or not driver.is_file():
+            raise FileNotFoundError(
+                f"Chrome for Testing copiado de forma incompleta para {destination}"
+            )
+        return destination, browser, driver
+
     def _criar_driver(self):
         options = webdriver.ChromeOptions()
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-default-apps")
         options.add_argument("--no-first-run")
-        # Runtime exatamente anterior à introdução do Chrome for Testing/
-        # Selenium Manager explícito: deixa o Selenium selecionar o Chrome
-        # instalado na máquina e mantém a janela minimizada como antes.
+        options.add_argument("--disable-popup-blocking")
         options.add_argument("--start-minimized")
-        driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+
         try:
-            driver.minimize_window()
-        except WebDriverException:
-            # --start-minimized já cobre o Chromium quando a API não estiver
-            # disponível no ambiente.
-            pass
-        return driver
+            import selenium
+            selenium_version = selenium.__version__
+        except Exception:
+            selenium_version = "desconhecido"
+
+        self._registrar_diagnostico(
+            "Início do driver; "
+            f"frozen={getattr(sys, 'frozen', False)}; "
+            f"meipass={getattr(sys, '_MEIPASS', '')}; "
+            f"selenium={selenium_version}"
+        )
+
+        bundle = self._bundle_cft()
+        if bundle is not None:
+            root, bundled_browser, bundled_driver, version = bundle
+            self._registrar_diagnostico(
+                f"CFT embutido detectado: versão={version}; root={root}; "
+                f"browser={bundled_browser}; driver={bundled_driver}"
+            )
+            self._status("Selenium: preparando navegador integrado...")
+            try:
+                cache_root, browser_path, driver_path = self._cache_cft(root, version)
+                self._registrar_diagnostico(
+                    f"CFT preparado em cache estável: root={cache_root}; "
+                    f"browser={browser_path}; driver={driver_path}"
+                )
+                options.binary_location = str(browser_path)
+                service = Service(executable_path=str(driver_path))
+                driver = webdriver.Chrome(service=service, options=options)
+                driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+                capabilities = getattr(driver, "capabilities", {}) or {}
+                chrome_caps = capabilities.get("chrome", {}) or {}
+                self._registrar_diagnostico(
+                    "Driver iniciado com CFT integrado: "
+                    f"browserVersion={capabilities.get('browserVersion', '')}; "
+                    f"driverVersion={chrome_caps.get('chromedriverVersion', '')}; "
+                    f"current_url={getattr(driver, 'current_url', '')}"
+                )
+                self._status("Selenium: navegador integrado iniciado.")
+                try:
+                    driver.minimize_window()
+                except WebDriverException:
+                    pass
+                return driver
+            except Exception as exc:
+                self._registrar_diagnostico(
+                    f"Falha ao iniciar CFT integrado: {type(exc).__name__}: {exc!r}"
+                )
+                raise AutomacaoError(
+                    "Não foi possível iniciar o Chrome for Testing integrado. "
+                    f"Detalhes técnicos foram registrados em {self._diagnostico_path()}. "
+                    f"Erro: {exc}",
+                    "navegador",
+                ) from exc
+
+        self._registrar_diagnostico(
+            "CFT embutido não disponível; usando webdriver.Chrome() com Selenium Manager."
+        )
+        self._status("Selenium: abrindo navegador...")
+        try:
+            driver = webdriver.Chrome(options=options)
+            driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+            capabilities = getattr(driver, "capabilities", {}) or {}
+            chrome_caps = capabilities.get("chrome", {}) or {}
+            self._registrar_diagnostico(
+                "Driver iniciado via Selenium Manager: "
+                f"browserVersion={capabilities.get('browserVersion', '')}; "
+                f"driverVersion={chrome_caps.get('chromedriverVersion', '')}; "
+                f"current_url={getattr(driver, 'current_url', '')}"
+            )
+            try:
+                driver.minimize_window()
+            except WebDriverException:
+                pass
+            return driver
+        except Exception as exc:
+            self._registrar_diagnostico(
+                f"Falha no webdriver.Chrome(): {type(exc).__name__}: {exc!r}"
+            )
+            raise AutomacaoError(
+                "Não foi possível iniciar o navegador da automação. "
+                f"Detalhes técnicos foram registrados em {self._diagnostico_path()}. "
+                f"Erro: {exc}",
+                "navegador",
+            ) from exc
 
     def iniciar_navegador(self):
         dados = _recarregar_configuracao_runtime()
@@ -243,25 +383,73 @@ class Automacao:
             raise AutomacaoError(mensagem, "configuracao")
         self._status("Abrindo o Feegow...")
         self.driver=self._criar_driver()
-        self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao()
+        try:
+            self.driver.get(SITE_URL)
+            self._registrar_diagnostico(
+                f"Feegow carregado: url={self.driver.current_url}; title={self.driver.title!r}"
+            )
+        except Exception as exc:
+            self._registrar_diagnostico(
+                f"Falha ao carregar Feegow: {type(exc).__name__}: {exc!r}; "
+                f"url={getattr(self.driver, 'current_url', '')}"
+            )
+            raise
+        self._fazer_login()
+        self._abrir_autorizacao()
+
     def _fazer_login(self):
         try:
             self._status("Entrando no portal...")
             u=WebDriverWait(self.driver,LOGIN_TIMEOUT,poll_frequency=.2).until(EC.visibility_of_element_located((By.XPATH,LOGIN_USER_XPATH)))
             p=WebDriverWait(self.driver,LOGIN_TIMEOUT,poll_frequency=.2).until(EC.visibility_of_element_located((By.XPATH,LOGIN_PASSWORD_XPATH)))
+            self._registrar_diagnostico("Campos de login encontrados.")
             u.clear(); u.send_keys(PORTAL_USUARIO); p.clear(); p.send_keys(PORTAL_SENHA)
             WebDriverWait(self.driver,LOGIN_TIMEOUT,poll_frequency=.2).until(EC.element_to_be_clickable((By.XPATH,LOGIN_BUTTON_XPATH))).click()
+            self._registrar_diagnostico(
+                f"Botão de login acionado; url={self.driver.current_url}; title={self.driver.title!r}"
+            )
             WebDriverWait(self.driver,PAGE_LOAD_TIMEOUT,poll_frequency=.2).until(EC.presence_of_element_located((By.XPATH,PAGE_LINK_XPATH)))
-        except TimeoutException as e: raise AutomacaoError("Falha no login: tempo excedido.","login") from e
-        except WebDriverException as e: raise AutomacaoError("Falha no navegador durante o login.","navegador") from e
-        except Exception as e: raise AutomacaoError(f"Falha no login: {e}","login") from e
+            self._registrar_diagnostico(
+                f"Login concluído; link de autorização encontrado; url={self.driver.current_url}"
+            )
+        except TimeoutException as e:
+            self._registrar_diagnostico(
+                f"Timeout no login; url={getattr(self.driver, 'current_url', '')}; title={getattr(self.driver, 'title', '')!r}"
+            )
+            raise AutomacaoError("Falha no login: tempo excedido.","login") from e
+        except WebDriverException as e:
+            self._registrar_diagnostico(
+                f"WebDriverError no login: {type(e).__name__}: {e!r}"
+            )
+            raise AutomacaoError("Falha no navegador durante o login.","navegador") from e
+        except Exception as e:
+            self._registrar_diagnostico(
+                f"Erro geral no login: {type(e).__name__}: {e!r}"
+            )
+            raise AutomacaoError(f"Falha no login: {e}","login") from e
+
     def _abrir_autorizacao(self):
         try:
             self._status("Abrindo Autorizar Procedimento...")
             WebDriverWait(self.driver,PAGE_LOAD_TIMEOUT,poll_frequency=.2).until(EC.element_to_be_clickable((By.XPATH,PAGE_LINK_XPATH))).click()
+            self._registrar_diagnostico(
+                f"Link de autorização acionado; url={self.driver.current_url}; title={self.driver.title!r}"
+            )
             WebDriverWait(self.driver,PAGE_LOAD_TIMEOUT,poll_frequency=.2).until(EC.presence_of_element_located((By.XPATH,CODE_INPUT_XPATH)))
-        except TimeoutException as e: raise AutomacaoError("Não foi possível abrir Autorizar Procedimento.","autorizacao") from e
-        except WebDriverException as e: raise AutomacaoError("O navegador apresentou um problema ao abrir Autorizar Procedimento.","navegador") from e
+            self._registrar_diagnostico(
+                f"Campo de código encontrado; url={self.driver.current_url}"
+            )
+        except TimeoutException as e:
+            self._registrar_diagnostico(
+                f"Timeout ao abrir Autorizar Procedimento; url={getattr(self.driver, 'current_url', '')}; title={getattr(self.driver, 'title', '')!r}"
+            )
+            raise AutomacaoError("Não foi possível abrir Autorizar Procedimento.","autorizacao") from e
+        except WebDriverException as e:
+            self._registrar_diagnostico(
+                f"WebDriverError ao abrir autorização: {type(e).__name__}: {e!r}"
+            )
+            raise AutomacaoError("O navegador apresentou um problema ao abrir Autorizar Procedimento.","navegador") from e
+
     def executar_codigo(self,codigo):
         try:
             self._executar_codigo_uma_vez(codigo)
@@ -270,6 +458,7 @@ class Automacao:
             recuperado=self.recuperar_apos_erro(tipo)
             msg=str(e)
             raise AutomacaoError(msg,tipo,recuperado) from e
+
     def _executar_codigo_uma_vez(self,codigo):
         try:
             campo=WebDriverWait(self.driver,ELEMENT_TIMEOUT,poll_frequency=.15).until(EC.element_to_be_clickable((By.XPATH,CODE_INPUT_XPATH)))
@@ -281,8 +470,10 @@ class Automacao:
         except (StaleElementReferenceException,NoSuchElementException) as e: raise AutomacaoError("O elemento da tela mudou ou desapareceu.","elemento") from e
         except ElementClickInterceptedException as e: raise AutomacaoError("O site bloqueou o clique do próximo elemento.","elemento") from e
         except WebDriverException as e: raise AutomacaoError("O navegador perdeu a comunicação com a página.","navegador") from e
+
     def _classificar_erro(self,e):
         return e.tipo if isinstance(e,AutomacaoError) else ("navegador" if isinstance(e,WebDriverException) else "erro_site")
+
     def recuperar_apos_erro(self,tipo):
         if self.driver is None or not self._navegador_vivo(): return self._reiniciar_navegador()
         try:
@@ -291,9 +482,11 @@ class Automacao:
             WebDriverWait(self.driver,RECOVERY_TIMEOUT,poll_frequency=.15).until(EC.presence_of_element_located((By.XPATH,CODE_INPUT_XPATH)))
             return True
         except Exception: return self._reiniciar_navegador()
+
     def _navegador_vivo(self):
         try: _=self.driver.current_url; return True
         except Exception: return False
+
     def _reiniciar_navegador(self):
         dados = _recarregar_configuracao_runtime()
         if not dados["PORTAL_USUARIO"] or not dados["PORTAL_SENHA"]:
@@ -301,6 +494,7 @@ class Automacao:
         self._status("Recuperando o navegador e entrando novamente...")
         self.fechar()
         self.driver=self._criar_driver(); self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao(); self._status("Navegador recuperado. Continuando..."); return True
+
     def tentar_fechar_alerta(self):
         if self.driver is None:
             return False
@@ -320,6 +514,7 @@ class Automacao:
             return True
         except (TimeoutException, NoAlertPresentException, WebDriverException):
             return False
+
     def fechar(self):
         if self.driver:
             try: self.driver.quit()
