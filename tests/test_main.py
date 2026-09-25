@@ -1111,6 +1111,13 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('texto_status.lower().startswith("selenium:")', block)
         self.assertIn('self._add_activity(mensagem, self.INFO)', block)
 
+    def test_inicio_automacao_registra_diagnostico_e_trata_falha_sincrona(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _registrar_diagnostico_automacao", source)
+        self.assertIn("Clique em Iniciar recebido.", source)
+        self.assertIn("Falha síncrona antes do worker Selenium.", source)
+        self.assertIn("A automação não chegou a iniciar o Selenium.", source)
+
     def test_selenium_usa_cft_embutido_com_service_explicito(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
         self.assertIn('def _bundle_cft()', source)
