@@ -1066,6 +1066,26 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _instalar_atalhos_teclado",source)
         self.assertNotIn("bind_all",source)
 
+    def test_status_do_selenium_e_exibido_no_modo_compacto(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _aplicar_status")
+        end=source.index("def atualizar_progresso", start)
+        block=source[start:end]
+        self.assertIn('if getattr(self, "_visualizacao", "complete") == "compact":', block)
+        self.assertIn('if "baixando chrome" in low:', block)
+        self.assertIn('display = "Baixando Chrome"', block)
+        self.assertIn('display = "Preparando Chrome"', block)
+        self.assertIn('display = "Iniciando"', block)
+        self.assertIn('self.status_text.configure(', block)
+
+    def test_selenium_status_registra_etapas_na_atividade(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def atualizar_status")
+        end=source.index("def atualizar_progresso", start)
+        block=source[start:end]
+        self.assertIn('texto_status.lower().startswith("selenium:")', block)
+        self.assertIn('self._add_activity(mensagem, self.INFO)', block)
+
     def test_selenium_abre_chrome_for_testing_visivel(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
         self.assertIn('options.browser_version = "stable"', source)
