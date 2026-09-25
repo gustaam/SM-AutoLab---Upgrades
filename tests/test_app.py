@@ -98,6 +98,18 @@ class SeleniumWindowBehaviorTests(unittest.TestCase):
         self.assertIn("Chrome for Testing pronto", source)
         self.assertIn("baixando Chrome for Testing", source)
 
+    def test_selenium_manager_exibe_progresso_e_usa_cache_por_usuario(self):
+        source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"--cache-path", str(cache_path)', source)
+        self.assertIn('"--avoid-stats"', source)
+        self.assertIn('"--output", "LOGGER"', source)
+        self.assertIn('subprocess.Popen(', source)
+        self.assertIn('stdout=subprocess.PIPE', source)
+        self.assertIn('stderr=subprocess.STDOUT', source)
+        self.assertIn('if "download" in low:', source)
+        self.assertIn('self._status("Selenium: baixando Chrome for Testing...")', source)
     def test_driver_e_executa_com_chrome_for_testing_visivel(self):
         source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
             encoding="utf-8"
