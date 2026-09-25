@@ -6553,6 +6553,11 @@ class App:
             )
             if codigos_reexecutaveis:
                 reexecutar_btn.pack(side="right", padx=(6, 0))
+                self._vincular_enter_confirmacao(
+                    parent,
+                    reexecutar_erros,
+                    reexecutar_btn,
+                )
 
             selecionados = set()
             botoes = {}
