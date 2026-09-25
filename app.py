@@ -227,15 +227,36 @@ class Automacao:
 
     @staticmethod
     def _bundled_chrome_paths():
-        """Retorna Chrome for Testing + ChromeDriver embutidos no executável."""
+        """Localiza o Chrome for Testing externo e, como legado, o bundle interno."""
+        candidatos = []
+
+        # Distribuição recomendada: o navegador fica ao lado do executável.
+        if getattr(sys, "frozen", False):
+            candidatos.append(Path(sys.executable).resolve().parent / "navegador")
+        else:
+            candidatos.append(Path(__file__).resolve().parent / "navegador")
+
+        # Compatibilidade com builds antigos que ainda embutiam o navegador
+        # dentro do CArchive do PyInstaller.
         bundle_root = getattr(sys, "_MEIPASS", None)
-        if not bundle_root:
-            return None, None
-        root = Path(bundle_root) / "chrome_for_testing"
-        browser = root / "chrome-win64" / "chrome.exe"
-        driver = root / "chromedriver-win64" / "chromedriver.exe"
-        if browser.is_file() and driver.is_file():
-            return browser, driver
+        if bundle_root:
+            candidatos.append(Path(bundle_root) / "chrome_for_testing")
+
+        vistos = set()
+        for root in candidatos:
+            try:
+                chave = str(root.resolve()).casefold()
+            except Exception:
+                chave = str(root).casefold()
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+
+            browser = root / "chrome-win64" / "chrome.exe"
+            driver = root / "chromedriver-win64" / "chromedriver.exe"
+            if browser.is_file() and driver.is_file():
+                return browser, driver
+
         return None, None
 
     def _criar_driver(self):
