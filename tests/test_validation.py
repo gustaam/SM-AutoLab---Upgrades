@@ -84,7 +84,11 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn('text="Reiniciar"', interface)
         self.assertIn("self._vincular_enter_confirmacao(dialog, reiniciar, reiniciar_btn)", interface)
         self.assertIn("self._vincular_enter_confirmacao(popup, salvar, salvar_btn)", interface)
-        self.assertIn("self._vincular_enter_confirmacao(parent, reexecutar_erros, reexecutar_btn)", interface)
+        interface_sem_espacos = "".join(interface.split())
+        self.assertIn(
+            "".join("self._vincular_enter_confirmacao(parent, reexecutar_erros, reexecutar_btn,".split()),
+            interface_sem_espacos,
+        )
         self.assertIn("largura, altura = 520, 300", interface)
         self.assertIn("width=140", interface)
         self.assertIn("width=150", interface)
