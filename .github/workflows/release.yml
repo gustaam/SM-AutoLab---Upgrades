@@ -320,9 +320,9 @@ jobs:
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." --add-data "build_resources\chrome_for_testing;chrome_for_testing" main.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
-      - name: Validar Selenium Manager dentro do executável
+      - name: Validar Selenium Manager e navegador externo
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
@@ -336,20 +336,23 @@ jobs:
             throw "Selenium Manager não foi encontrado no bundle do executável."
           }
           Write-Host "Selenium Manager encontrado no bundle PyInstaller."
-          if ($archive -notmatch "(?i)chrome_for_testing.*chrome-win64.*chrome\.exe") {
-            throw "Chrome for Testing não foi encontrado no bundle do executável."
+          if ($archive -match "(?i)chrome_for_testing.*chrome-win64.*chrome\.exe") {
+            throw "Chrome for Testing ainda está embutido no executável; ele deve ser distribuído na pasta navegador."
           }
-          if ($archive -notmatch "(?i)chrome_for_testing.*chromedriver-win64.*chromedriver\.exe") {
-            throw "ChromeDriver integrado não foi encontrado no bundle do executável."
-          }
-          Write-Host "Chrome for Testing e ChromeDriver encontrados no bundle PyInstaller."
-          $archiveEntries = @($archive -split "\r?\n" | Where-Object { $_ -match "selenium-manager(\.exe)?|selenium\\webdriver\\common\\windows" })
-          if ($archiveEntries.Count -eq 0) {
-            throw "A inspeção do CArchive não encontrou nenhuma entrada do Selenium Manager."
-          }
-          Write-Host "=== Entradas do Selenium Manager ==="
-          $archiveEntries | ForEach-Object { Write-Host $_ }
 
+          $browser = "dist\navegador\chrome-win64\chrome.exe"
+          $driver = "dist\navegador\chromedriver-win64\chromedriver.exe"
+          $versionFile = "dist\navegador\version.txt"
+          if (-not (Test-Path $browser)) { throw "Chrome for Testing não foi encontrado em dist\navegador." }
+          if (-not (Test-Path $driver)) { throw "ChromeDriver não foi encontrado em dist\navegador." }
+          if (-not (Test-Path $versionFile)) { throw "version.txt do Chrome for Testing não foi encontrado." }
+
+          $locked = (Get-Content "CHROME_FOR_TESTING_VERSION" -Raw).Trim()
+          $bundled = (Get-Content $versionFile -Raw).Trim()
+          if ($locked -and $bundled -ne $locked) {
+            throw "A versão do navegador distribuído ($bundled) não corresponde à versão fixada ($locked)."
+          }
+          Write-Host "Navegador externo validado: $bundled"
       - name: Validar estrutura e metadados do executável
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: pwsh
@@ -377,13 +380,33 @@ jobs:
         shell: pwsh
         run: |
           $main = "dist\SM AutoLab.exe"
+          $package = "dist\SM AutoLab Windows.zip"
           if (-not (Test-Path $main)) { throw "Executável principal não foi gerado." }
           if ((Get-Item $main).Length -lt 1000000) { throw "Executável principal suspeitamente pequeno." }
+          if (-not (Test-Path "dist\navegador\chrome-win64\chrome.exe")) { throw "Chrome for Testing externo não foi preparado." }
+          if (-not (Test-Path "dist\navegador\chromedriver-win64\chromedriver.exe")) { throw "ChromeDriver externo não foi preparado." }
           $version = (Get-Content VERSION -Raw).Trim()
           $tag = $env:RELEASE_TAG
           $mainSha256 = (Get-FileHash -Algorithm SHA256 $main).Hash.ToLower()
-          $manifest = @{ channel = "SM-AUTOLAB-RESET-2026-09"; version = $version; tag = $tag; commit = $env:EXPECTED_COMMIT; main_asset = "SM AutoLab.exe"; main_sha256 = $mainSha256 } | ConvertTo-Json -Compress
+          $cftVersion = (Get-Content "dist\navegador\version.txt" -Raw).Trim()
+          $manifest = @{ channel = "SM-AUTOLAB-RESET-2026-09"; version = $version; tag = $tag; commit = $env:EXPECTED_COMMIT; main_asset = "SM AutoLab.exe"; main_sha256 = $mainSha256; package_asset = "SM AutoLab Windows.zip"; package_sha256 = ""; chrome_for_testing_version = $cftVersion } | ConvertTo-Json -Compress
           Set-Content -Path "SM AutoLab Release Manifest.json" -Value $manifest -Encoding UTF8
+
+      - name: Criar pacote Windows com navegador externo
+        if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
+        shell: pwsh
+        run: |
+          $package = "dist\SM AutoLab Windows.zip"
+          if (Test-Path $package) { Remove-Item $package -Force }
+          Compress-Archive -Path "dist\SM AutoLab.exe","dist\navegador" -DestinationPath $package -CompressionLevel Optimal
+          if (-not (Test-Path $package)) { throw "Pacote Windows não foi criado." }
+          $packageSha256 = (Get-FileHash -Algorithm SHA256 $package).Hash.ToLower()
+          $manifestPath = "SM AutoLab Release Manifest.json"
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $manifest.package_sha256 = $packageSha256
+          $manifest | ConvertTo-Json -Compress | Set-Content -Path $manifestPath -Encoding UTF8
+          Write-Host "Pacote Windows criado: $package"
+          Write-Host "SHA-256 do pacote: $packageSha256"
 
       - name: Anexar arquivos à GitHub Release
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
@@ -394,6 +417,7 @@ jobs:
           overwrite_files: true
           files: |
             dist/SM AutoLab.exe
+            dist/SM AutoLab Windows.zip
             SM AutoLab Release Manifest.json
 
       - name: Verificar artefatos efetivamente publicados
@@ -426,5 +450,14 @@ jobs:
           if ([string]$publishedManifest.commit -ne [string]$commit) { throw "Commit do manifesto não corresponde à tag publicada." }
           if ((Normalize-AssetName([string]$publishedManifest.main_asset)) -ne (Normalize-AssetName([string]$exe.name))) { throw "Nome do executável no manifesto diverge do asset publicado." }
           if ([string]$publishedManifest.main_sha256 -ne [string]$assetDigest) { throw "SHA-256 do manifesto diverge do SHA-256 do asset publicado." }
+
+          $packageAsset = $assets | Where-Object { (Normalize-AssetName $_.name) -eq (Normalize-AssetName 'SM AutoLab Windows.zip') } | Select-Object -First 1
+          if (-not $packageAsset) { throw "Pacote Windows com navegador externo não encontrado na release publicada." }
+          $packageDigest = [string]$packageAsset.digest
+          if ($packageDigest.ToLower().StartsWith('sha256:')) { $packageDigest = $packageDigest.Substring(7) }
+          if ([string]$publishedManifest.package_asset -ne 'SM AutoLab Windows.zip') { throw "Nome do pacote no manifesto diverge do asset publicado." }
+          if ([string]$publishedManifest.package_sha256 -ne [string]$packageDigest) { throw "SHA-256 do manifesto diverge do SHA-256 do pacote publicado." }
+          if (-not [string]$publishedManifest.chrome_for_testing_version) { throw "Versão do Chrome for Testing ausente no manifesto." }
+
           if (@($assets | Where-Object { (Normalize-AssetName $_.name) -eq (Normalize-AssetName 'SM AutoLab Updater.exe') }).Count -gt 0) { throw "Atualizador separado foi publicado." }
           Write-Host "Validação remota da release: OK"
