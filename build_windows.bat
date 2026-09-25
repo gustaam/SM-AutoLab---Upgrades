@@ -103,12 +103,12 @@ if not exist "version_info.txt" (
 )
 
 echo.
-echo Preparando Chrome for Testing integrado...
+echo Preparando Chrome for Testing externo...
 %PYTHON% scripts\prepare_chrome_for_testing.py
 if errorlevel 1 goto :erro
 if not exist "build_resources\chrome_for_testing\chrome-win64\chrome.exe" goto :erro
 if not exist "build_resources\chrome_for_testing\chromedriver-win64\chromedriver.exe" goto :erro
-echo Chrome for Testing integrado: OK
+echo Chrome for Testing preparado: OK
 echo.
 
 echo Gerando SM AutoLab v!APP_VERSION!...
@@ -121,7 +121,7 @@ if not exist "dist\SM AutoLab.exe" (
 )
 
 echo.
-echo Copiando navegador externo para dist\\navegador...
+echo Copiando navegador externo para dist\navegador...
 if exist "dist\navegador" rmdir /s /q "dist\navegador"
 robocopy "build_resources\chrome_for_testing" "dist\navegador" /E /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 (
@@ -132,7 +132,7 @@ if not exist "dist\navegador\chrome-win64\chrome.exe" goto :erro
 if not exist "dist\navegador\chromedriver-win64\chromedriver.exe" goto :erro
 if not exist "dist\navegador\version.txt" goto :erro
 
-%PYTHON% -c "from pathlib import Path; import sys; expected=Path('CHROME_FOR_TESTING_VERSION').read_text(encoding='utf-8').strip(); actual=Path(r'dist\\navegador\\version.txt').read_text(encoding='utf-8').strip(); raise SystemExit(0 if actual == expected else 1)"
+%PYTHON% -c "from pathlib import Path; import sys; expected=Path('CHROME_FOR_TESTING_VERSION').read_text(encoding='utf-8').strip(); actual=Path(r'dist\navegador\version.txt').read_text(encoding='utf-8').strip(); raise SystemExit(0 if actual == expected else 1)"
 if errorlevel 1 (
     echo ERRO: a versao do navegador distribuido nao corresponde ao lock.
     goto :erro
