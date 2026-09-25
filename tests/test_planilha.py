@@ -183,6 +183,28 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertEqual(App._planilha_teclar_celula(app, event), "break")
         self.assertEqual(entry.value, "X")
 
+    def test_shift_nao_bloqueia_o_primeiro_caractere_digitado(self):
+        app = self._app()
+        app._planilha_celula_ativa = ("0", 1)
+
+        class Entry:
+            def __init__(self):
+                self.value = "antigo"
+            def delete(self, *_args):
+                self.value = ""
+            def insert(self, _index, value):
+                self.value += value
+
+        entry = Entry()
+        app._planilha_editar_iid = lambda _row, _col: setattr(
+            app, "_planilha_edit_entry", entry
+        )
+
+        # Tk usa o bit 0x0001 para Shift; letras maiúsculas precisam passar.
+        event = SimpleNamespace(char="X", keysym="X", state=0x0001)
+        self.assertEqual(App._planilha_teclar_celula(app, event), "break")
+        self.assertEqual(entry.value, "X")
+
     def test_tab_avanca_para_a_direita_e_quebra_para_a_linha_seguinte(self):
         app = self._app()
         class Tree:
@@ -235,7 +257,8 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         self.assertIn('canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', source)
         self.assertIn('canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")', source)
-        self.assertNotIn('win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")', source)
+        self.assertIn('win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")', source)
+        self.assertIn('win.bind("<Tab>", self._planilha_tabular_janela, add="+")', source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
 
     def test_duplo_clique_manual_edita_a_mesma_celula(self):
