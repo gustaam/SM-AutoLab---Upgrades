@@ -7098,29 +7098,57 @@ class App:
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
         self._planilha_ultimo_clique = None
-        tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
-        tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
-        tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
-        tree.bind("<KeyPress>", self._planilha_teclar_celula, add="+")
-        tree.bind("<Return>", self._planilha_editar_selecao)
-        tree.bind("<Tab>", self._planilha_tabular)
-        tree.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
-        tree.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
-        tree.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")
-        tree.bind("<Control-KeyPress-c>", self._planilha_atalho_copiar, add="+")
-        tree.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")
-        tree.bind("<Delete>", self._planilha_atalho_excluir, add="+")
-        tree.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")
-        tree.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")
-        tree.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")
-        tree.bind("<<Paste>>", self._planilha_atalho_colar, add="+")
+        self._planilha_teclado_na_grade = False
+
+        # O Canvas interno é o widget que realmente recebe os eventos da
+        # grade. A bindtag dedicada fica antes das tags de classe para que
+        # a primeira tecla após um único clique seja capturada de forma
+        # determinística.
+        canvas = tree._canvas
+        canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")
+        canvas.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")
+        canvas.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")
+        try:
+            tags = tuple(canvas.bindtags())
+            if PLANILHA_KEY_BINDTAG not in tags:
+                canvas.bindtags((PLANILHA_KEY_BINDTAG, *tags))
+            canvas.bind_class(
+                PLANILHA_KEY_BINDTAG,
+                "<KeyPress>",
+                self._planilha_teclar_celula,
+                add="+",
+            )
+            canvas.bind_class(
+                PLANILHA_KEY_BINDTAG,
+                "<KeyRelease>",
+                self._planilha_teclar_celula,
+                add="+",
+            )
+        except tk.TclError:
+            pass
+        canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")
+        canvas.bind("<Return>", self._planilha_editar_selecao, add="+")
+        canvas.bind("<KP_Enter>", self._planilha_editar_selecao, add="+")
+        canvas.bind("<Tab>", self._planilha_tabular)
+        canvas.bind("<Control-KeyPress-z>", self._planilha_atalho_desfazer, add="+")
+        canvas.bind("<Control-KeyPress-y>", self._planilha_atalho_refazer, add="+")
+        canvas.bind("<Control-KeyPress-a>", self._planilha_atalho_selecionar_tudo, add="+")
+        canvas.bind("<Control-KeyPress-c>", self._planilha_atalho_copiar, add="+")
+        canvas.bind("<Control-KeyPress-x>", self._planilha_recortar, add="+")
+        canvas.bind("<Delete>", self._planilha_atalho_excluir, add="+")
+        canvas.bind("<BackSpace>", self._planilha_atalho_excluir, add="+")
+        canvas.bind("<Control-KeyPress-v>", self._planilha_atalho_colar, add="+")
+        canvas.bind("<Control-KeyPress-V>", self._planilha_atalho_colar, add="+")
+        canvas.bind("<<Paste>>", self._planilha_atalho_colar, add="+")
+        canvas.bind("<Shift-Insert>", self._planilha_atalho_colar, add="+")
         def _planilha_botao_direito(event):
             current = tree.identify_cell(event.x, event.y)
             if current is not None:
                 row, col = current
                 self._planilha_definir_selecao({current}, active=current)
                 tree.focus(str(row))
-                tree.focus_set()
+                self._planilha_teclado_na_grade = True
+                self._planilha_foco_na_grade()
             try:
                 self._planilha_fechar_edicao()
                 self._atualizar_menu_contexto_planilha()
