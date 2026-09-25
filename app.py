@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime
@@ -224,11 +225,21 @@ class Automacao:
             return Path(raiz) / "SM AutoLab" / "Selenium"
         return Path.home() / ".cache" / "SM AutoLab" / "selenium"
 
+    @staticmethod
+    def _bundled_chrome_paths():
+        """Retorna Chrome for Testing + ChromeDriver embutidos no executável."""
+        bundle_root = getattr(sys, "_MEIPASS", None)
+        if not bundle_root:
+            return None, None
+        root = Path(bundle_root) / "chrome_for_testing"
+        browser = root / "chrome-win64" / "chrome.exe"
+        driver = root / "chromedriver-win64" / "chromedriver.exe"
+        if browser.is_file() and driver.is_file():
+            return browser, driver
+        return None, None
+
     def _criar_driver(self):
         options = webdriver.ChromeOptions()
-        # O Selenium Manager administra Chrome for Testing quando o Chrome
-        # não está instalado. A versão estável é mantida em cache por usuário.
-        options.browser_version = "stable"
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-default-apps")
@@ -236,15 +247,33 @@ class Automacao:
         # O navegador deve permanecer visível durante os testes manuais.
         options.add_argument("--disable-popup-blocking")
 
+        # A versão empacotada traz navegador e driver correspondentes,
+        # eliminando o download no primeiro uso.
+        bundled_browser, bundled_driver = self._bundled_chrome_paths()
+        if bundled_browser is not None and bundled_driver is not None:
+            self._status("Selenium: usando Chrome for Testing integrado. Iniciando navegador...")
+            try:
+                options.binary_location = str(bundled_browser)
+                service = Service(executable_path=str(bundled_driver))
+                driver = webdriver.Chrome(service=service, options=options)
+            except Exception as exc:
+                raise AutomacaoError(
+                    "O Chrome for Testing integrado está disponível, mas não foi possível iniciar o navegador.",
+                    "navegador",
+                ) from exc
+            driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+            self._status("Selenium: navegador integrado iniciado.")
+            return driver
+
+        # Desenvolvimento/instalação antiga sem o bundle: Selenium Manager
+        # continua disponível como fallback.
+        options.browser_version = "stable"
         cache_path = self._selenium_cache_path()
         cache_path.mkdir(parents=True, exist_ok=True)
         manager = SeleniumManager()
 
         self._status("Selenium: verificando Chrome for Testing...")
 
-        # Em um .exe PyInstaller, prefira explicitamente o Selenium Manager
-        # que foi empacotado junto ao aplicativo. Isso evita depender de PATH,
-        # instalação do Python ou arquivos externos na máquina do usuário.
         bundle_root = getattr(sys, "_MEIPASS", None)
         bundled_manager = (
             Path(bundle_root)
@@ -278,8 +307,6 @@ class Automacao:
                 "navegador",
             )
 
-        # O próprio wrapper do Selenium respeitará este caminho nas próximas
-        # chamadas, inclusive em ambientes PyInstaller.
         os.environ["SE_MANAGER_PATH"] = str(manager_binary)
         comando = [
             str(manager_binary),
@@ -318,7 +345,7 @@ class Automacao:
                 elif "chromedriver" in low:
                     self._status("Selenium: preparando ChromeDriver...")
                 elif "discover" in low or "browser" in low:
-                    self._status("Selenium: localizando componentes do Chrome...")
+                    self._status("Selenium: localizando componentes do Chrome")
             retorno = processo.wait()
         except Exception as exc:
             raise AutomacaoError(
@@ -349,9 +376,6 @@ class Automacao:
             if not driver_path or not Path(driver_path).is_file():
                 raise FileNotFoundError(f"ChromeDriver não encontrado: {driver_path}")
 
-            # Passa explicitamente os caminhos resolvidos ao Selenium. Isso
-            # evita uma segunda busca ambígua pelo navegador/driver e garante
-            # que o Chrome for Testing gerenciado será o processo iniciado.
             options.binary_location = browser_path
             service = Service(executable_path=driver_path)
             self._status("Selenium: iniciando Chrome for Testing...")
