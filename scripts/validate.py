@@ -216,7 +216,10 @@ def validate_architecture(root: Path) -> None:
         "def install_ui(App)",
         "from interface import App, SM_AUTOLAB_GRADE_VIRTUAL",
     ))
-    require_markers("app.py", app, ("class Resultados", "def carregar_codigos"))
+    require_markers("app.py", app, (
+        "class Resultados",
+        "def carregar_codigos",
+    ))
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
 
     require_markers("interface.py", interface, (
