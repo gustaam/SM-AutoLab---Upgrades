@@ -1433,6 +1433,7 @@ SM_AUTOLAB_GRADE_VIRTUAL = "SM-AUTOLAB-GRADE-VIRTUAL"
 DEFAULT_TOTAL_ROWS = 10000
 DEFAULT_ROW_HEIGHT = 28
 DEFAULT_OVERSCAN = 3
+PLANILHA_KEY_BINDTAG = "SM_AUTOLAB_PLANILHA_KEYS"
 
 # Dimensões canônicas dos controles de execução. O modo compacto reutiliza
 # exatamente os mesmos tamanhos do modo completo para evitar deformações.
@@ -7168,6 +7169,27 @@ class App:
         canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")
         canvas.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")
         canvas.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")
+        # Coloca uma tag de teclado dedicada antes dos bindings de classe
+        # do Canvas. Isso reduz a dependência do comportamento padrão do Tk
+        # para entregar o primeiro caractere após um único clique.
+        try:
+            tags = tuple(canvas.bindtags())
+            if PLANILHA_KEY_BINDTAG not in tags:
+                canvas.bindtags((PLANILHA_KEY_BINDTAG, *tags))
+            canvas.bind_class(
+                PLANILHA_KEY_BINDTAG,
+                "<KeyPress>",
+                self._planilha_teclar_celula,
+                add="+",
+            )
+            canvas.bind_class(
+                PLANILHA_KEY_BINDTAG,
+                "<KeyRelease>",
+                self._planilha_teclar_celula,
+                add="+",
+            )
+        except tk.TclError:
+            pass
         canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")
         canvas.bind("<Return>", self._planilha_editar_selecao, add="+")
         canvas.bind("<KP_Enter>", self._planilha_editar_selecao, add="+")
@@ -7516,8 +7538,45 @@ class App:
             return None
         return self._planilha_tabular(event)
 
+    @staticmethod
+    def _planilha_caractere_do_evento(event):
+        """Retorna o caractere digitável, usando keysym como fallback."""
+        char = getattr(event, "char", "") or ""
+        if char and char.isprintable():
+            return char
+
+        keysym = str(getattr(event, "keysym", "") or "")
+        if not keysym:
+            return ""
+
+        if len(keysym) == 1 and keysym.isprintable():
+            return keysym
+
+        named = {
+            "space": " ",
+            "comma": ",", "period": ".", "slash": "/", "backslash": "\\",
+            "semicolon": ";", "colon": ":", "apostrophe": "'", "quotedbl": '"',
+            "minus": "-", "underscore": "_", "equal": "=", "plus": "+",
+            "bracketleft": "[", "bracketright": "]",
+            "braceleft": "{", "braceright": "}",
+            "exclam": "!", "at": "@", "numbersign": "#", "dollar": "$",
+            "percent": "%", "asciicircum": "^", "ampersand": "&",
+            "asterisk": "*", "parenleft": "(", "parenright": ")",
+            "less": "<", "greater": ">", "question": "?",
+            "bar": "|",
+            "KP_0": "0", "KP_1": "1", "KP_2": "2", "KP_3": "3", "KP_4": "4",
+            "KP_5": "5", "KP_6": "6", "KP_7": "7", "KP_8": "8", "KP_9": "9",
+            "KP_Decimal": ".", "KP_Add": "+", "KP_Subtract": "-",
+            "KP_Multiply": "*", "KP_Divide": "/",
+        }
+        if keysym == "grave":
+            return chr(96)
+        return named.get(keysym, "")
+
     def _planilha_teclar_celula(self, event):
         """Inicia a edição da célula ativa quando o usuário digita após um clique."""
+        # KeyRelease é usado como fallback quando KeyPress não fornece o
+        # caractere traduzido. Se o Entry já foi criado, não duplica.
         if getattr(self, "_planilha_edit_entry", None) is not None:
             return None
 
@@ -7525,21 +7584,19 @@ class App:
         if not active:
             return None
 
-        char = getattr(event, "char", "") or ""
-        keysym = str(getattr(event, "keysym", "") or "")
-        if not char and len(keysym) == 1 and keysym.isprintable():
-            char = keysym
-        elif not char and keysym.startswith("KP_") and len(keysym) == 4 and keysym[-1].isdigit():
-            char = keysym[-1]
-
-        # Teclas de navegação/atalhos permanecem com seus próprios bindings.
         state = int(getattr(event, "state", 0) or 0)
         if state & 0x0004 or state & 0x0008:
             return None
 
-        if keysym in ("BackSpace", "Delete"):
+        keysym = str(getattr(event, "keysym", "") or "")
+        if keysym in (
+            "Return", "KP_Enter", "Tab", "Left", "Right", "Up", "Down",
+            "Home", "End", "Prior", "Next", "Escape", "BackSpace", "Delete",
+        ):
             return None
-        if not char or not char.isprintable():
+
+        char = self._planilha_caractere_do_evento(event)
+        if not char:
             return None
 
         try:
@@ -7550,11 +7607,8 @@ class App:
             if entry is None:
                 return "break"
 
-            if char and char.isprintable():
-                entry.delete(0, "end")
-                entry.insert(0, char)
-            elif keysym in ("BackSpace", "Delete"):
-                entry.delete(0, "end")
+            entry.delete(0, "end")
+            entry.insert(0, char)
             return "break"
         except Exception:
             LOGGER.debug("Falha ao iniciar edição por teclado na planilha.", exc_info=True)
@@ -8136,6 +8190,12 @@ class App:
                 pass
             self._planilha_edit_entry=None
         self._planilha_edit_context=None
+        try:
+            if win is not None:
+                win.unbind_class(PLANILHA_KEY_BINDTAG, "<KeyPress>")
+                win.unbind_class(PLANILHA_KEY_BINDTAG, "<KeyRelease>")
+        except (AttributeError, tk.TclError):
+            pass
         if self._planilha_context_menu is not None:
             try:
                 self._planilha_context_menu.destroy()
