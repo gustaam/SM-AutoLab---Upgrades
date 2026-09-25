@@ -289,10 +289,22 @@ jobs:
           $metadata = $metadata.Replace('__MAJOR__',$parts[0]).Replace('__MINOR__',$parts[1]).Replace('__PATCH__',$parts[2]).Replace('__BUILD__',$build).Replace('__VERSION__',$version)
           Set-Content -Path "version_info.txt" -Value $metadata -Encoding UTF8
 
+      - name: Resolver Selenium Manager para o build
+        if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
+        shell: pwsh
+        run: |
+          $seleniumManager = (python -c "from selenium.webdriver.common.selenium_manager import SeleniumManager; print(SeleniumManager._get_binary())").Trim()
+          if (-not (Test-Path $seleniumManager)) {
+            throw "Selenium Manager não encontrado no ambiente de build: $seleniumManager"
+          }
+          "SELENIUM_MANAGER_PATH=$seleniumManager" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Selenium Manager: $seleniumManager"
+
       - name: Build SM AutoLab
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
-        shell: cmd
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-binaries selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --add-binary "$env:SELENIUM_MANAGER_PATH;selenium\webdriver\common\windows" --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
       - name: Validar Selenium Manager dentro do executável
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
