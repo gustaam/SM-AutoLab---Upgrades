@@ -78,7 +78,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn('win.bind("<Tab>", self._planilha_tabular_janela, add="+")', interface)
         self.assertIn("win.focus_force()", interface)
         self.assertIn("widget.focus_force()", interface)
-        self.assertIn('return "break"\\n\\n\\n    def _planilha_arrastar_selecao', interface)
+        self.assertIn('return "break"\n\n\n    def _planilha_arrastar_selecao', interface)
         self.assertIn('widget.bind("<Return>", confirmar, add="+")', interface)
         self.assertIn('widget.bind("<KP_Enter>", confirmar, add="+")', interface)
         self.assertIn('text="Reiniciar"', interface)
