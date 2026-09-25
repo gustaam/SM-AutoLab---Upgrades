@@ -241,34 +241,46 @@ class Automacao:
         manager = SeleniumManager()
 
         self._status("Selenium: verificando Chrome for Testing...")
-        try:
-            manager_binary = manager._get_binary()
-        except Exception as exc:
-            # No one-file PyInstaller, use o caminho exato onde o workflow
-            # coloca o binário dentro do pacote selenium.
-            bundle_root = getattr(sys, "_MEIPASS", None)
-            candidato = (
-                Path(bundle_root)
-                / "selenium"
-                / "webdriver"
-                / "common"
-                / "windows"
-                / "selenium-manager.exe"
-                if bundle_root
-                else None
-            )
-            if candidato is None or not candidato.is_file():
+
+        # Em um .exe PyInstaller, prefira explicitamente o Selenium Manager
+        # que foi empacotado junto ao aplicativo. Isso evita depender de PATH,
+        # instalação do Python ou arquivos externos na máquina do usuário.
+        bundle_root = getattr(sys, "_MEIPASS", None)
+        bundled_manager = (
+            Path(bundle_root)
+            / "selenium"
+            / "webdriver"
+            / "common"
+            / "windows"
+            / "selenium-manager.exe"
+            if bundle_root
+            else None
+        )
+
+        manager_binary = None
+        if bundled_manager is not None and bundled_manager.is_file():
+            manager_binary = bundled_manager
+
+        if manager_binary is None:
+            try:
+                manager_binary = manager._get_binary()
+            except Exception as exc:
                 raise AutomacaoError(
                     "O executável do Selenium Manager não está disponível no SM AutoLab. "
                     "A versão empacotada precisa incluir o binário selenium-manager.",
                     "navegador",
                 ) from exc
-            manager_binary = candidato
 
-        # Garante que chamadas internas subsequentes do Selenium também usem
-        # exatamente o manager que está dentro do bundle.
+        manager_binary = Path(manager_binary)
+        if not manager_binary.is_file():
+            raise AutomacaoError(
+                f"Selenium Manager não encontrado em: {manager_binary}",
+                "navegador",
+            )
+
+        # O próprio wrapper do Selenium respeitará este caminho nas próximas
+        # chamadas, inclusive em ambientes PyInstaller.
         os.environ["SE_MANAGER_PATH"] = str(manager_binary)
-
         comando = [
             str(manager_binary),
             "--browser", "chrome",
