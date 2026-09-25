@@ -708,6 +708,34 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("_aplicar_status_compacto", source)
 
 
+    def test_modo_compacto_usa_mesmos_tamanhos_dos_botoes_de_execucao(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _configurar_dashboard_compacto")
+        end = source.index("def _abrir_historico_compacto", start)
+        block = source[start:end]
+        self.assertIn("COMPACT_WINDOW_WIDTH = 600", source)
+        self.assertIn("COMPACT_WINDOW_HEIGHT = 340", source)
+        self.assertIn("largura, altura = COMPACT_WINDOW_WIDTH, COMPACT_WINDOW_HEIGHT", block)
+        self.assertIn("width=ACTION_STOP_WIDTH", block)
+        self.assertIn("width=ACTION_START_WIDTH", block)
+        self.assertIn("height=ACTION_BUTTON_HEIGHT", block)
+        self.assertIn("ACTION_BUTTON_GAP", block)
+
+    def test_build_distribui_navegador_fora_do_onefile(self):
+        build = (self.root / "build_windows.bat").read_text(encoding="utf-8")
+        self.assertIn('robocopy "build_resources\\chrome_for_testing" "dist\\navegador"', build)
+        self.assertIn('dist\\navegador\\chrome-win64\\chrome.exe', build)
+        self.assertIn('dist\\navegador\\chromedriver-win64\\chromedriver.exe', build)
+        self.assertIn('Compress-Archive -Path \'dist\\SM AutoLab.exe\',\'dist\\navegador\'', build)
+        self.assertNotIn('build_resources\\chrome_for_testing;chrome_for_testing', build)
+
+    def test_release_publica_o_pacote_com_navegador_externo(self):
+        release = (self.root / ".github/workflows/release.yml").read_text(encoding="utf-8")
+        self.assertIn('dist/SM AutoLab Windows.zip', release)
+        self.assertIn('dist\\navegador\\chrome-win64\\chrome.exe', release)
+        self.assertIn('dist\\navegador\\chromedriver-win64\\chromedriver.exe', release)
+        self.assertNotIn('build_resources\\chrome_for_testing;chrome_for_testing', release)
+
     def test_menu_configuracoes_ancora_no_botao_na_visualizacao_compacta(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _reposicionar_menus")
