@@ -12,6 +12,7 @@ import subprocess
 import shutil
 import sys
 import tempfile
+import traceback
 import threading
 import time
 import tkinter as tk
@@ -9233,6 +9234,9 @@ class App:
             f"Iniciando automação com {len(codigos)} código(s) da coluna 'Senha'.",
             self.INFO
         )
+        self._registrar_diagnostico_automacao(
+            f"_iniciar_automacao_interna alcançou o ponto de disparo do Selenium com {len(codigos)} código(s)."
+        )
         self._add_historico("Nova execução iniciada pela planilha interna.")
         self.atualizar_status("Iniciando")
         threading.Thread(
@@ -9241,29 +9245,78 @@ class App:
             daemon=True
         ).start()
 
+    def _registrar_diagnostico_automacao(self, mensagem, exc=None):
+        """Registra o caminho de inicialização sem credenciais nem códigos."""
+        try:
+            caminho = Path.home() / "SM AutoLab" / "interface_runtime.log"
+            caminho.parent.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with caminho.open("a", encoding="utf-8") as handle:
+                handle.write(f"[{stamp}] {mensagem}\n")
+                if exc is not None:
+                    handle.write(
+                        "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+                    )
+        except Exception:
+            pass
+
     def _executar_interno(self,codigos,start):
+        self._registrar_diagnostico_automacao(
+            f"Worker iniciado; chamando principal_interno a partir do índice {int(start)}."
+        )
         try:
             resultado=principal_interno(codigos,self,start)
+            self._registrar_diagnostico_automacao("principal_interno retornou normalmente.")
             if not self._closing:
                 self.app.after(0,lambda:self._finalizar(resultado))
         except Exception as exc:
+            self._registrar_diagnostico_automacao(
+                "principal_interno lançou exceção.", exc
+            )
             if not self._closing:
                 self.app.after(0,lambda:self._falha_geral(str(exc)))
 
     def iniciar_thread(self):
         """Inicia diretamente a partir dos códigos salvos na coluna Senha."""
-        if not self._validar_planilha_antes_execucao():
-            return
-        codigos=self._extrair_codigos_planilha()
-        if not codigos:
-            self.abrir_planilha()
-            messagebox.showwarning(
-                "Nenhum código",
-                "Preencha os códigos na coluna 'Senha' da planilha.",
-                parent=self._planilha_window
+        self._registrar_diagnostico_automacao("Clique em Iniciar recebido.")
+        try:
+            self.atualizar_status("Preparando automação...")
+            if not self._validar_planilha_antes_execucao():
+                self._registrar_diagnostico_automacao(
+                    "Execução cancelada na validação da planilha."
+                )
+                return
+
+            self._registrar_diagnostico_automacao("Validação da planilha concluída.")
+            codigos=self._extrair_codigos_planilha()
+            self._registrar_diagnostico_automacao(
+                f"Códigos extraídos da coluna Senha: {len(codigos)}."
             )
-            return
-        self._iniciar_automacao_interna(codigos)
+            if not codigos:
+                self.abrir_planilha()
+                messagebox.showwarning(
+                    "Nenhum código",
+                    "Preencha os códigos na coluna 'Senha' da planilha.",
+                    parent=self._planilha_window
+                )
+                return
+            self._iniciar_automacao_interna(codigos)
+            self._registrar_diagnostico_automacao(
+                "Fluxo de inicialização entregue ao worker."
+            )
+        except Exception as exc:
+            self._registrar_diagnostico_automacao(
+                "Falha síncrona antes do worker Selenium.", exc
+            )
+            if not self._closing:
+                messagebox.showerror(
+                    "Erro ao iniciar automação",
+                    "A automação não chegou a iniciar o Selenium.\n\n"
+                    f"{type(exc).__name__}: {exc}\n\n"
+                    "Um diagnóstico técnico foi salvo em:\n"
+                    f"{Path.home() / 'SM AutoLab' / 'interface_runtime.log'}",
+                    parent=self._planilha_window or self.app,
+                )
 
     def _falha_geral(self, msg):
         self._parar_metricas_execucao()
