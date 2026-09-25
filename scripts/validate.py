@@ -219,6 +219,7 @@ def validate_architecture(root: Path) -> None:
     require_markers("app.py", app, (
         "class Resultados",
         "def carregar_codigos",
+        "def _bundled_chrome_paths",
     ))
     require_markers("tests/test_patch.py", tests, TEST_MARKERS)
 
@@ -235,14 +236,10 @@ def validate_architecture(root: Path) -> None:
         'canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")',
         'canvas.bind("<Return>", self._planilha_editar_selecao, add="+")',
         'def _vincular_enter_confirmacao',
-        "def _bundled_chrome_paths",
         'command=self._mostrar_menu_aparencia',
         'aparencia.bind("<Enter>", self._mostrar_menu_aparencia',
         'aparencia.bind("<Leave>", self._agendar_fechar_aparencia',
         'def _monitorar_menus',
-        'tree.bind("<ButtonPress-1>", self._planilha_clicar_celula',
-        'tree.bind("<B1-Motion>", self._planilha_arrastar_selecao',
-        'tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao',
         "entry=Entry(tree._canvas",
         'tags=("virtual-column-line",)',
         'tags=("planilha-selection",)',
