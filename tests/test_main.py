@@ -729,7 +729,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_release_embute_navegador_no_executavel(self):
         release = (self.root / ".github/workflows/release.yml").read_text(encoding="utf-8")
-        self.assertIn('build_resources\\\\chrome_for_testing;chrome_for_testing', release)
+        self.assertIn('build_resources\\chrome_for_testing;chrome_for_testing', release)
         self.assertIn("Validar Selenium Manager e Chrome for Testing dentro do executável", release)
         self.assertNotIn('dist\\navegador\\chrome-win64\\chrome.exe', release)
 
