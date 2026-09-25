@@ -3,6 +3,7 @@ from pathlib import Path
 from PyInstaller.utils.hooks import get_package_paths
 
 _, package_dir = get_package_paths("selenium")
+package_dir = Path(package_dir)
 manager = (
     package_dir
     / "webdriver"
