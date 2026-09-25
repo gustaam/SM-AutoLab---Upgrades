@@ -106,7 +106,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("scripts\\prepare_chrome_for_testing.py", build_bat)
         self.assertNotIn('build_resources\\chrome_for_testing;chrome_for_testing', build_bat)
         self.assertIn('robocopy "build_resources\\chrome_for_testing" "dist\\navegador"', build_bat)
-        self.assertIn('Compress-Archive -Path "dist\\SM AutoLab.exe","dist\\navegador"', build_bat)
+        self.assertIn("Compress-Archive -Path 'dist\\SM AutoLab.exe','dist\\navegador'", build_bat)
         prepare = (root / "scripts" / "prepare_chrome_for_testing.py").read_text(encoding="utf-8")
         self.assertIn("last-known-good-versions-with-downloads.json", prepare)
         self.assertIn("known-good-versions-with-downloads.json", prepare)
