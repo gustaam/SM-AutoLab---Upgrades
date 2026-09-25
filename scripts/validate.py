@@ -144,6 +144,10 @@ def validate_workflow_runtime(root: Path) -> None:
         fail(f"build_windows.bat deve fixar pip em {REQUIRED_PIP_VERSION}")
     if "python -m pip install pyinstaller==6.22.3" not in read_text(root, ".github/workflows/release.yml"):
         fail("release.yml deve instalar PyInstaller pelo módulo pip do Python configurado")
+
+    release = read_text(root, ".github/workflows/release.yml")
+    if "Smoke test real do runtime Selenium com Chrome for Testing" not in release:
+        fail("release.yml deve executar smoke test real do Selenium com Chrome for Testing")
     if "%PYTHON% -m pip install pyinstaller==6.22.3" not in build:
         fail("build_windows.bat deve instalar PyInstaller pelo interpretador Python configurado")
     release = read_text(root, ".github/workflows/release.yml")
