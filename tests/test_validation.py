@@ -115,7 +115,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn('"chrome-win64" / "chrome.exe"', prepare)
         self.assertIn('"chromedriver-win64" / "chromedriver.exe"', prepare)
         self.assertIn("_safe_extract", prepare)
-        self.assertIn("Selenium Manager dentro do executável", release)
+        self.assertIn("Selenium Manager e Chrome for Testing dentro do executável", release)
         self.assertIn("id: release_gate", release)
         self.assertIn("should_release=$($eligible.ToString().ToLower())", release)
         self.assertNotIn("    if: >-", release)
