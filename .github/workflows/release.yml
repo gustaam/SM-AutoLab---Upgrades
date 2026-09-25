@@ -27,7 +27,7 @@ jobs:
     permissions:
       contents: write
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
     steps:
@@ -309,11 +309,18 @@ jobs:
           Write-Host "Selenium Manager: $seleniumManager"
           Write-Host "Hook PyInstaller: $hook"
 
+      - name: Preparar Chrome for Testing integrado
+        if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
+        shell: pwsh
+        run: |
+          python scripts/prepare_chrome_for_testing.py
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar o Chrome for Testing integrado." }
+
       - name: Build SM AutoLab
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." --add-data "build_resources\chrome_for_testing;chrome_for_testing" main.py
 
       - name: Validar Selenium Manager dentro do executável
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
@@ -329,6 +336,13 @@ jobs:
             throw "Selenium Manager não foi encontrado no bundle do executável."
           }
           Write-Host "Selenium Manager encontrado no bundle PyInstaller."
+          if ($archive -notmatch "(?i)chrome_for_testing.*chrome-win64.*chrome\.exe") {
+            throw "Chrome for Testing não foi encontrado no bundle do executável."
+          }
+          if ($archive -notmatch "(?i)chrome_for_testing.*chromedriver-win64.*chromedriver\.exe") {
+            throw "ChromeDriver integrado não foi encontrado no bundle do executável."
+          }
+          Write-Host "Chrome for Testing e ChromeDriver encontrados no bundle PyInstaller."
           $archiveEntries = @($archive -split "\r?\n" | Where-Object { $_ -match "selenium-manager(\.exe)?|selenium\\webdriver\\common\\windows" })
           if ($archiveEntries.Count -eq 0) {
             throw "A inspeção do CArchive não encontrou nenhuma entrada do Selenium Manager."
