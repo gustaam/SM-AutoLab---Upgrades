@@ -750,6 +750,19 @@ class CanonicalRuntimeTests(unittest.TestCase):
         fail_block = source[start:end]
         self.assertIn('if not self._execucao_atual.get("reexecucao_de"):', fail_block)
 
+    def test_retomada_planilha_carrega_dados_salvos_antes_de_iniciar(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _verificar_retomada_pendente")
+        end = source.index("def _iniciar_historico_execucao", start)
+        block = source[start:end]
+
+        self.assertIn("salvo = self._carregar_planilha_interna()", block)
+        self.assertIn("self._planilha_data = dict(salvo)", block)
+        self.assertIn("self._planilha_salva_data = dict(salvo)", block)
+        self.assertIn("inicio_forcado=inicio", block)
+        self.assertIn("ignorar_checkpoint=True", block)
+        self.assertNotIn("self.iniciar_thread()", block)
+
     def test_reexecucao_de_erros_fica_registrada_e_nao_reaparece_na_mesma_execucao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _abrir_detalhe_historico")
