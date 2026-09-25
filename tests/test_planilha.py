@@ -153,12 +153,14 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         app.app = Clipboard()
         return app
 
-    def test_clique_fora_da_grade_desativa_alvo_de_teclado(self):
+    def test_clique_na_grade_define_o_canvas_como_alvo_de_teclado(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")', source)
-        self.assertIn("self._planilha_teclado_na_grade = bool(dentro)", source)
-        self.assertIn("self.app.after_idle(self._planilha_foco_na_grade)", source)
-        self.assertNotIn("win.focus_get() is not canvas", source)
+        self.assertIn('canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', source)
+        self.assertIn('canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")', source)
+        self.assertIn("self._planilha_teclado_na_grade = False", source)
+        self.assertIn("self._planilha_teclado_na_grade = True", source)
+        self.assertIn("def _planilha_foco_na_grade", source)
+        self.assertNotIn('win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")', source)
 
     def test_um_clique_e_digito_iniciam_edicao_da_celula_ativa(self):
         app = self._app()
