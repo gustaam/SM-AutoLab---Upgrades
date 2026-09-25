@@ -268,14 +268,24 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         start = source.index("def _configurar_dashboard_compacto")
         end = source.index("    def _abrir_historico_compacto", start)
         block = source[start:end]
-        self.assertRegex(
+        self.assertIn(
+            'text="Parar",',
             block,
-            r'text="Parar".*?width=140,\s*height=46',
+            "O botão Parar deve existir no modo compacto.",
+        )
+        self.assertIn(
+            "width=140,\n            height=46",
+            block,
             "Parar compacto deve ter 140x46, como no modo completo.",
         )
-        self.assertRegex(
+        self.assertIn(
+            "text=self.INICIAR_LABEL,",
             block,
-            r'text=self\.INICIAR_LABEL.*?width=150,\s*height=46',
+            "O botão Iniciar deve existir no modo compacto.",
+        )
+        self.assertIn(
+            "width=150,\n            height=46",
+            block,
             "Iniciar compacto deve ter 150x46, como no modo completo.",
         )
 
