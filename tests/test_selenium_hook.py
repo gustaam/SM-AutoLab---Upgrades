@@ -8,7 +8,7 @@ class SeleniumManagerHookTests(unittest.TestCase):
         hook = root / "hooks" / "hook-selenium.webdriver.common.selenium_manager.py"
         source = hook.read_text(encoding="utf-8")
 
-        self.assertIn('get_package_dir("selenium")', source)
+        self.assertIn('get_package_paths("selenium")', source)
         self.assertIn('"selenium-manager.exe"', source)
         self.assertIn('"selenium/webdriver/common/windows"', source)
         self.assertIn("binaries = [", source)
