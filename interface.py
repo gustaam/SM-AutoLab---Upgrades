@@ -2874,7 +2874,7 @@ class App:
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
-        largura, altura = 520, 250
+        largura, altura = 520, 285
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -3032,7 +3032,7 @@ class App:
             border_width=1,
             border_color=self.ERROR,
             text_color=self.ERROR,
-            font=("Segoe UI", 11, "bold"),
+            font=("Segoe UI", 14, "bold"),
             state="disabled",
         )
         self.botao_parar.pack(side="left", padx=3, pady=3)
@@ -3048,7 +3048,7 @@ class App:
             hover_color=self.ACCENT_HOVER,
             border_width=0,
             text_color="#FFFFFF",
-            font=("Segoe UI", 11, "bold"),
+            font=("Segoe UI", 14, "bold"),
         )
         self.botao_iniciar.pack(side="left", padx=3, pady=3)
 
@@ -6960,6 +6960,8 @@ class App:
         win.bind("<Control-KeyPress-F>", self._abrir_busca_planilha, add="+")
         win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-KeyPress-S>", self._planilha_atalho_salvar, add="+")
+        win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")
+        win.bind("<Tab>", self._planilha_tabular_janela, add="+")
         win.bind("<Control-Return>", self._atalho_iniciar, add="+")
         win.bind("<Control-KP_Enter>", self._atalho_iniciar, add="+")
         # Restaurar rascunho após a janela existir para que o diálogo tenha parent válido.
@@ -7442,6 +7444,10 @@ class App:
             return None
         if not getattr(self, "_planilha_teclado_na_grade", False):
             return None
+
+        keysym = str(getattr(event, "keysym", "") or "")
+        if keysym in ("Return", "KP_Enter"):
+            return self._planilha_editar_selecao(event)
         return self._planilha_teclar_celula(event)
 
     def _planilha_tabular_janela(self, event=None):
@@ -7471,7 +7477,7 @@ class App:
 
         # Teclas de navegação/atalhos permanecem com seus próprios bindings.
         state = int(getattr(event, "state", 0) or 0)
-        if state & 0x0004 or state & 0x0008 or state & 0x0001:
+        if state & 0x0004 or state & 0x0008:
             return None
 
         if keysym in ("BackSpace", "Delete"):
