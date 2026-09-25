@@ -316,6 +316,13 @@ jobs:
           python scripts/prepare_chrome_for_testing.py
           if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar o Chrome for Testing integrado." }
 
+      - name: Smoke test real do runtime Selenium com Chrome for Testing
+        if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
+        shell: pwsh
+        run: |
+          python -c "from pathlib import Path; from selenium import webdriver; from selenium.webdriver.chrome.service import Service; b=Path(r'build_resources\\chrome_for_testing\\chrome-win64\\chrome.exe'); d=Path(r'build_resources\\chrome_for_testing\\chromedriver-win64\\chromedriver.exe'); o=webdriver.ChromeOptions(); o.binary_location=str(b); [o.add_argument(a) for a in ['--headless=new','--disable-extensions','--disable-notifications','--disable-default-apps','--no-first-run','--window-size=1280,720']]; html='data:text/html,<title>SM AutoLab Selenium Smoke</title><input id=Codigo>'; \
+          with webdriver.Chrome(service=Service(executable_path=str(d)), options=o) as driver: driver.get(html); assert driver.title == 'SM AutoLab Selenium Smoke'; assert driver.find_element('id','Codigo').get_attribute('id') == 'Codigo'; print('Selenium runtime smoke: OK', driver.capabilities.get('browserVersion',''), driver.capabilities.get('chrome',{}).get('chromedriverVersion',''))"
+
       - name: Build SM AutoLab
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: pwsh
