@@ -93,14 +93,14 @@ class SeleniumWindowBehaviorTests(unittest.TestCase):
         self.assertIn('Service(executable_path=driver_path)', source)
         self.assertIn("options.binary_location = browser_path", source)
         self.assertIn("Chrome for Testing pronto", source)
-        self.assertIn("Baixando Chrome for Testing", source)
+        self.assertIn("baixando Chrome for Testing", source)
 
     def test_driver_e_executa_com_chrome_for_testing_visivel(self):
         source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
             encoding="utf-8"
         )
         self.assertIn('options.browser_version = "stable"', source)
-        self.assertIn('driver = webdriver.Chrome(options=options)', source)
+        self.assertIn('driver = webdriver.Chrome(service=service, options=options)', source)
         self.assertNotIn('options.add_argument("--start-minimized")', source)
         self.assertNotIn("driver.minimize_window()", source)
 
