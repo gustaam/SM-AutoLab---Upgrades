@@ -150,100 +150,8 @@ class PlanilhaBehaviorTests(unittest.TestCase):
             value = ""
             def clipboard_get(self):
                 return Clipboard.value
-        class AppEvents(Clipboard):
-            def after(self, *_args, **_kwargs):
-                return None
-            def winfo_containing(self, *_args, **_kwargs):
-                return None
-        app.app = AppEvents()
-        app._planilha_foco_na_grade = lambda: True
+        app.app = Clipboard()
         return app
-
-    def test_um_clique_e_digito_iniciam_edicao_da_celula_ativa(self):
-        app = self._app()
-        app._planilha_celula_ativa = ("0", 1)
-
-        class Entry:
-            def __init__(self):
-                self.value = "antigo"
-            def delete(self, *_args):
-                self.value = ""
-            def insert(self, _index, value):
-                self.value += value
-
-        entry = Entry()
-        app._planilha_editar_iid = lambda _row, _col: setattr(
-            app, "_planilha_edit_entry", entry
-        )
-
-        # Shift não pode bloquear a digitação: é uma modificação normal
-        # usada para letras maiúsculas e símbolos.
-        event = SimpleNamespace(char="X", keysym="x", state=0x0001)
-        self.assertEqual(App._planilha_teclar_celula(app, event), "break")
-        self.assertEqual(entry.value, "X")
-
-    def test_um_clique_real_segue_diretamente_para_a_digitacao(self):
-        app = self._app()
-
-        class MouseTree:
-            def identify_cell(self, _x, _y):
-                return (0, 1)
-            def focus(self, _iid=None):
-                return None
-            def focus_set(self):
-                return None
-
-        class Entry:
-            def __init__(self):
-                self.value = "antigo"
-            def delete(self, *_args):
-                self.value = ""
-            def insert(self, _index, value):
-                self.value += value
-
-        entry = Entry()
-        app._planilha_tree = MouseTree()
-        app._planilha_editar_iid = lambda _row, _col: setattr(
-            app, "_planilha_edit_entry", entry
-        )
-
-        click = SimpleNamespace(x=10, y=10, state=0)
-        key = SimpleNamespace(char="X", keysym="x", state=0x0001)
-
-        self.assertEqual(App._planilha_clicar_celula(app, click), "break")
-        self.assertEqual(app._planilha_celula_ativa, ("0", 1))
-        self.assertEqual(App._planilha_teclar_celula(app, key), "break")
-        self.assertEqual(entry.value, "X")
-    def test_fallback_da_janela_inicia_edicao_quando_canvas_nao_recebe_a_tecla(self):
-        app = self._app()
-        app._planilha_celula_ativa = ("0", 1)
-
-        class Entry:
-            def __init__(self):
-                self.value = "antigo"
-            def delete(self, *_args):
-                self.value = ""
-            def insert(self, _index, value):
-                self.value += value
-
-        entry = Entry()
-        app._planilha_editar_iid = lambda _row, _col: setattr(
-            app, "_planilha_edit_entry", entry
-        )
-        app._planilha_teclado_na_grade = True
-        event = SimpleNamespace(char="X", keysym="x", state=0x0001)
-
-        self.assertEqual(App._planilha_teclar_janela(app, event), "break")
-        self.assertEqual(entry.value, "X")
-
-    def test_foco_da_grade_e_reafirmado_quando_clique_define_a_grade_como_alvo(self):
-        app = self._app()
-        calls = []
-        app._planilha_foco_na_grade = lambda: calls.append(True)
-        app._planilha_teclado_na_grade = True
-        App._planilha_reafirmar_foco_grade(app)
-        self.assertEqual(calls, [True])
-
 
     def test_tab_avanca_para_a_direita_e_quebra_para_a_linha_seguinte(self):
         app = self._app()
@@ -293,16 +201,29 @@ class PlanilhaBehaviorTests(unittest.TestCase):
             (str(MAX_ROWS - 1), MAX_COLS - 1),
         )
 
-    def test_planilha_instala_tecla_de_edicao_apos_clique(self):
+    def test_planilha_nao_tem_camada_extra_para_digitar_apos_um_clique(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', source)
-        self.assertIn('canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")', source)
-        self.assertIn('canvas.bind_class(\n                PLANILHA_KEY_BINDTAG,\n                "<KeyPress>"', source)
-        self.assertIn('canvas.bind_class(\n                PLANILHA_KEY_BINDTAG,\n                "<KeyRelease>"', source)
-        self.assertIn('win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")', source)
-        self.assertIn('win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")', source)
-        self.assertIn('win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")', source)
+        for marker in (
+            "PLANILHA_KEY_BINDTAG",
+            "_planilha_clique_janela",
+            "_planilha_widget_na_grade",
+            "_planilha_foco_entrou_na_grade",
+            "_planilha_reafirmar_foco_grade",
+            "_planilha_foco_na_grade",
+            "_planilha_teclar_janela",
+            "_planilha_teclar_celula",
+            "_planilha_teclado_na_grade",
+        ):
+            self.assertNotIn(marker, source)
+        self.assertIn("def _planilha_duplo_clique_celula", source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
+
+    def test_modo_compacto_fica_mais_alto_e_um_pouco_mais_estreito(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _configurar_dashboard_compacto")
+        end = source.index("def _configurar_dashboard_completo", start) if "def _configurar_dashboard_completo" in source[start:] else len(source)
+        block = source[start:end]
+        self.assertIn("largura, altura = 500, 270", block)
 
     def test_botoes_compactos_usam_as_mesmas_dimensoes_do_modo_completo(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
@@ -551,9 +472,9 @@ class PlanilhaDeterministicOpenTests(unittest.TestCase):
         self.assertIn('self._planilha_implementacao = "grade-virtual"', interface)
         self.assertIn("class VirtualGridTree", interface)
         self.assertIn("def identify_cell", interface)
-        self.assertIn('canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', interface)
-        self.assertIn('canvas.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")', interface)
-        self.assertIn('canvas.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")', interface)
+        self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)', interface)
+        self.assertIn('tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)', interface)
+        self.assertIn('tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)', interface)
         self.assertNotIn("bind_all", interface)
         self.assertFalse((self.root / "patch.py").exists())
 

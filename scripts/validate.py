@@ -231,16 +231,27 @@ def validate_architecture(root: Path) -> None:
         'aparencia.bind("<Enter>", self._mostrar_menu_aparencia',
         'aparencia.bind("<Leave>", self._agendar_fechar_aparencia',
         'def _monitorar_menus',
-        'canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")',
-        'canvas.bind("<B1-Motion>", self._planilha_arrastar_selecao, add="+")',
-        'canvas.bind("<ButtonRelease-1>", self._planilha_soltar_selecao, add="+")',
-        'canvas.bind_class(',
-        'win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")',
-        'win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")',
+        'tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)',
+        'tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)',
+        'tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)',
         "entry=Entry(tree._canvas",
         'tags=("virtual-column-line",)',
         'tags=("planilha-selection",)',
     ))
+
+    for removed_planilha_marker in (
+        "PLANILHA_KEY_BINDTAG",
+        "_planilha_clique_janela",
+        "_planilha_widget_na_grade",
+        "_planilha_foco_entrou_na_grade",
+        "_planilha_reafirmar_foco_grade",
+        "_planilha_foco_na_grade",
+        "_planilha_teclar_janela",
+        "_planilha_teclar_celula",
+        "_planilha_teclado_na_grade",
+    ):
+        if removed_planilha_marker in interface:
+            fail(f"camada removida de digitação por um clique ainda presente: {removed_planilha_marker}")
     
     for legacy in (
         "from patch import",
