@@ -3017,12 +3017,19 @@ class App:
             button.pack(side="left", padx=3, pady=3)
             top_buttons.append(button)
 
-        bottom_row = ctk.CTkFrame(actions, fg_color="transparent")
+        # Grupo inferior com exatamente as mesmas dimensões do modo completo.
+        bottom_row = ctk.CTkFrame(
+            actions,
+            fg_color="transparent",
+            width=297,
+            height=52,
+        )
         bottom_row.pack(anchor="center", pady=(8, 0))
+        bottom_row.pack_propagate(False)
 
         self.botao_parar = ctk.CTkButton(
             bottom_row,
-            text="Parar",
+            text="■  Parar",
             command=self.parar,
             width=140,
             height=46,
@@ -3035,7 +3042,7 @@ class App:
             font=("Segoe UI", 14, "bold"),
             state="disabled",
         )
-        self.botao_parar.pack(side="left", padx=3, pady=3)
+        self.botao_parar.pack(side="left")
 
         self.botao_iniciar = ctk.CTkButton(
             bottom_row,
@@ -3050,7 +3057,7 @@ class App:
             text_color="#FFFFFF",
             font=("Segoe UI", 14, "bold"),
         )
-        self.botao_iniciar.pack(side="left", padx=3, pady=3)
+        self.botao_iniciar.pack(side="left", padx=(7, 0))
 
         self.botao_planilha = top_buttons[0]
         self.botao_historico_planilha = top_buttons[1]
@@ -6960,6 +6967,7 @@ class App:
         win.bind("<Control-KeyPress-F>", self._abrir_busca_planilha, add="+")
         win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-KeyPress-S>", self._planilha_atalho_salvar, add="+")
+        win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")
         win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")
         win.bind("<Tab>", self._planilha_tabular_janela, add="+")
         win.bind("<Control-Return>", self._atalho_iniciar, add="+")
@@ -7421,14 +7429,20 @@ class App:
         return None
 
     def _planilha_foco_na_grade(self):
-        """Garante que o Canvas virtual receba o teclado após um clique."""
+        """Garante foco real no Toplevel e depois no Canvas da grade."""
         tree = getattr(self, "_planilha_tree", None)
         canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        win = getattr(self, "_planilha_window", None)
         if canvas is None:
             return False
         try:
+            if win is not None:
+                win.lift()
+                win.focus_force()
             canvas.focus_force()
             canvas.focus_set()
+            if win is not None:
+                win.after_idle(canvas.focus_force)
             return True
         except tk.TclError:
             return False
@@ -7553,10 +7567,12 @@ class App:
         tree.focus(str(current[0]))
         self._planilha_foco_na_grade()
         try:
+            # O clique deve continuar a propagação normal do Tk para que o
+            # Toplevel e o Canvas possam consolidar o foco após a seleção.
             self.app.after_idle(self._planilha_foco_na_grade)
         except Exception:
             pass
-        return "break"
+        return None
 
 
     def _planilha_arrastar_selecao(self, event):
