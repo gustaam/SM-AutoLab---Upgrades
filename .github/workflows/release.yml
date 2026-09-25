@@ -322,6 +322,16 @@ jobs:
         run: |
           python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
+      - name: Copiar navegador externo para dist
+        if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
+        shell: pwsh
+        run: |
+          if (Test-Path "dist\navegador") { Remove-Item "dist\navegador" -Recurse -Force }
+          robocopy "build_resources\chrome_for_testing" "dist\navegador" /E /NFL /NDL /NJH /NJS /NP
+          if ($LASTEXITCODE -ge 8) { throw "Falha ao copiar o Chrome for Testing para dist\navegador." }
+          if (-not (Test-Path "dist\navegador\chrome-win64\chrome.exe")) { throw "chrome.exe não foi copiado para dist\navegador." }
+          if (-not (Test-Path "dist\navegador\chromedriver-win64\chromedriver.exe")) { throw "chromedriver.exe não foi copiado para dist\navegador." }
+
       - name: Validar Selenium Manager dentro do executável e navegador externo
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: pwsh
