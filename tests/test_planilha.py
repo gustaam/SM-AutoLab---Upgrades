@@ -233,6 +233,30 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertEqual(App._planilha_teclar_celula(app, event), "break")
         self.assertEqual(entry.value, "x")
 
+    def test_bindtag_dedicado_captura_keypress_e_keyrelease(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('PLANILHA_KEY_BINDTAG = "SM_AUTOLAB_PLANILHA_KEYS"', source)
+        self.assertIn('canvas.bind_class(\n                PLANILHA_KEY_BINDTAG,\n                "<KeyPress>"', source)
+        self.assertIn('canvas.bind_class(\n                PLANILHA_KEY_BINDTAG,\n                "<KeyRelease>"', source)
+        self.assertIn('canvas.bindtags((PLANILHA_KEY_BINDTAG, *tags))', source)
+
+    def test_keysym_nomeado_e_convertido_em_caractere(self):
+        class Event:
+            char = ""
+            keysym = "semicolon"
+
+        self.assertEqual(
+            App._planilha_caractere_do_evento(Event()),
+            ";",
+        )
+
+    def test_tecla_keyrelease_nao_duplica_quando_entry_ja_existe(self):
+        app = self._app()
+        app._planilha_celula_ativa = ("0", 1)
+        app._planilha_edit_entry = object()
+        event = SimpleNamespace(char="X", keysym="x", state=0)
+        self.assertIsNone(App._planilha_teclar_celula(app, event))
+
     def test_foco_da_grade_e_sincronizado_com_focusin_e_reentrada(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         self.assertIn('win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")', source)
