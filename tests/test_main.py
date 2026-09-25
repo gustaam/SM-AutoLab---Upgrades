@@ -1111,15 +1111,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('texto_status.lower().startswith("selenium:")', block)
         self.assertIn('self._add_activity(mensagem, self.INFO)', block)
 
-    def test_selenium_abre_chrome_com_fluxo_runtime_anterior(self):
+    def test_selenium_abre_chrome_com_runtime_exatamente_anterior_ao_CFT(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
-        self.assertIn('options.browser_version = "stable"', source)
+        self.assertNotIn('options.browser_version = "stable"', source)
         self.assertIn('options.add_argument("--disable-extensions")', source)
         self.assertIn('options.add_argument("--disable-notifications")', source)
         self.assertIn('options.add_argument("--disable-default-apps")', source)
         self.assertIn('options.add_argument("--no-first-run")', source)
-        self.assertNotIn('--start-minimized', source)
-        self.assertNotIn('driver.minimize_window()', source)
+        self.assertIn('options.add_argument("--start-minimized")', source)
+        self.assertIn('driver.minimize_window()', source)
         self.assertIn('driver = webdriver.Chrome(options=options)', source)
         self.assertNotIn('driver = webdriver.Chrome(service=service, options=options)', source)
         self.assertNotIn('SeleniumManager()', source)

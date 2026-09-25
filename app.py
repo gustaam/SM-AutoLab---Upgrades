@@ -217,26 +217,22 @@ class Automacao:
 
     def _criar_driver(self):
         options = webdriver.ChromeOptions()
-        # Esta é a implementação do runtime que existia antes das alterações
-        # de gerenciamento explícito do Selenium Manager e que utilizava o
-        # fluxo padrão do Selenium para Chrome/ChromeDriver.
-        options.browser_version = "stable"
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-default-apps")
         options.add_argument("--no-first-run")
-        # O navegador deve permanecer visível durante os testes manuais.
-        # Não usar --headless nem minimizar a janela aqui.
-        try:
-            driver = webdriver.Chrome(options=options)
-        except WebDriverException as exc:
-            raise AutomacaoError(
-                "Não foi possível abrir o Chrome para a automação. "
-                "O Selenium tentou usar/baixar o Chrome for Testing. "
-                "Verifique a conexão com a internet e tente novamente.",
-                "navegador",
-            ) from exc
+        # Runtime exatamente anterior à introdução do Chrome for Testing/
+        # Selenium Manager explícito: deixa o Selenium selecionar o Chrome
+        # instalado na máquina e mantém a janela minimizada como antes.
+        options.add_argument("--start-minimized")
+        driver = webdriver.Chrome(options=options)
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+        try:
+            driver.minimize_window()
+        except WebDriverException:
+            # --start-minimized já cobre o Chromium quando a API não estiver
+            # disponível no ambiente.
+            pass
         return driver
 
     def iniciar_navegador(self):

@@ -84,7 +84,9 @@ class SeleniumWindowBehaviorTests(unittest.TestCase):
         source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn('options.browser_version = "stable"', source)
+        self.assertIn('options.add_argument("--start-minimized")', source)
+        self.assertIn("driver.minimize_window()", source)
+        self.assertNotIn('options.browser_version = "stable"', source)
         self.assertIn('options.add_argument("--disable-extensions")', source)
         self.assertIn('options.add_argument("--disable-notifications")', source)
         self.assertIn('options.add_argument("--no-first-run")', source)
