@@ -170,8 +170,43 @@ class PlanilhaBehaviorTests(unittest.TestCase):
             app, "_planilha_edit_entry", entry
         )
 
-        event = SimpleNamespace(char="X", keysym="x")
+        # Shift não pode bloquear a digitação: é uma modificação normal
+        # usada para letras maiúsculas e símbolos.
+        event = SimpleNamespace(char="X", keysym="x", state=0x0001)
         self.assertEqual(App._planilha_teclar_celula(app, event), "break")
+        self.assertEqual(entry.value, "X")
+
+    def test_um_clique_real_segue_diretamente_para_a_digitacao(self):
+        app = self._app()
+
+        class MouseTree:
+            def identify_cell(self, _x, _y):
+                return (0, 1)
+            def focus(self, _iid=None):
+                return None
+            def focus_set(self):
+                return None
+
+        class Entry:
+            def __init__(self):
+                self.value = "antigo"
+            def delete(self, *_args):
+                self.value = ""
+            def insert(self, _index, value):
+                self.value += value
+
+        entry = Entry()
+        app._planilha_tree = MouseTree()
+        app._planilha_editar_iid = lambda _row, _col: setattr(
+            app, "_planilha_edit_entry", entry
+        )
+
+        click = SimpleNamespace(x=10, y=10, state=0)
+        key = SimpleNamespace(char="X", keysym="x", state=0x0001)
+
+        self.assertEqual(App._planilha_clicar_celula(app, click), "break")
+        self.assertEqual(app._planilha_celula_ativa, ("0", 1))
+        self.assertEqual(App._planilha_teclar_celula(app, key), "break")
         self.assertEqual(entry.value, "X")
 
     def test_tab_avanca_para_a_direita_e_quebra_para_a_linha_seguinte(self):
@@ -227,6 +262,22 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)', source)
         self.assertIn('tree.bind("<KeyPress>", self._planilha_teclar_celula, add="+")', source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
+
+    def test_botoes_compactos_usam_as_mesmas_dimensoes_do_modo_completo(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _configurar_dashboard_compacto")
+        end = source.index("    def _abrir_historico_compacto", start)
+        block = source[start:end]
+        self.assertRegex(
+            block,
+            r'text="Parar".*?width=140,\s*height=46',
+            "Parar compacto deve ter 140x46, como no modo completo.",
+        )
+        self.assertRegex(
+            block,
+            r'text=self\.INICIAR_LABEL.*?width=150,\s*height=46',
+            "Iniciar compacto deve ter 150x46, como no modo completo.",
+        )
 
     def test_duplo_clique_manual_edita_a_mesma_celula(self):
         app = self._app()
