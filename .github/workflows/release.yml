@@ -301,7 +301,7 @@ jobs:
           if (-not (Test-Path $hook)) {
             throw "Hook do Selenium Manager não encontrado: $hook"
           }
-          $hookManager = (python -c "from pathlib import Path; from PyInstaller.utils.hooks import get_package_dir; print(Path(get_package_dir('selenium')) / 'webdriver' / 'common' / 'windows' / 'selenium-manager.exe')").Trim()
+          $hookManager = (python -c "from pathlib import Path; import selenium; print(Path(selenium.__file__).resolve().parent / 'webdriver' / 'common' / 'windows' / 'selenium-manager.exe')").Trim()
           if ($hookManager -ne $seleniumManager) {
             throw "O hook aponta para Selenium Manager diferente do pacote: $hookManager"
           }
