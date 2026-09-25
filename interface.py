@@ -5699,17 +5699,72 @@ class App:
                 self._retomada_dialogo_aberto = False
             return
 
+        # A execução pode continuar sem a janela da planilha estar aberta.
+        # Portanto, a fonte dos códigos precisa ser o arquivo persistido em disco,
+        # não _planilha_data (que começa vazio após uma nova inicialização).
         try:
-            codigos = self._extrair_codigos_planilha()
+            salvo = self._carregar_planilha_interna()
+            if salvo:
+                self._planilha_data = dict(salvo)
+                self._planilha_salva_data = dict(salvo)
+                self._planilha_efetuou_alteracao = False
+        except Exception:
+            salvo = {}
+
+        codigos = self._extrair_codigos_planilha()
+        if not codigos:
+            # Último recurso: tenta recuperar o snapshot salvo no histórico da
+            # própria planilha, caso o arquivo principal esteja indisponível.
+            try:
+                historico = self._carregar_historico_planilhas()
+                esperado = str(pendente.get("planilha_fingerprint", "")).strip()
+                for item in reversed(historico if isinstance(historico, list) else []):
+                    cells = item.get("cells", {}) if isinstance(item, dict) else {}
+                    if not isinstance(cells, dict):
+                        continue
+                    if esperado and self._planilha_fingerprint(cells) != esperado:
+                        continue
+                    candidatos = extract_column(cells, column=1)
+                    if candidatos:
+                        self._planilha_data = {
+                            str(k): str(v)
+                            for k, v in cells.items()
+                            if str(v) != ""
+                        }
+                        self._planilha_salva_data = dict(self._planilha_data)
+                        codigos = candidatos
+                        break
+            except Exception:
+                pass
+
+        # O checkpoint do arquivo interno deve ser validado contra a mesma
+        # lista de códigos recuperada do disco.
+        try:
             interno = ler_checkpoint_interno(codigos) if codigos else None
             if interno is not None:
                 inicio = int(interno)
         except Exception:
             pass
 
-        proximo = max(1, inicio)
+        proximo = max(1, inicio + 1)
         self._retomada_dialogo_aberto = True
         try:
+            if not codigos:
+                pendente["status"] = "Retomada manual necessária"
+                pendente["mensagem"] = (
+                    "A execução foi interrompida, mas a planilha salva "
+                    "não pôde ser recuperada automaticamente."
+                )
+                self._salvar_estado_persistente()
+                messagebox.showwarning(
+                    "Planilha não encontrada",
+                    "Foi encontrada uma execução interrompida, mas os códigos "
+                    "da planilha salva não puderam ser recuperados. "
+                    "Abra a planilha e verifique o arquivo salvo.",
+                    parent=self.app,
+                )
+                return
+
             detalhes = (
                 "Foi encontrado um processamento interrompido.\n\n"
                 f"Planilha: {planilha_nome or 'Planilha interna'}\n"
@@ -5723,7 +5778,11 @@ class App:
                 parent=self.app,
             )
             if resposta:
-                self.iniciar_thread()
+                self._iniciar_automacao_interna(
+                    codigos,
+                    inicio_forcado=inicio,
+                    ignorar_checkpoint=True,
+                )
             else:
                 self._add_activity(
                     "Retomada recusada na abertura do aplicativo.",
@@ -8871,14 +8930,29 @@ class App:
         except Exception:
             iniciar_depois_de_fechar()
 
-    def _iniciar_automacao_interna(self, codigos, ignorar_checkpoint=False):
-        codigos=[str(c).strip() for c in codigos if str(c).strip()]
+    def _iniciar_automacao_interna(
+        self,
+        codigos,
+        ignorar_checkpoint=False,
+        inicio_forcado=None,
+    ):
+        codigos = [str(c).strip() for c in codigos if str(c).strip()]
         if not codigos:
-            messagebox.showwarning("Nenhum código","A coluna 'Senha' está vazia.",parent=self.app)
+            messagebox.showwarning(
+                "Nenhum código",
+                "A coluna 'Senha' está vazia.",
+                parent=self.app,
+            )
             return
 
-        inicio = None if ignorar_checkpoint else ler_checkpoint_interno(codigos)
-        start=0
+        if inicio_forcado is not None:
+            try:
+                start = max(0, min(int(inicio_forcado), len(codigos)))
+            except (TypeError, ValueError):
+                start = 0
+        else:
+            inicio = None if ignorar_checkpoint else ler_checkpoint_interno(codigos)
+            start = 0
         if inicio is not None and inicio < len(codigos):
             resposta=messagebox.askyesno(
                 "Retomar processamento",
