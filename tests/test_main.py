@@ -1096,7 +1096,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn('--start-minimized', source)
         self.assertNotIn('driver.minimize_window()', source)
         self.assertIn('driver = webdriver.Chrome(service=service, options=options)', source)
-        self.assertIn('Não foi possível abrir o Chrome para a automação.', source)
+        self.assertIn('O Chrome for Testing foi preparado, mas não foi possível iniciar o navegador.', source)
 
     def test_indicador_de_salvamento_sem_autosave_novo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
