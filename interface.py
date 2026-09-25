@@ -6916,6 +6916,7 @@ class App:
         win.bind("<Control-KeyPress-F>", self._abrir_busca_planilha, add="+")
         win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")
         win.bind("<Tab>", self._planilha_tabular_janela, add="+")
+        win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")
         win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-KeyPress-S>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-Return>", self._atalho_iniciar, add="+")
@@ -7091,6 +7092,7 @@ class App:
         self._planilha_drag_start_xy = None
         self._planilha_dragging = False
         self._planilha_ultimo_clique = None
+        self._planilha_teclado_na_grade = False
         tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)
         tree.bind("<B1-Motion>", self._planilha_arrastar_selecao)
         tree.bind("<ButtonRelease-1>", self._planilha_soltar_selecao)
@@ -7340,6 +7342,32 @@ class App:
         return rectangle_selection(inicio, fim)
 
 
+    def _planilha_clique_janela(self, event=None):
+        """Atualiza o alvo de teclado conforme o widget realmente clicado."""
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        if canvas is None or event is None:
+            return None
+        try:
+            alvo = self.app.winfo_containing(event.x_root, event.y_root)
+            dentro = (
+                alvo is canvas
+                or (
+                    alvo is not None
+                    and str(alvo).startswith(str(canvas) + ".")
+                )
+            )
+        except tk.TclError:
+            dentro = False
+
+        self._planilha_teclado_na_grade = bool(dentro)
+        if dentro:
+            try:
+                self.app.after_idle(self._planilha_foco_na_grade)
+            except Exception:
+                self._planilha_foco_na_grade()
+        return None
+
     def _planilha_foco_na_grade(self):
         """Garante que o Canvas virtual receba o teclado após um clique."""
         tree = getattr(self, "_planilha_tree", None)
@@ -7362,10 +7390,7 @@ class App:
         win = getattr(self, "_planilha_window", None)
         if canvas is None or win is None:
             return None
-        try:
-            if win.focus_get() is not canvas:
-                return None
-        except tk.TclError:
+        if not getattr(self, "_planilha_teclado_na_grade", False):
             return None
         return self._planilha_teclar_celula(event)
 
@@ -7378,10 +7403,7 @@ class App:
         win = getattr(self, "_planilha_window", None)
         if canvas is None or win is None:
             return None
-        try:
-            if win.focus_get() is not canvas:
-                return None
-        except tk.TclError:
+        if not getattr(self, "_planilha_teclado_na_grade", False):
             return None
         return self._planilha_tabular(event)
 
@@ -7469,9 +7491,14 @@ class App:
         self._planilha_drag_anchor = current
         self._planilha_drag_start_xy = (event.x, event.y)
         self._planilha_dragging = False
+        self._planilha_teclado_na_grade = True
         self._planilha_fechar_edicao()
         tree.focus(str(current[0]))
         self._planilha_foco_na_grade()
+        try:
+            self.app.after_idle(self._planilha_foco_na_grade)
+        except Exception:
+            pass
         return "break"
 
 
