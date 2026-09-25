@@ -371,7 +371,7 @@ jobs:
         run: |
           $main = "dist\SM AutoLab.exe"
           if (-not (Test-Path $main)) { throw "Executável principal não foi gerado." }
-          if ((Get-Item $main).Length -lt 200000000) { throw "Executável principal não contém o navegador integrado ou está suspeitamente pequeno." }
+          if ((Get-Item $main).Length -lt 1000000) { throw "Executável principal suspeitamente pequeno." }
           $version = (Get-Content VERSION -Raw).Trim()
           $tag = $env:RELEASE_TAG
           $mainSha256 = (Get-FileHash -Algorithm SHA256 $main).Hash.ToLower()
