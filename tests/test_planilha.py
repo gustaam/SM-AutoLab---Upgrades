@@ -150,7 +150,13 @@ class PlanilhaBehaviorTests(unittest.TestCase):
             value = ""
             def clipboard_get(self):
                 return Clipboard.value
-        app.app = Clipboard()
+        class AppEvents(Clipboard):
+            def after(self, *_args, **_kwargs):
+                return None
+            def winfo_containing(self, *_args, **_kwargs):
+                return None
+        app.app = AppEvents()
+        app._planilha_foco_na_grade = lambda: True
         return app
 
     def test_um_clique_e_digito_iniciam_edicao_da_celula_ativa(self):
@@ -208,6 +214,36 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertEqual(app._planilha_celula_ativa, ("0", 1))
         self.assertEqual(App._planilha_teclar_celula(app, key), "break")
         self.assertEqual(entry.value, "X")
+    def test_fallback_da_janela_inicia_edicao_quando_canvas_nao_recebe_a_tecla(self):
+        app = self._app()
+        app._planilha_celula_ativa = ("0", 1)
+
+        class Entry:
+            def __init__(self):
+                self.value = "antigo"
+            def delete(self, *_args):
+                self.value = ""
+            def insert(self, _index, value):
+                self.value += value
+
+        entry = Entry()
+        app._planilha_editar_iid = lambda _row, _col: setattr(
+            app, "_planilha_edit_entry", entry
+        )
+        app._planilha_teclado_na_grade = True
+        event = SimpleNamespace(char="X", keysym="x", state=0x0001)
+
+        self.assertEqual(App._planilha_teclar_janela(app, event), "break")
+        self.assertEqual(entry.value, "X")
+
+    def test_foco_da_grade_e_reafirmado_quando_clique_define_a_grade_como_alvo(self):
+        app = self._app()
+        calls = []
+        app._planilha_foco_na_grade = lambda: calls.append(True)
+        app._planilha_teclado_na_grade = True
+        App._planilha_reafirmar_foco_grade(app)
+        self.assertEqual(calls, [True])
+
 
     def test_tab_avanca_para_a_direita_e_quebra_para_a_linha_seguinte(self):
         app = self._app()
@@ -259,8 +295,13 @@ class PlanilhaBehaviorTests(unittest.TestCase):
 
     def test_planilha_instala_tecla_de_edicao_apos_clique(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        self.assertIn('tree.bind("<ButtonPress-1>", self._planilha_clicar_celula)', source)
-        self.assertIn('tree.bind("<KeyPress>", self._planilha_teclar_celula, add="+")', source)
+        self.assertIn('canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")', source)
+        self.assertIn('canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")', source)
+        self.assertIn('canvas.bind_class(\n                PLANILHA_KEY_BINDTAG,\n                "<KeyPress>"', source)
+        self.assertIn('canvas.bind_class(\n                PLANILHA_KEY_BINDTAG,\n                "<KeyRelease>"', source)
+        self.assertIn('win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")', source)
+        self.assertIn('win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")', source)
+        self.assertIn('win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")', source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
 
     def test_botoes_compactos_usam_as_mesmas_dimensoes_do_modo_completo(self):
