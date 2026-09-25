@@ -1066,14 +1066,17 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _instalar_atalhos_teclado",source)
         self.assertNotIn("bind_all",source)
 
-    def test_selenium_reutiliza_driver_com_opcoes_leves(self):
+    def test_selenium_abre_chrome_for_testing_visivel(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
-        self.assertIn("def _criar_driver(self):",source)
-        self.assertIn("--disable-extensions",source)
-        self.assertIn("--disable-notifications",source)
-        self.assertIn("self.driver=self._criar_driver()",source)
-        self.assertIn("NoAlertPresentException",source)
-        self.assertIn("0.18",source)
+        self.assertIn('options.browser_version = "stable"', source)
+        self.assertIn('options.add_argument("--disable-extensions")', source)
+        self.assertIn('options.add_argument("--disable-notifications")', source)
+        self.assertIn('options.add_argument("--disable-default-apps")', source)
+        self.assertIn('options.add_argument("--no-first-run")', source)
+        self.assertNotIn('--start-minimized', source)
+        self.assertNotIn('driver.minimize_window()', source)
+        self.assertIn('driver = webdriver.Chrome(options=options)', source)
+        self.assertIn('Não foi possível abrir o Chrome para a automação.', source)
 
     def test_indicador_de_salvamento_sem_autosave_novo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
