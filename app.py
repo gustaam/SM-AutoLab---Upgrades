@@ -227,20 +227,21 @@ class Automacao:
 
     @staticmethod
     def _bundled_chrome_paths():
-        """Localiza o Chrome for Testing externo e, como legado, o bundle interno."""
+        """Localiza Chrome for Testing + ChromeDriver distribuídos com o AutoLab."""
         candidatos = []
 
-        # Distribuição recomendada: o navegador fica ao lado do executável.
+        # No build --onefile, o PyInstaller extrai os arquivos para _MEIPASS.
+        # Este é o caminho principal: o EXE funciona sem Chrome instalado e sem
+        # precisar baixar o navegador ou o driver.
+        bundle_root = getattr(sys, "_MEIPASS", None)
+        if bundle_root:
+            candidatos.append(Path(bundle_root) / "chrome_for_testing")
+
+        # Compatibilidade com a antiga distribuição portátil externa.
         if getattr(sys, "frozen", False):
             candidatos.append(Path(sys.executable).resolve().parent / "navegador")
         else:
             candidatos.append(Path(__file__).resolve().parent / "navegador")
-
-        # Compatibilidade com builds antigos que ainda embutiam o navegador
-        # dentro do CArchive do PyInstaller.
-        bundle_root = getattr(sys, "_MEIPASS", None)
-        if bundle_root:
-            candidatos.append(Path(bundle_root) / "chrome_for_testing")
 
         vistos = set()
         for root in candidatos:

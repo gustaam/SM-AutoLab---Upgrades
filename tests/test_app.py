@@ -88,6 +88,7 @@ class SeleniumWindowBehaviorTests(unittest.TestCase):
         self.assertIn("import sys", source)
         self.assertIn("def _bundled_chrome_paths()", source)
         self.assertIn('"navegador"', source)
+        self.assertIn('candidatos.append(Path(bundle_root) / "chrome_for_testing")', source)
         self.assertIn('Path(sys.executable).resolve().parent / "navegador"', source)
         self.assertIn('Path(__file__).resolve().parent / "navegador"', source)
         self.assertIn('"chrome_for_testing"', source)

@@ -721,20 +721,17 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("height=ACTION_BUTTON_HEIGHT", block)
         self.assertIn("ACTION_BUTTON_GAP", block)
 
-    def test_build_distribui_navegador_fora_do_onefile(self):
+    def test_build_embute_navegador_no_onefile(self):
         build = (self.root / "build_windows.bat").read_text(encoding="utf-8")
-        self.assertIn('robocopy "build_resources\\chrome_for_testing" "dist\\navegador"', build)
-        self.assertIn('dist\\navegador\\chrome-win64\\chrome.exe', build)
-        self.assertIn('dist\\navegador\\chromedriver-win64\\chromedriver.exe', build)
-        self.assertIn('Compress-Archive -Path \'dist\\SM AutoLab.exe\',\'dist\\navegador\'', build)
-        self.assertNotIn('build_resources\\chrome_for_testing;chrome_for_testing', build)
+        self.assertIn('build_resources\\chrome_for_testing;chrome_for_testing', build)
+        self.assertNotIn('robocopy "build_resources\\chrome_for_testing" "dist\\navegador"', build)
+        self.assertIn('dist\\SM AutoLab.exe', build)
 
-    def test_release_publica_o_pacote_com_navegador_externo(self):
+    def test_release_embute_navegador_no_executavel(self):
         release = (self.root / ".github/workflows/release.yml").read_text(encoding="utf-8")
-        self.assertIn('dist/SM AutoLab Windows.zip', release)
-        self.assertIn('dist\\navegador\\chrome-win64\\chrome.exe', release)
-        self.assertIn('dist\\navegador\\chromedriver-win64\\chromedriver.exe', release)
-        self.assertNotIn('build_resources\\chrome_for_testing;chrome_for_testing', release)
+        self.assertIn('build_resources\\chrome_for_testing;chrome_for_testing', release)
+        self.assertIn("Validar Selenium Manager e Chrome for Testing dentro do executável", release)
+        self.assertNotIn('dist\\navegador\\chrome-win64\\chrome.exe', release)
 
     def test_menu_configuracoes_ancora_no_botao_na_visualizacao_compacta(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
