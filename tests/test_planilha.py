@@ -218,6 +218,13 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertIn("def _planilha_duplo_clique_celula", source)
         self.assertNotIn('tree.bind("<Double-Button-1>", self._planilha_duplo_clique_celula)', source)
 
+    def test_modo_compacto_fica_mais_alto_e_um_pouco_mais_estreito(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _configurar_dashboard_compacto")
+        end = source.index("def _configurar_dashboard_completo", start) if "def _configurar_dashboard_completo" in source[start:] else len(source)
+        block = source[start:end]
+        self.assertIn("largura, altura = 500, 270", block)
+
     def test_botoes_compactos_usam_as_mesmas_dimensoes_do_modo_completo(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _configurar_dashboard_compacto")
