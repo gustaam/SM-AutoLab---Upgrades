@@ -244,11 +244,30 @@ class Automacao:
         try:
             manager_binary = manager._get_binary()
         except Exception as exc:
-            raise AutomacaoError(
-                "O executável do Selenium Manager não está disponível no SM AutoLab. "
-                "A versão empacotada precisa incluir o binário selenium-manager.",
-                "navegador",
-            ) from exc
+            # No one-file PyInstaller, use o caminho exato onde o workflow
+            # coloca o binário dentro do pacote selenium.
+            bundle_root = getattr(sys, "_MEIPASS", None)
+            candidato = (
+                Path(bundle_root)
+                / "selenium"
+                / "webdriver"
+                / "common"
+                / "windows"
+                / "selenium-manager.exe"
+                if bundle_root
+                else None
+            )
+            if candidato is None or not candidato.is_file():
+                raise AutomacaoError(
+                    "O executável do Selenium Manager não está disponível no SM AutoLab. "
+                    "A versão empacotada precisa incluir o binário selenium-manager.",
+                    "navegador",
+                ) from exc
+            manager_binary = candidato
+
+        # Garante que chamadas internas subsequentes do Selenium também usem
+        # exatamente o manager que está dentro do bundle.
+        os.environ["SE_MANAGER_PATH"] = str(manager_binary)
 
         comando = [
             str(manager_binary),
