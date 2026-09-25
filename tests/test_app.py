@@ -85,6 +85,9 @@ class SeleniumWindowBehaviorTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("SeleniumManager()", source)
+        self.assertIn('getattr(sys, "_MEIPASS", None)', source)
+        self.assertIn('"selenium-manager.exe"', source)
+        self.assertIn('os.environ["SE_MANAGER_PATH"]', source)
         self.assertIn('manager._get_binary()', source)
         self.assertIn('"--browser", "chrome"', source)
         self.assertIn('"--browser-version", "stable"', source)
