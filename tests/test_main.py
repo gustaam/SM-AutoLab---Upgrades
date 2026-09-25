@@ -1111,7 +1111,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('texto_status.lower().startswith("selenium:")', block)
         self.assertIn('self._add_activity(mensagem, self.INFO)', block)
 
-    def test_selenium_abre_chrome_for_testing_visivel(self):
+    def test_selenium_abre_chrome_com_fluxo_runtime_anterior(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
         self.assertIn('options.browser_version = "stable"', source)
         self.assertIn('options.add_argument("--disable-extensions")', source)
@@ -1120,8 +1120,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('options.add_argument("--no-first-run")', source)
         self.assertNotIn('--start-minimized', source)
         self.assertNotIn('driver.minimize_window()', source)
-        self.assertIn('driver = webdriver.Chrome(service=service, options=options)', source)
-        self.assertIn('O Chrome for Testing foi preparado, mas não foi possível iniciar o navegador.', source)
+        self.assertIn('driver = webdriver.Chrome(options=options)', source)
+        self.assertNotIn('driver = webdriver.Chrome(service=service, options=options)', source)
+        self.assertNotIn('SeleniumManager()', source)
 
     def test_indicador_de_salvamento_sem_autosave_novo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
