@@ -289,7 +289,20 @@ jobs:
       - name: Build SM AutoLab
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: cmd
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-binaries selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+
+      - name: Validar Selenium Manager dentro do executável
+        if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
+        shell: pwsh
+        run: |
+          $exe = "dist\SM AutoLab.exe"
+          if (-not (Test-Path $exe)) { throw "Executável não encontrado para inspeção do Selenium Manager." }
+          $archive = & pyi-archive_viewer --brief --recursive $exe
+          if ($LASTEXITCODE -ne 0) { throw "Não foi possível inspecionar o executável com pyi-archive_viewer." }
+          if ($archive -notmatch "selenium-manager\.exe") {
+            throw "Selenium Manager não foi encontrado no bundle do executável."
+          }
+          Write-Host "Selenium Manager encontrado no bundle PyInstaller."
 
       - name: Validar estrutura e metadados do executável
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
