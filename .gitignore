@@ -12,6 +12,7 @@ env/
 # Build/package outputs
 build/
 dist/
+build_resources/
 *.spec
 *.exe
 *.zip
