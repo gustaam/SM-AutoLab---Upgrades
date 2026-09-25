@@ -80,6 +80,21 @@ class ExecutionLifecycleTests(unittest.TestCase):
 
 
 class SeleniumWindowBehaviorTests(unittest.TestCase):
+    def test_selenium_manager_e_chromedriver_sao_resolvidos_explicitamente(self):
+        source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("SeleniumManager()", source)
+        self.assertIn('manager._get_binary()', source)
+        self.assertIn('"--browser", "chrome"', source)
+        self.assertIn('"--browser-version", "stable"', source)
+        self.assertIn('"--cache-path", str(cache_path)', source)
+        self.assertIn('"--output", "LOGGER"', source)
+        self.assertIn('Service(executable_path=driver_path)', source)
+        self.assertIn("options.binary_location = browser_path", source)
+        self.assertIn("Chrome for Testing pronto", source)
+        self.assertIn("Baixando Chrome for Testing", source)
+
     def test_driver_e_executa_com_chrome_for_testing_visivel(self):
         source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
             encoding="utf-8"
