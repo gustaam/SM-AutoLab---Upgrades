@@ -1434,6 +1434,15 @@ DEFAULT_TOTAL_ROWS = 10000
 DEFAULT_ROW_HEIGHT = 28
 DEFAULT_OVERSCAN = 3
 
+# Dimensões canônicas dos controles de execução. O modo compacto reutiliza
+# exatamente os mesmos tamanhos do modo completo para evitar deformações.
+ACTION_STOP_WIDTH = 140
+ACTION_START_WIDTH = 150
+ACTION_BUTTON_HEIGHT = 46
+ACTION_BUTTON_GAP = 7
+COMPACT_WINDOW_WIDTH = 600
+COMPACT_WINDOW_HEIGHT = 340
+
 def _clamp_fraction(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
 
@@ -2839,7 +2848,7 @@ class App:
         buttons.pack(side="right", padx=20, pady=11)
         self.botao_parar = ctk.CTkButton(
             buttons, text="■  Parar", command=self.parar,
-            width=140, height=46, corner_radius=8,
+            width=ACTION_STOP_WIDTH, height=ACTION_BUTTON_HEIGHT, corner_radius=8,
             fg_color=self.CARD, hover_color=("#FDECEC", "#3A2424"),
             border_width=1, border_color=self.ERROR, text_color=self.ERROR,
             font=("Segoe UI", 14, "bold"), state="disabled"
@@ -2849,8 +2858,8 @@ class App:
             buttons,
             text=self.INICIAR_LABEL,
             command=self.iniciar_thread,
-            width=150,
-            height=46,
+            width=ACTION_START_WIDTH,
+            height=ACTION_BUTTON_HEIGHT,
             corner_radius=8,
             fg_color=self.ACCENT,
             hover_color=self.ACCENT_HOVER,
@@ -2874,7 +2883,7 @@ class App:
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
-        largura, altura = 520, 300
+        largura, altura = COMPACT_WINDOW_WIDTH, COMPACT_WINDOW_HEIGHT
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -3017,13 +3026,13 @@ class App:
             button.pack(side="left", padx=3, pady=3)
             top_buttons.append(button)
 
-        # Grupo inferior com exatamente as mesmas dimensões do modo completo:
-        # Parar 140x46 + 7 px + Iniciar 150x46 = 297x52.
+        # Grupo inferior: exatamente as mesmas dimensões do modo completo.
+        # Parar 140x46 + 7 px + Iniciar 150x46 = 297x46.
         bottom_row = ctk.CTkFrame(
             actions,
             fg_color="transparent",
-            width=297,
-            height=52,
+            width=ACTION_STOP_WIDTH + ACTION_BUTTON_GAP + ACTION_START_WIDTH,
+            height=ACTION_BUTTON_HEIGHT,
         )
         bottom_row.pack(anchor="center", pady=(8, 0))
         bottom_row.pack_propagate(False)
@@ -3032,8 +3041,8 @@ class App:
             bottom_row,
             text="Parar",
             command=self.parar,
-            width=140,
-            height=46,
+            width=ACTION_STOP_WIDTH,
+            height=ACTION_BUTTON_HEIGHT,
             corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#FDECEC", "#3A2424"),
@@ -3049,8 +3058,8 @@ class App:
             bottom_row,
             text=self.INICIAR_LABEL,
             command=self.iniciar_thread,
-            width=150,
-            height=46,
+            width=ACTION_START_WIDTH,
+            height=ACTION_BUTTON_HEIGHT,
             corner_radius=8,
             fg_color=self.ACCENT,
             hover_color=self.ACCENT_HOVER,
@@ -3058,7 +3067,7 @@ class App:
             text_color="#FFFFFF",
             font=("Segoe UI", 14, "bold"),
         )
-        self.botao_iniciar.pack(side="left", padx=(7, 0))
+        self.botao_iniciar.pack(side="left", padx=(ACTION_BUTTON_GAP, 0))
 
         self.botao_planilha = top_buttons[0]
         self.botao_historico_planilha = top_buttons[1]
@@ -6974,6 +6983,7 @@ class App:
         win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-KeyPress-S>", self._planilha_atalho_salvar, add="+")
         win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")
+        win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")
         win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")
         win.bind("<Tab>", self._planilha_tabular_janela, add="+")
         win.bind("<Control-Return>", self._atalho_iniciar, add="+")
@@ -7416,23 +7426,44 @@ class App:
             return None
         try:
             alvo = self.app.winfo_containing(event.x_root, event.y_root)
-            dentro = (
-                alvo is canvas
-                or (
-                    alvo is not None
-                    and str(alvo).startswith(str(canvas) + ".")
-                )
-            )
+            dentro = self._planilha_widget_na_grade(alvo)
         except tk.TclError:
             dentro = False
 
         self._planilha_teclado_na_grade = bool(dentro)
         if dentro:
             try:
-                self.app.after_idle(self._planilha_foco_na_grade)
+                self.app.after(0, self._planilha_foco_na_grade)
             except Exception:
                 self._planilha_foco_na_grade()
         return None
+
+    def _planilha_widget_na_grade(self, widget):
+        """Retorna True quando o widget está dentro do Canvas da grade."""
+        tree = getattr(self, "_planilha_tree", None)
+        canvas = getattr(tree, "_canvas", None) if tree is not None else None
+        if canvas is None or widget is None:
+            return False
+        try:
+            if widget is canvas:
+                return True
+            return str(widget).startswith(str(canvas) + ".")
+        except Exception:
+            return False
+
+    def _planilha_foco_entrou_na_grade(self, event=None):
+        """Mantém o estado de teclado sincronizado com o foco real do Tk."""
+        widget = getattr(event, "widget", None)
+        self._planilha_teclado_na_grade = self._planilha_widget_na_grade(widget)
+        return None
+
+    def _planilha_reafirmar_foco_grade(self):
+        """Reafirma o foco após o evento de clique, sem roubar foco de outro controle."""
+        if getattr(self, "_planilha_edit_entry", None) is not None:
+            return
+        if not getattr(self, "_planilha_teclado_na_grade", False):
+            return
+        self._planilha_foco_na_grade()
 
     def _planilha_foco_na_grade(self):
         """Fixa o foco imediatamente na grade, sem depender do ciclo ocioso do Tk."""
@@ -7496,6 +7527,10 @@ class App:
 
         char = getattr(event, "char", "") or ""
         keysym = str(getattr(event, "keysym", "") or "")
+        if not char and len(keysym) == 1 and keysym.isprintable():
+            char = keysym
+        elif not char and keysym.startswith("KP_") and len(keysym) == 4 and keysym[-1].isdigit():
+            char = keysym[-1]
 
         # Teclas de navegação/atalhos permanecem com seus próprios bindings.
         state = int(getattr(event, "state", 0) or 0)
@@ -7585,6 +7620,10 @@ class App:
         self._planilha_fechar_edicao()
         tree.focus(str(current[0]))
         self._planilha_foco_na_grade()
+        try:
+            self.app.after(0, self._planilha_reafirmar_foco_grade)
+        except Exception:
+            pass
 
         # Interrompe o binding padrão do Canvas. A seleção e o foco já foram
         # resolvidos acima; deixar o binding de classe continuar pode transferir
