@@ -27,6 +27,7 @@ REQUIRED_PATHS = (
     "VERSION", "SM AutoLab.ico", "assets", "build_windows.bat", "scripts/validate.py",
     "tests/test_patch.py", "tests/test_main.py", "tests/test_planilha.py",
     "tests/test_app.py", "tests/test_validation.py", "scripts/smoke_ui.py",
+    "scripts/prepare_chrome_for_testing.py",
 )
 
 OBSOLETE_PATHS = (
@@ -227,6 +228,11 @@ def validate_architecture(root: Path) -> None:
         "def _planilha_soltar_selecao",
         "def _planilha_duplo_clique_celula",
         "def _planilha_desenhar_borda",
+        'canvas.bind("<ButtonPress-1>", self._planilha_clicar_celula, add="+")',
+        'canvas.bind("<KeyPress>", self._planilha_teclar_celula, add="+")',
+        'canvas.bind("<Return>", self._planilha_editar_selecao, add="+")',
+        'def _vincular_enter_confirmacao',
+        "def _bundled_chrome_paths",
         'command=self._mostrar_menu_aparencia',
         'aparencia.bind("<Enter>", self._mostrar_menu_aparencia',
         'aparencia.bind("<Leave>", self._agendar_fechar_aparencia',
