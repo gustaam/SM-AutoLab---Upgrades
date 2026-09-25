@@ -103,8 +103,16 @@ if not exist "version_info.txt" (
 )
 
 echo.
+echo Preparando Chrome for Testing integrado...
+%PYTHON% scripts\prepare_chrome_for_testing.py
+if errorlevel 1 goto :erro
+if not exist "build_resources\chrome_for_testing\chrome-win64\chrome.exe" goto :erro
+if not exist "build_resources\chrome_for_testing\chromedriver-win64\chromedriver.exe" goto :erro
+echo Chrome for Testing integrado: OK
+echo.
+
 echo Gerando SM AutoLab v!APP_VERSION!...
-%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." --add-data "build_resources\chrome_for_testing;chrome_for_testing" main.py
 if errorlevel 1 goto :erro
 
 if not exist "dist\SM AutoLab.exe" (
