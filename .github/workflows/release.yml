@@ -322,7 +322,7 @@ jobs:
         run: |
           python -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --additional-hooks-dir hooks --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 
-      - name: Validar Selenium Manager e navegador externo
+      - name: Validar Selenium Manager dentro do executável e navegador externo
         if: steps.release_gate.outputs.should_release == 'true' && steps.release_state.outputs.already_published != 'true'
         shell: pwsh
         run: |
