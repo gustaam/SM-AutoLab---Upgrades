@@ -1433,6 +1433,7 @@ SM_AUTOLAB_GRADE_VIRTUAL = "SM-AUTOLAB-GRADE-VIRTUAL"
 DEFAULT_TOTAL_ROWS = 10000
 DEFAULT_ROW_HEIGHT = 28
 DEFAULT_OVERSCAN = 3
+PLANILHA_KEY_BINDTAG = "SM_AUTOLAB_PLANILHA_KEYS"
 
 def _clamp_fraction(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
@@ -6918,6 +6919,12 @@ class App:
         win.bind("<Control-KeyPress-F>", self._abrir_busca_planilha, add="+")
         win.bind("<Control-KeyPress-s>", self._planilha_atalho_salvar, add="+")
         win.bind("<Control-KeyPress-S>", self._planilha_atalho_salvar, add="+")
+        # Captura de teclado no Toplevel como fallback quando o Canvas não
+        # recebe diretamente o primeiro caractere após um único clique.
+        win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")
+        win.bind("<FocusIn>", self._planilha_foco_entrou_na_grade, add="+")
+        win.bind("<KeyPress>", self._planilha_teclar_janela, add="+")
+        win.bind("<Tab>", self._planilha_tabular_janela, add="+")
         win.bind("<Control-Return>", self._atalho_iniciar, add="+")
         win.bind("<Control-KP_Enter>", self._atalho_iniciar, add="+")
         # Restaurar rascunho após a janela existir para que o diálogo tenha parent válido.
