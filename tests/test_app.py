@@ -80,60 +80,30 @@ class ExecutionLifecycleTests(unittest.TestCase):
 
 
 class SeleniumWindowBehaviorTests(unittest.TestCase):
-    def test_selenium_manager_e_chromedriver_sao_resolvidos_explicitamente(self):
-        source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("SeleniumManager()", source)
-        self.assertIn("import sys", source)
-        self.assertIn("def _bundled_chrome_paths()", source)
-        self.assertIn('"navegador"', source)
-        self.assertIn('candidatos.append(Path(bundle_root) / "chrome_for_testing")', source)
-        self.assertIn('Path(sys.executable).resolve().parent / "navegador"', source)
-        self.assertIn('Path(__file__).resolve().parent / "navegador"', source)
-        self.assertIn('"chrome_for_testing"', source)
-        self.assertIn('"chrome-win64" / "chrome.exe"', source)
-        self.assertIn('"chromedriver-win64" / "chromedriver.exe"', source)
-        self.assertIn("bundled_browser, bundled_driver = self._bundled_chrome_paths()", source)
-        self.assertIn("options.binary_location = str(bundled_browser)", source)
-        self.assertIn("Service(executable_path=str(bundled_driver))", source)
-        self.assertIn('getattr(sys, "_MEIPASS", None)', source)
-        self.assertIn("bundled_manager = (", source)
-        self.assertIn('Path(bundle_root)', source)
-        self.assertIn('os.environ["SE_MANAGER_PATH"] = str(manager_binary)', source)
-        self.assertIn('if bundled_manager is not None and bundled_manager.is_file():', source)
-        self.assertIn('"selenium-manager.exe"', source)
-        self.assertIn('os.environ["SE_MANAGER_PATH"]', source)
-        self.assertIn('manager._get_binary()', source)
-        self.assertIn('"--browser", "chrome"', source)
-        self.assertIn('"--browser-version", "stable"', source)
-        self.assertIn('"--cache-path", str(cache_path)', source)
-        self.assertIn('"--output", "LOGGER"', source)
-        self.assertIn('Service(executable_path=driver_path)', source)
-        self.assertIn("options.binary_location = browser_path", source)
-        self.assertIn("Chrome for Testing pronto", source)
-        self.assertIn("baixando Chrome for Testing", source)
-
-    def test_selenium_manager_exibe_progresso_e_usa_cache_por_usuario(self):
-        source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn('"--cache-path", str(cache_path)', source)
-        self.assertIn('"--avoid-stats"', source)
-        self.assertIn('"--output", "LOGGER"', source)
-        self.assertIn('subprocess.Popen(', source)
-        self.assertIn('stdout=subprocess.PIPE', source)
-        self.assertIn('stderr=subprocess.STDOUT', source)
-        self.assertIn('if "download" in low:', source)
-        self.assertIn('self._status("Selenium: baixando Chrome for Testing...")', source)
-    def test_driver_e_executa_com_chrome_for_testing_visivel(self):
+    def test_runtime_selenium_usa_fluxo_padrao_antes_das_alteracoes_explicitas(self):
         source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
             encoding="utf-8"
         )
         self.assertIn('options.browser_version = "stable"', source)
-        self.assertIn('driver = webdriver.Chrome(service=service, options=options)', source)
-        self.assertNotIn('options.add_argument("--start-minimized")', source)
-        self.assertNotIn("driver.minimize_window()", source)
+        self.assertIn('options.add_argument("--disable-extensions")', source)
+        self.assertIn('options.add_argument("--disable-notifications")', source)
+        self.assertIn('options.add_argument("--no-first-run")', source)
+        self.assertIn("driver = webdriver.Chrome(options=options)", source)
+        self.assertIn("driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)", source)
+        self.assertNotIn("SeleniumManager()", source)
+        self.assertNotIn("Service(executable_path=", source)
+        self.assertNotIn("binary_location =", source)
+        self.assertNotIn('subprocess.Popen(', source)
+        self.assertNotIn("--cache-path", source)
+        self.assertNotIn("--language-binding", source)
+
+    def test_driver_e_executa_sem_forcar_navegador_embutido(self):
+        source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("def _criar_driver(self):", source)
+        self.assertIn("driver = webdriver.Chrome(options=options)", source)
+        self.assertNotIn("def _bundled_chrome_paths", source)
 
 
 class StorageSafeTests(unittest.TestCase):
