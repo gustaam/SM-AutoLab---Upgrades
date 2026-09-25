@@ -3029,7 +3029,7 @@ class App:
 
         self.botao_parar = ctk.CTkButton(
             bottom_row,
-            text="■  Parar",
+            text="Parar",
             command=self.parar,
             width=140,
             height=46,
