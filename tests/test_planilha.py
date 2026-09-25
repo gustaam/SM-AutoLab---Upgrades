@@ -160,7 +160,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertIn("self._planilha_teclado_na_grade = False", source)
         self.assertIn("self._planilha_teclado_na_grade = True", source)
         self.assertIn("def _planilha_foco_na_grade", source)
-        self.assertNotIn('win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")', source)
+        self.assertIn('win.bind("<ButtonPress-1>", self._planilha_clique_janela, add="+")', source)
 
     def test_um_clique_e_digito_iniciam_edicao_da_celula_ativa(self):
         app = self._app()
