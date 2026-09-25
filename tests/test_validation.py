@@ -69,6 +69,7 @@ class ConsolidatedValidationTests(unittest.TestCase):
         self.assertIn("Selenium Manager não encontrado no ambiente de build", release)
         self.assertIn("Preparar Chrome for Testing integrado", release)
         self.assertIn("scripts/prepare_chrome_for_testing.py", release)
+        self.assertIn('robocopy "build_resources\\chrome_for_testing" "dist\\navegador"', release)
         self.assertIn('dist\\navegador\\chrome-win64\\chrome.exe', release)
         self.assertIn('dist\\navegador\\chromedriver-win64\\chromedriver.exe', release)
         self.assertNotIn('build_resources\\chrome_for_testing;chrome_for_testing', release)
