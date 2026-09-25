@@ -3020,12 +3020,14 @@ class App:
         bottom_row = ctk.CTkFrame(actions, fg_color="transparent")
         bottom_row.pack(anchor="center", pady=(8, 0))
 
+        # Mantém as ações principais do modo compacto com exatamente
+        # as mesmas dimensões visuais do modo completo.
         self.botao_parar = ctk.CTkButton(
             bottom_row,
             text="Parar",
             command=self.parar,
-            width=115,
-            height=38,
+            width=140,
+            height=46,
             corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#FDECEC", "#3A2424"),
@@ -3041,8 +3043,8 @@ class App:
             bottom_row,
             text=self.INICIAR_LABEL,
             command=self.iniciar_thread,
-            width=115,
-            height=38,
+            width=150,
+            height=46,
             corner_radius=8,
             fg_color=self.ACCENT,
             hover_color=self.ACCENT_HOVER,
@@ -7352,9 +7354,11 @@ class App:
         char = getattr(event, "char", "") or ""
         keysym = str(getattr(event, "keysym", "") or "")
 
-        # Teclas de navegação/atalhos permanecem com seus próprios bindings.
+        # Ctrl e Alt indicam atalhos: deixam o comando seguir para seus
+        # bindings específicos. Shift, por outro lado, faz parte da digitação
+        # normal (por exemplo, letras maiúsculas e símbolos) e deve ser aceito.
         state = int(getattr(event, "state", 0) or 0)
-        if state & 0x0004 or state & 0x0008 or state & 0x0001:
+        if state & 0x0004 or state & 0x0008:
             return None
 
         if keysym in ("BackSpace", "Delete"):
