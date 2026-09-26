@@ -500,6 +500,78 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertTrue(interface.App._historico_execucao_tem_erros({"status": "Erro geral", "erros": 0}))
         self.assertFalse(interface.App._historico_execucao_tem_erros({"status": "Concluída", "erros": 0}))
 
+    def test_checkpoint_interno_fica_vinculado_a_revisao_completa_da_planilha(self):
+        import app
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checkpoint = Path(temp_dir) / "interno_checkpoint.json"
+            codigos = ["AAA", "BBB"]
+            with patch("app.caminho_checkpoint_interno", return_value=checkpoint):
+                app.salvar_checkpoint_interno(codigos, 1, "planilha-fp-1")
+                self.assertEqual(
+                    app.ler_checkpoint_interno(codigos, "planilha-fp-1"),
+                    1,
+                )
+                self.assertIsNone(
+                    app.ler_checkpoint_interno(codigos, "planilha-fp-2"),
+                )
+                dados = app.read_json_with_backup(checkpoint, {})
+                self.assertEqual(dados.get("version"), 2)
+                self.assertEqual(dados.get("planilha_fingerprint"), "planilha-fp-1")
+
+    def test_falha_fatal_mantem_execucao_pendente_para_retomada(self):
+        import interface
+
+        obj = object.__new__(interface.App)
+        obj._execucao_atual = {
+            "origem": "planilha_interna",
+            "planilha_fingerprint": "fp",
+            "checkpoint": 0,
+            "proximo_indice": 0,
+            "erros": 0,
+        }
+        obj._planilha_data = {"0,0": "1", "0,1": "AAA"}
+        obj._checkpoint_indice_seguro = 0
+        obj._historico_execucoes = []
+        obj._codigos_erros_execucao = []
+        obj._salvar_estado_persistente = lambda: None
+        obj._restaurar_historico_na_tela = lambda: None
+        obj._atualizar_contador_arquivos = lambda: None
+        obj._desmarcar_planilha_interna_processada = lambda: None
+        obj._extrair_codigos_planilha = lambda: ["AAA"]
+        obj._planilha_fingerprint = lambda _cells: "fp"
+
+        with patch("interface.salvar_checkpoint_interno") as salvar:
+            interface.App._registrar_falha_historico(obj, "Selenium falhou")
+            salvar.assert_called_once_with(["AAA"], 0, "fp")
+
+        self.assertIsNotNone(obj._execucao_atual)
+        self.assertIn("interrompida", obj._execucao_atual["status"].lower())
+        self.assertEqual(obj._execucao_atual["checkpoint"], 0)
+        self.assertEqual(obj._execucao_atual["proximo_indice"], 0)
+        self.assertEqual(obj._execucao_atual["erros"], 1)
+
+    def test_planilha_pendente_tem_prioridade_sobre_marcador_de_processada(self):
+        import interface
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            obj = object.__new__(interface.App)
+            obj._planilha_arquivo = Path(temp_dir) / "planilha_interna.json"
+            cells = {"0,0": "1", "0,1": "AAA"}
+            obj._planilha_data = dict(cells)
+            obj._execucao_atual = {
+                "origem": "planilha_interna",
+                "status": "Interrompida — erro de execução",
+                "planilha_fingerprint": interface.App._planilha_fingerprint(cells),
+            }
+            obj._historico_execucoes = []
+            obj._salvar_planilha_interna_data()
+            obj._marcar_planilha_interna_processada(cells)
+
+            self.assertFalse(obj._planilha_foi_processada(cells))
+
     def test_planilha_processada_persiste_e_impede_reabertura_da_mesma_revisao(self):
         import interface
         import tempfile
@@ -751,7 +823,11 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _registrar_falha_historico")
         end = source.index("def _restaurar_historico_na_tela", start)
         fail_block = source[start:end]
-        self.assertIn('if not self._execucao_atual.get("reexecucao_de"):', fail_block)
+        self.assertIn('self._execucao_atual["status"] = "Interrompida — erro de execução"', fail_block)
+        self.assertIn('self._execucao_atual["checkpoint"]', fail_block)
+        self.assertIn("self._desmarcar_planilha_interna_processada()", fail_block)
+        self.assertIn("salvar_checkpoint_interno(", fail_block)
+        self.assertNotIn("self._execucao_atual = None", fail_block)
 
     def test_fluxo_de_retomada_usa_os_codigos_do_arquivo_salvo(self):
         app = App.__new__(App)
@@ -1014,6 +1090,27 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("cmd.exe", source)
         self.assertIn("SM_AUTOLAB_UPDATE_CLEANUP_DIR", source)
         self.assertIn("def _agendar_limpeza_atualizacao", source)
+
+    def test_execucao_interna_propaga_fingerprint_da_planilha_para_o_checkpoint(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn(
+            'planilha_fingerprint=str(',
+            source[source.index("def _executar_interno"):source.index("def _recuperar_planilha_persistida_para_execucao")],
+        )
+        start = source.index("def _iniciar_automacao_interna")
+        end = source.index("def _executar_interno", start)
+        block = source[start:end]
+        self.assertIn("planilha_fingerprint = self._planilha_fingerprint(self._planilha_data)", block)
+        self.assertIn("ler_checkpoint_interno(codigos, planilha_fingerprint)", block)
+
+    def test_fechamento_da_execucao_interna_reconstroi_codigos_do_disco_se_necessario(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _fechar_aplicativo")
+        end = source.index("def _agendar_estabilizacao_apos_retomada", start)
+        block = source[start:end]
+        self.assertIn("salvo = self._carregar_planilha_interna()", block)
+        self.assertIn("salvar_checkpoint_interno(", block)
+        self.assertIn("self._planilha_fingerprint(self._planilha_data)", block)
 
     def test_execucao_recria_automacao_e_libera_referencia_ao_final(self):
         source = (self.root / "app.py").read_text(encoding="utf-8")
