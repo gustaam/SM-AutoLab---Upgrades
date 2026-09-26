@@ -5740,7 +5740,12 @@ class App:
         # O checkpoint do arquivo interno deve ser validado contra a mesma
         # lista de códigos recuperada do disco.
         try:
-            interno = ler_checkpoint_interno(codigos) if codigos else None
+            esperado = str(pendente.get("planilha_fingerprint", "")).strip()
+            interno = (
+                ler_checkpoint_interno(codigos, esperado)
+                if codigos
+                else None
+            )
             if interno is not None:
                 inicio = int(interno)
         except Exception:
@@ -6003,15 +6008,41 @@ class App:
             return
         agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._execucao_atual["fim"] = agora
-        self._execucao_atual["status"] = "Erro geral"
+        self._execucao_atual["status"] = "Interrompida — erro de execução"
         self._execucao_atual["mensagem"] = str(mensagem)
         self._execucao_atual["erros"] = max(
             int(self._execucao_atual.get("erros", 0) or 0),
             1,
         )
-        if not self._execucao_atual.get("reexecucao_de"):
-            self._historico_execucoes.append(dict(self._execucao_atual))
-        self._execucao_atual = None
+        self._execucao_atual["checkpoint"] = max(
+            0,
+            int(getattr(self, "_checkpoint_indice_seguro", 0) or 0),
+        )
+        self._execucao_atual["proximo_indice"] = int(
+            self._execucao_atual["checkpoint"]
+        )
+
+        # A falha fatal não encerra a execução persistida. Ela precisa sobreviver
+        # ao fechamento do aplicativo para permitir retomada no próximo início.
+        if str(self._execucao_atual.get("origem", "")).strip() == "planilha_interna":
+            self._execucao_atual["planilha_fingerprint"] = self._planilha_fingerprint(
+                self._planilha_data
+            )
+            self._desmarcar_planilha_interna_processada()
+
+            try:
+                codigos = self._extrair_codigos_planilha()
+                if codigos:
+                    salvar_checkpoint_interno(
+                        codigos,
+                        int(self._execucao_atual["checkpoint"]),
+                        self._execucao_atual["planilha_fingerprint"],
+                    )
+            except Exception:
+                LOGGER.exception(
+                    "Falha ao persistir checkpoint após erro fatal da automação."
+                )
+
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
         self._atualizar_contador_arquivos()
@@ -6805,6 +6836,21 @@ class App:
         """Retorna True quando a revisão salva já foi concluída pela automação."""
         fingerprint = self._planilha_fingerprint(cells)
 
+        # Uma execução pendente desta mesma revisão sempre tem prioridade:
+        # o usuário precisa poder retomá-la, mesmo que exista um marcador
+        # antigo ou inconsistente de processamento concluído.
+        pendente = getattr(self, "_execucao_atual", None)
+        if isinstance(pendente, dict):
+            status = str(pendente.get("status", "")).strip().casefold()
+            origem = str(pendente.get("origem", "")).strip()
+            pendente_fp = str(pendente.get("planilha_fingerprint", "")).strip()
+            if (
+                origem == "planilha_interna"
+                and ("em andamento" in status or "interrompida" in status or "parando" in status)
+                and pendente_fp == fingerprint
+            ):
+                return False
+
         # O marcador persistido continua válido mesmo depois de o histórico
         # visual ser apagado pelo usuário.
         try:
@@ -6825,6 +6871,14 @@ class App:
                 continue
             status = str(execucao.get("status", "")).strip().casefold()
             if status != "concluída":
+                continue
+            try:
+                erros = int(execucao.get("erros", 0) or 0)
+                sucessos = int(execucao.get("sucessos", 0) or 0)
+                total = int(execucao.get("total", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if erros != 0 or total <= 0 or sucessos < total:
                 continue
             if str(execucao.get("planilha_fingerprint", "")).strip() == fingerprint:
                 return True
@@ -6849,6 +6903,25 @@ class App:
         except Exception:
             LOGGER.exception("Falha ao registrar a planilha interna como processada.")
 
+
+    def _desmarcar_planilha_interna_processada(self):
+        """Remove o marcador de processamento concluído sem apagar os códigos salvos."""
+        try:
+            self._garantir_pasta_planilha()
+            data = read_json_with_backup(self._planilha_arquivo, {})
+            if not isinstance(data, dict):
+                data = {}
+            data["version"] = 1
+            data["cells"] = {
+                str(chave): str(valor)
+                for chave, valor in (self._planilha_data or {}).items()
+                if str(valor) != ""
+            }
+            data["processed_fingerprint"] = ""
+            data["processed_at"] = ""
+            atomic_write_json(self._planilha_arquivo, data)
+        except Exception:
+            LOGGER.exception("Falha ao remover o marcador de planilha processada.")
 
     def _planilha_atualizar_estado_salvamento(self, estado):
         label = getattr(self, "_planilha_estado_salvamento_label", None)
@@ -8946,13 +9019,18 @@ class App:
             )
             return
 
+        planilha_fingerprint = self._planilha_fingerprint(self._planilha_data)
         if inicio_forcado is not None:
             try:
                 start = max(0, min(int(inicio_forcado), len(codigos)))
             except (TypeError, ValueError):
                 start = 0
         else:
-            inicio = None if ignorar_checkpoint else ler_checkpoint_interno(codigos)
+            inicio = (
+                None
+                if ignorar_checkpoint
+                else ler_checkpoint_interno(codigos, planilha_fingerprint)
+            )
             start = 0
         if inicio is not None and inicio < len(codigos):
             resposta=messagebox.askyesno(
@@ -8979,7 +9057,7 @@ class App:
             self._execucao_atual["reexecucao_de"] = self._reexecucao_origem_id
             self._reexecucao_origem_id = None
         self._origem_reexecucao = "planilha_interna"
-        self._execucao_atual["planilha_fingerprint"] = self._planilha_fingerprint(self._planilha_data)
+        self._execucao_atual["planilha_fingerprint"] = planilha_fingerprint
         self._execucao_atual["total"] = len(codigos)
         self._execucao_atual["checkpoint"] = int(start)
         self._execucao_atual["proximo_indice"] = int(start)
@@ -9017,7 +9095,16 @@ class App:
 
     def _executar_interno(self,codigos,start):
         try:
-            resultado=principal_interno(codigos,self,start)
+            resultado=principal_interno(
+                codigos,
+                self,
+                start,
+                planilha_fingerprint=str(
+                    getattr(self, "_execucao_atual", {}).get(
+                        "planilha_fingerprint", ""
+                    )
+                ),
+            )
             if not self._closing:
                 self.app.after(0,lambda:self._finalizar(resultado))
         except Exception as exc:
@@ -9103,20 +9190,33 @@ class App:
         except Exception:
             pass
 
+        processamento_concluido = (
+            not self._parar
+            and int(getattr(resultado, "erros", 0) or 0) == 0
+            and int(getattr(resultado, "sucessos", 0) or 0) >= int(getattr(resultado, "total_planejado", 0) or 0)
+        )
         if self._parar:
             self._add_activity("Processo parado. Ponto de retomada salvo.", self.WARNING)
+            self._desmarcar_planilha_interna_processada()
             self._finalizar_historico_execucao(resultado, "Parada pelo usuário")
             self._aplicar_status("Parado pelo usuário")
-        else:
+        elif processamento_concluido:
             self._add_activity("Processo finalizado.", self.SUCCESS)
-            try:
-                self._marcar_planilha_interna_processada(self._planilha_data)
-            except Exception:
-                pass
+            self._marcar_planilha_interna_processada(self._planilha_data)
             self._finalizar_historico_execucao(resultado, "Concluída")
             # Aplicar imediatamente: evita que a messagebox bloqueie a atualização
             # do cabeçalho deixando-o visualmente em "Processando".
             self._aplicar_status("Finalizado")
+        else:
+            # Uma execução com qualquer erro NÃO consome a planilha salva.
+            # Os códigos permanecem disponíveis para nova tentativa.
+            self._add_activity(
+                "Processo finalizado com erros. A planilha salva foi preservada para nova tentativa.",
+                self.WARNING,
+            )
+            self._desmarcar_planilha_interna_processada()
+            self._finalizar_historico_execucao(resultado, "Erro na execução")
+            self._aplicar_status("Processo finalizado com erros")
 
         for item in resultado.itens:
             if item.status == "Erro":
@@ -9405,8 +9505,20 @@ class App:
 
                 if str(self._execucao_atual.get("origem", "")) == "planilha_interna":
                     codigos = self._extrair_codigos_planilha()
+                    if not codigos:
+                        try:
+                            salvo = self._carregar_planilha_interna()
+                            if salvo:
+                                self._planilha_data = dict(salvo)
+                                codigos = self._extrair_codigos_planilha()
+                        except Exception:
+                            codigos = []
                     if codigos:
-                        salvar_checkpoint_interno(codigos, indice)
+                        salvar_checkpoint_interno(
+                            codigos,
+                            indice,
+                            self._planilha_fingerprint(self._planilha_data),
+                        )
 
                 self._salvar_estado_persistente()
             except Exception:
