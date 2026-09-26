@@ -2291,7 +2291,7 @@ APP_VERSION = _ler_versao_aplicativo()
 # para o extremo direito. Os pesos das cinco colunas finais ainda permitem
 # adaptação contínua quando a janela diminui.
 HISTORICO_COL_PESOS = (0, 0, 18, 4, 4, 3, 5, 1, 0)
-HISTORICO_COL_MINS = (72, 60, 8, 60, 60, 46, 58, 16, 0)
+HISTORICO_COL_MINS = (82, 68, 8, 72, 72, 52, 100, 18, 0)
 
 class App:
     INICIAR_LABEL = "Iniciar"
@@ -3009,8 +3009,14 @@ class App:
         top_row.pack(fill="x")
         top_row.pack_propagate(False)
 
+        top_group = ctk.CTkFrame(
+            top_row, fg_color="transparent", width=354, height=68
+        )
+        top_group.pack(anchor="center")
+        top_group.pack_propagate(False)
+
         self.botao_planilha = ctk.CTkButton(
-            top_row,
+            top_group,
             text=icon_grid,
             command=self.abrir_planilha,
             width=110,
@@ -3026,7 +3032,7 @@ class App:
         self.botao_planilha.pack(side="left", padx=(0, 6), pady=3)
 
         secondary_row = ctk.CTkFrame(
-            top_row, fg_color="transparent", width=238, height=62
+            top_group, fg_color="transparent", width=238, height=62
         )
         secondary_row.pack(side="left", padx=(0, 0), pady=3)
         secondary_row.pack_propagate(False)
@@ -3065,11 +3071,18 @@ class App:
         self.botao_historico_compacto._sm_autolab_tooltip_message = "Histórico"
         self.botao_historico_compacto.pack(side="left")
 
-        bottom_row = ctk.CTkFrame(actions, fg_color="transparent")
+        bottom_row = ctk.CTkFrame(actions, fg_color="transparent", height=44)
         bottom_row.pack(fill="x", pady=(2, 0))
+        bottom_row.pack_propagate(False)
+
+        bottom_group = ctk.CTkFrame(
+            bottom_row, fg_color="transparent", width=354, height=44
+        )
+        bottom_group.pack(anchor="center")
+        bottom_group.pack_propagate(False)
 
         self.botao_parar = ctk.CTkButton(
-            bottom_row,
+            bottom_group,
             text=icon_stop,
             command=self.parar,
             width=174,
@@ -3087,7 +3100,7 @@ class App:
         self.botao_parar.pack(side="left", padx=(0, 6))
 
         self.botao_iniciar = ctk.CTkButton(
-            bottom_row,
+            bottom_group,
             text=icon_play,
             command=self.iniciar_thread,
             width=174,
@@ -3136,11 +3149,11 @@ class App:
         self._historico_compacto_window = win
         self._configurar_icone_janela(win)
         win.title("Histórico")
-        win.geometry("700x390")
-        win.minsize(620, 330)
+        win.geometry("760x390")
+        win.minsize(700, 330)
         win.resizable(True, True)
         win.transient(self.app)
-        self._centralizar_janela(win, 700, 390)
+        self._centralizar_janela(win, 760, 390)
 
         header = ctk.CTkFrame(
             win, fg_color=self.CARD, corner_radius=0, height=52
@@ -6887,7 +6900,7 @@ class App:
 
 
     def _planilha_foi_processada(self, cells):
-        """Retorna True quando a revisão salva já foi concluída pela automação."""
+        """Retorna True quando a revisão salva já foi processada."""
         fingerprint = self._planilha_fingerprint(cells)
 
         # Uma execução pendente desta mesma revisão sempre tem prioridade:
@@ -6917,6 +6930,21 @@ class App:
         except Exception:
             pass
 
+        # Uma execução concluída com erro continua sendo uma execução já processada.
+        # O histórico de erros deve permanecer disponível para reexecução, mas isso
+        # não significa que a planilha deva voltar a disparar o diálogo de recuperação
+        # ao abrir o editor novamente.
+        for execucao in reversed(getattr(self, "_historico_execucoes", [])):
+            if not isinstance(execucao, dict):
+                continue
+            if str(execucao.get("origem", "")).strip() != "planilha_interna":
+                continue
+            status = str(execucao.get("status", "")).strip().casefold()
+            if status != "erro na execução":
+                continue
+            if str(execucao.get("planilha_fingerprint", "")).strip() == fingerprint:
+                return True
+
         # Fallback para execuções registradas antes do marcador persistido.
         for execucao in reversed(getattr(self, "_historico_execucoes", [])):
             if not isinstance(execucao, dict):
@@ -6939,7 +6967,7 @@ class App:
         return False
 
     def _marcar_planilha_interna_processada(self, cells):
-        """Persiste que a revisão salva foi processada com sucesso."""
+        """Persiste que a revisão salva já foi processada."""
         try:
             self._garantir_pasta_planilha()
             data = read_json_with_backup(self._planilha_arquivo, {})
@@ -9270,6 +9298,7 @@ class App:
             )
             self._desmarcar_planilha_interna_processada()
             self._finalizar_historico_execucao(resultado, "Erro na execução")
+            self._marcar_planilha_interna_processada(self._planilha_data)
             self._aplicar_status("Processo finalizado com erros")
 
         for item in resultado.itens:
