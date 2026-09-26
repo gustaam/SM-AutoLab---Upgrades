@@ -3009,7 +3009,7 @@ class App:
 
         self.botao_planilha = ctk.CTkButton(
             top_row,
-            text=f"{icon_grid}  Abrir",
+            text=icon_grid,
             command=self.abrir_planilha,
             width=170,
             height=62,
@@ -3018,9 +3018,9 @@ class App:
             hover_color=self.ACCENT_HOVER,
             border_width=0,
             text_color="#FFFFFF",
-            font=("Segoe UI", 13, "bold"),
+            font=icon_font_large,
         )
-        self.botao_planilha._sm_autolab_tooltip_message = "Abre a planilha interna."
+        self.botao_planilha._sm_autolab_tooltip_message = "Abrir planilha"
         self.botao_planilha.pack(side="left", padx=(0, 6), pady=3)
 
         secondary_row = ctk.CTkFrame(top_row, fg_color="transparent")
