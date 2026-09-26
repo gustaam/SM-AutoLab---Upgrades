@@ -51,6 +51,22 @@ class FakeTree:
 
 
 class PlanilhaPersistenceTests(unittest.TestCase):
+    def test_execucao_com_erro_nao_marca_planilha_como_processada(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _finalizar(self, resultado):")
+        end = source.index("def parar(self):", start)
+        block = source[start:end]
+
+        self.assertIn("processamento_concluido = (", block)
+        self.assertIn('int(getattr(resultado, "erros", 0) or 0) == 0', block)
+        self.assertIn("self._desmarcar_planilha_interna_processada()", block)
+        self.assertIn('self._finalizar_historico_execucao(resultado, "Erro na execução")', block)
+
+    def test_execucao_concluida_soh_marca_planilha_quando_todos_os_codigos_tiverem_sucesso(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("and int(getattr(resultado, "sucessos", 0) or 0) >= int(getattr(resultado, "total_planejado", 0) or 0)", source)
+        self.assertIn("if erros != 0 or total <= 0 or sucessos < total:", source)
+
     def test_execucao_recupera_planilha_do_disco_quando_memoria_esta_vazia(self):
         app = App.__new__(App)
         app._planilha_data = {}
