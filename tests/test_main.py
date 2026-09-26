@@ -477,6 +477,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _planilha_fingerprint", source)
         self.assertIn("def _planilha_foi_processada", source)
         self.assertIn('status != "concluída"', source)
+        self.assertIn('status != "erro na execução"', source)
         self.assertIn('"A última planilha salva ainda não foi processada.', source)
 
     def test_planilha_processada_abre_nova_vazia_e_apaga_rascunho(self):
@@ -573,6 +574,27 @@ class CanonicalRuntimeTests(unittest.TestCase):
             obj._marcar_planilha_interna_processada(cells)
 
             self.assertFalse(obj._planilha_foi_processada(cells))
+
+    def test_planilha_processada_com_erro_nao_dispara_recuperacao(self):
+        import interface
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            obj = object.__new__(interface.App)
+            obj._planilha_arquivo = Path(temp_dir) / "planilha_interna.json"
+            cells = {"0,0": "1", "0,1": "ABC", "0,2": "Item"}
+            obj._planilha_data = dict(cells)
+            obj._execucao_atual = None
+            obj._historico_execucoes = [{
+                "origem": "planilha_interna",
+                "status": "Erro na execução",
+                "planilha_fingerprint": interface.App._planilha_fingerprint(cells),
+                "erros": 1,
+                "codigos_erros": ["ABC"],
+            }]
+            obj._salvar_planilha_interna_data()
+
+            self.assertTrue(obj._planilha_foi_processada(cells))
 
     def test_planilha_processada_persiste_e_impede_reabertura_da_mesma_revisao(self):
         import interface
@@ -1007,9 +1029,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('width=110,', block)
         self.assertIn('width=174,', block)
         self.assertIn('height=44,', block)
+        self.assertIn('HISTORICO_COL_MINS = (82, 68, 8, 72, 72, 52, 100, 18, 0)', source)
         self.assertIn('self.botao_planilha._sm_autolab_tooltip_message = "Abrir planilha"', block)
         self.assertIn('self.botao_historico_planilha._sm_autolab_tooltip_message = "Arquivos"', block)
         self.assertIn('self.botao_historico_compacto._sm_autolab_tooltip_message = "Histórico"', block)
+        self.assertIn("top_group = ctk.CTkFrame(", block)
+        self.assertIn('top_group.pack(anchor="center")', block)
+        self.assertIn("bottom_group = ctk.CTkFrame(", block)
+        self.assertIn('bottom_group.pack(anchor="center")', block)
         self.assertIn("menu_y = max(0, by)", source)
     def test_atualizacao_usa_mesma_versao_da_interface(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
