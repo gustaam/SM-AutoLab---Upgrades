@@ -86,7 +86,9 @@ class HistoryPersistenceTests(unittest.TestCase):
 
             dados = json.loads(app._historico_arquivo.read_text(encoding="utf-8"))
             ids = {item["id"] for item in dados["historico_execucoes"]}
-            self.assertEqual(ids, {"antiga", "falha"})
+            self.assertEqual(ids, {"antiga"})
+            self.assertEqual(dados["execucao_atual"]["id"], "falha")
+            self.assertIn("interrompida", dados["execucao_atual"]["status"].lower())
 
     def test_limpar_historico_nao_reidrata_arquivo_legado(self):
         with tempfile.TemporaryDirectory() as temp:
