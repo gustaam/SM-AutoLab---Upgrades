@@ -268,7 +268,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         start = source.index("def _configurar_dashboard_compacto")
         end = source.index("def _configurar_dashboard_completo", start) if "def _configurar_dashboard_completo" in source[start:] else len(source)
         block = source[start:end]
-        self.assertIn("largura, altura = 410, 330", block)
+        self.assertIn("largura, altura = 520, 330", block)
         self.assertNotIn("largura, altura = 500, 270", block)
 
     def test_botoes_compactos_usam_iconografia_fluent_e_hierarquia_primaria(self):
@@ -278,7 +278,10 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("text=icon_grid,", block, "O botão Abrir deve usar o ícone de grade/planilha.")
         self.assertIn("width=170,\n            height=62", block, "Abrir deve ter maior área visual que as ações secundárias.")
-        self.assertEqual(block.count("height=28,\n            corner_radius=8"), 2)
+        self.assertIn("width=104,\n            height=62", block, "Arquivos deve ser um tile quadrado ao lado de Histórico.")
+        self.assertEqual(block.count("width=104,\n            height=62"), 2)
+        self.assertIn('pack(side="left", padx=(0, 6))', block)
+        self.assertIn('pack(side="left")', block)
         self.assertIn("text=icon_stop,", block, "Parar deve usar o símbolo de parada.")
         self.assertIn("text=icon_play,", block, "Iniciar deve usar o símbolo de reprodução.")
         self.assertIn("width=178,\n            height=44", block, "Os controles de execução devem manter dimensões compactas e equilibradas.")
