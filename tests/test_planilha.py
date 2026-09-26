@@ -278,6 +278,8 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("text=icon_grid,", block, "O botão Abrir deve usar o ícone de grade/planilha.")
         self.assertIn("width=110,\n            height=62", block, "Abrir deve ter maior área visual que as ações secundárias.")
+        self.assertIn('top_group.pack(anchor="center")', block)
+        self.assertIn('bottom_group.pack(anchor="center")', block)
         self.assertIn("width=116,\n            height=62", block, "Arquivos deve manter o tile quadrado ao lado de Histórico.")
         self.assertEqual(block.count("width=116,\n            height=62"), 2)
         self.assertIn('pack(side="left", padx=(0, 6))', block)
@@ -285,6 +287,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         self.assertIn("text=icon_stop,", block, "Parar deve usar o símbolo de parada.")
         self.assertIn("text=icon_play,", block, "Iniciar deve usar o símbolo de reprodução.")
         self.assertIn("width=174,\n            height=44", block, "Os controles de execução devem acompanhar a área de referência da dashboard.")
+        self.assertIn("secondary_row.pack(side=\"left\"", block)
     def test_duplo_clique_manual_edita_a_mesma_celula(self):
         app = self._app()
 
