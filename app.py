@@ -461,12 +461,17 @@ def caminho_checkpoint_interno():
     return Path.home() / "SM AutoLab" / "interno_checkpoint.json"
 
 
-def salvar_checkpoint_interno(codigos, proximo_indice):
+def salvar_checkpoint_interno(codigos, proximo_indice, planilha_fingerprint=None):
     c = caminho_checkpoint_interno()
     c.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "version": 1,
+        "version": 2,
         "fingerprint": _fingerprint_codigos(codigos),
+        "planilha_fingerprint": (
+            str(planilha_fingerprint).strip()
+            if planilha_fingerprint
+            else ""
+        ),
         "total": len(codigos),
         "proximo_indice": int(proximo_indice),
         "updated_at": datetime.now().isoformat(timespec="seconds"),
@@ -474,13 +479,21 @@ def salvar_checkpoint_interno(codigos, proximo_indice):
     atomic_write_json(c, payload)
 
 
-def ler_checkpoint_interno(codigos):
+def ler_checkpoint_interno(codigos, planilha_fingerprint=None):
     c = caminho_checkpoint_interno()
     if not c.exists():
         return None
     try:
         d = read_json_with_backup(c, {})
         if d.get("fingerprint") != _fingerprint_codigos(codigos):
+            return None
+        esperado = str(planilha_fingerprint or "").strip()
+        salvo = str(d.get("planilha_fingerprint", "") or "").strip()
+        if esperado and salvo and salvo != esperado:
+            return None
+        if esperado and not salvo:
+            # Checkpoints da v1 não conhecem a revisão completa da planilha.
+            # Não os reutilizamos quando a interface possui fingerprint completo.
             return None
         x = int(d.get("proximo_indice", 0))
         return x if 0 <= x <= len(codigos) else None
@@ -497,7 +510,12 @@ def excluir_checkpoint_interno():
         pass
 
 
-def principal_interno(codigos, aplicativo=None, indice_inicial=0):
+def principal_interno(
+    codigos,
+    aplicativo=None,
+    indice_inicial=0,
+    planilha_fingerprint=None,
+):
     codigos = [str(c).strip() for c in codigos if str(c).strip()]
     resultados = Resultados(len(codigos))
     auto = Automacao(status_callback=aplicativo.atualizar_status if aplicativo else None)
@@ -513,7 +531,7 @@ def principal_interno(codigos, aplicativo=None, indice_inicial=0):
         auto.iniciar_navegador()
         for indice in range(indice_inicial, total):
             if aplicativo and aplicativo.deve_parar():
-                salvar_checkpoint_interno(codigos, indice)
+                salvar_checkpoint_interno(codigos, indice, planilha_fingerprint)
                 break
             codigo = codigos[indice]
             numero = indice + 1
@@ -530,7 +548,7 @@ def principal_interno(codigos, aplicativo=None, indice_inicial=0):
                         f"Erro ({exc.tipo}) no código {codigo}. Indo para o próximo...",
                         aplicativo.ERROR,
                     )
-            salvar_checkpoint_interno(codigos, indice + 1)
+            salvar_checkpoint_interno(codigos, indice + 1, planilha_fingerprint)
             proximo_indice_seguro = indice + 1
             if aplicativo:
                 aplicativo.atualizar_progresso(
@@ -546,7 +564,7 @@ def principal_interno(codigos, aplicativo=None, indice_inicial=0):
         return resultados
     except Exception:
         try:
-            salvar_checkpoint_interno(codigos, proximo_indice_seguro)
+            salvar_checkpoint_interno(codigos, proximo_indice_seguro, planilha_fingerprint)
         except Exception:
             pass
         raise
