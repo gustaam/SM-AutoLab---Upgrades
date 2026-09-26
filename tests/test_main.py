@@ -1005,7 +1005,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('fg_color=self.BORDER', block)
         self.assertIn('progress_color=self.ACCENT', block)
         self.assertIn('width=170,', block)
-        self.assertIn('width=178,', block)
+        self.assertIn('width=242,', block)
         self.assertIn('height=44,', block)
         self.assertIn('self.botao_planilha._sm_autolab_tooltip_message = "Abrir planilha"', block)
         self.assertIn('self.botao_historico_planilha._sm_autolab_tooltip_message = "Arquivos"', block)
