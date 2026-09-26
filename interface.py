@@ -7044,7 +7044,7 @@ class App:
                 else:
                     recuperar = messagebox.askyesno(
                         "Recuperar última planilha",
-                        "A última planilha salva ainda não foi processada.\\n\\n"
+                        "A última planilha salva ainda não foi processada.\n\n"
                         "Deseja recuperá-la?",
                         parent=self.app,
                     )
