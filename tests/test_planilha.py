@@ -64,7 +64,7 @@ class PlanilhaPersistenceTests(unittest.TestCase):
 
     def test_execucao_concluida_soh_marca_planilha_quando_todos_os_codigos_tiverem_sucesso(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("and int(getattr(resultado, "sucessos", 0) or 0) >= int(getattr(resultado, "total_planejado", 0) or 0)", source)
+        self.assertIn('and int(getattr(resultado, "sucessos", 0) or 0) >= int(getattr(resultado, "total_planejado", 0) or 0)', source)
         self.assertIn("if erros != 0 or total <= 0 or sucessos < total:", source)
 
     def test_execucao_recupera_planilha_do_disco_quando_memoria_esta_vazia(self):
