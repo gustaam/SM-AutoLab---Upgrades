@@ -2898,9 +2898,10 @@ class App:
         # evitando glyphs ausentes que apareciam como quadrados.
         icon_font = ("Segoe UI Symbol", 18)
         icon_font_large = ("Segoe UI Symbol", 25)
+        icon_history_font = ("Segoe UI Symbol", 32)
         icon_folder_font = ("Segoe UI Emoji", 23)
         icon_settings = "\ue713"
-        icon_grid = "▦"
+        icon_grid = "▤"
         icon_folder = "📁"
         icon_history = "↻"
         icon_stop = "■"
@@ -3025,7 +3026,7 @@ class App:
         self.botao_planilha.pack(side="left", padx=(0, 6), pady=3)
 
         secondary_row = ctk.CTkFrame(
-            top_row, fg_color="transparent", width=214, height=62
+            top_row, fg_color="transparent", width=314, height=62
         )
         secondary_row.pack(side="left", padx=(0, 0), pady=3)
         secondary_row.pack_propagate(False)
@@ -3034,7 +3035,7 @@ class App:
             secondary_row,
             text=icon_folder,
             command=self.abrir_historico_planilha,
-            width=104,
+            width=154,
             height=62,
             corner_radius=10,
             fg_color=self.CARD,
@@ -3051,7 +3052,7 @@ class App:
             secondary_row,
             text=icon_history,
             command=self._abrir_historico_compacto,
-            width=104,
+            width=154,
             height=62,
             corner_radius=10,
             fg_color=self.CARD,
@@ -3059,7 +3060,7 @@ class App:
             border_width=1,
             border_color=self.BORDER,
             text_color=self.TEXT,
-            font=icon_font_large,
+            font=icon_history_font,
         )
         self.botao_historico_compacto._sm_autolab_tooltip_message = "Histórico"
         self.botao_historico_compacto.pack(side="left")
@@ -3071,7 +3072,7 @@ class App:
             bottom_row,
             text=icon_stop,
             command=self.parar,
-            width=178,
+            width=242,
             height=44,
             corner_radius=9,
             fg_color=self.CARD,
@@ -3089,7 +3090,7 @@ class App:
             bottom_row,
             text=icon_play,
             command=self.iniciar_thread,
-            width=178,
+            width=242,
             height=44,
             corner_radius=9,
             fg_color=self.ACCENT,
