@@ -266,36 +266,13 @@ class PlanilhaBehaviorTests(unittest.TestCase):
     def test_botoes_compactos_usam_iconografia_fluent_e_hierarquia_primaria(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _configurar_dashboard_compacto")
-        end = source.index("    def _abrir_historico_compacto", start)
+        end = source.index("def _abrir_historico_compacto", start)
         block = source[start:end]
         self.assertIn("text=icon_grid,", block, "O botão Abrir deve usar o ícone de grade/planilha.")
-        self.assertIn("width=170,\\n            height=62", block, "Abrir deve ter maior área visual que as ações secundárias.")
+        self.assertIn("width=170,\n            height=62", block, "Abrir deve ter maior área visual que as ações secundárias.")
         self.assertIn("text=icon_stop,", block, "Parar deve usar o símbolo de parada.")
         self.assertIn("text=icon_play,", block, "Iniciar deve usar o símbolo de reprodução.")
-        self.assertIn("width=178,\\n            height=44", block, "Os controles de execução devem manter dimensões compactas e equilibradas.")
-    def _abrir_historico_compacto", start)
-        block = source[start:end]
-        self.assertIn(
-            'text="Parar",',
-            block,
-            "O botão Parar deve existir no modo compacto.",
-        )
-        self.assertIn(
-            "width=140,\n            height=46",
-            block,
-            "Parar compacto deve ter 140x46, como no modo completo.",
-        )
-        self.assertIn(
-            "text=self.INICIAR_LABEL,",
-            block,
-            "O botão Iniciar deve existir no modo compacto.",
-        )
-        self.assertIn(
-            "width=150,\n            height=46",
-            block,
-            "Iniciar compacto deve ter 150x46, como no modo completo.",
-        )
-
+        self.assertIn("width=178,\n            height=44", block, "Os controles de execução devem manter dimensões compactas e equilibradas.")
     def test_duplo_clique_manual_edita_a_mesma_celula(self):
         app = self._app()
 
