@@ -2875,7 +2875,7 @@ class App:
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
         # Janela compacta mais quadrada, com hierarquia visual inspirada no Fluent 2.
-        largura, altura = 410, 330
+        largura, altura = 520, 330
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -2894,16 +2894,17 @@ class App:
         y = max((tela_h - altura) // 2, 0)
         self.app.geometry(f"{largura}x{altura}+{x}+{y}")
 
-        # Segoe Fluent Icons é o conjunto de ícones recomendado no Windows 11.
-        # Os rótulos acessíveis continuam presentes nos tooltips dos botões.
-        icon_font = ("Segoe Fluent Icons", 18)
-        icon_font_large = ("Segoe Fluent Icons", 25)
+        # Ícones do modo compacto usam caracteres Unicode amplamente suportados,
+        # evitando glyphs ausentes que apareciam como quadrados.
+        icon_font = ("Segoe UI Symbol", 18)
+        icon_font_large = ("Segoe UI Symbol", 25)
+        icon_folder_font = ("Segoe UI Emoji", 23)
         icon_settings = "\ue713"
-        icon_grid = "\uf232"
-        icon_folder = "\ue8b7"
-        icon_history = "\ue81c"
-        icon_stop = "\ue71a"
-        icon_play = "\ue768"
+        icon_grid = "▦"
+        icon_folder = "📁"
+        icon_history = "↻"
+        icon_stop = "■"
+        icon_play = "▶"
 
         header = ctk.CTkFrame(
             self.app, fg_color=self.CARD, corner_radius=0, height=54
@@ -3023,33 +3024,36 @@ class App:
         self.botao_planilha._sm_autolab_tooltip_message = "Abrir planilha"
         self.botao_planilha.pack(side="left", padx=(0, 6), pady=3)
 
-        secondary_row = ctk.CTkFrame(top_row, fg_color="transparent")
-        secondary_row.pack(side="left", fill="both", expand=True)
+        secondary_row = ctk.CTkFrame(
+            top_row, fg_color="transparent", width=214, height=62
+        )
+        secondary_row.pack(side="left", padx=(0, 0), pady=3)
+        secondary_row.pack_propagate(False)
 
         self.botao_historico_planilha = ctk.CTkButton(
             secondary_row,
             text=icon_folder,
             command=self.abrir_historico_planilha,
-            width=194,
-            height=28,
-            corner_radius=8,
+            width=104,
+            height=62,
+            corner_radius=10,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             border_width=1,
             border_color=self.BORDER,
             text_color=self.TEXT,
-            font=icon_font_large,
+            font=icon_folder_font,
         )
         self.botao_historico_planilha._sm_autolab_tooltip_message = "Arquivos"
-        self.botao_historico_planilha.pack(fill="x", pady=(3, 3))
+        self.botao_historico_planilha.pack(side="left", padx=(0, 6))
 
         self.botao_historico_compacto = ctk.CTkButton(
             secondary_row,
             text=icon_history,
             command=self._abrir_historico_compacto,
-            width=194,
-            height=28,
-            corner_radius=8,
+            width=104,
+            height=62,
+            corner_radius=10,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             border_width=1,
@@ -3058,7 +3062,7 @@ class App:
             font=icon_font_large,
         )
         self.botao_historico_compacto._sm_autolab_tooltip_message = "Histórico"
-        self.botao_historico_compacto.pack(fill="x", pady=(3, 3))
+        self.botao_historico_compacto.pack(side="left")
 
         bottom_row = ctk.CTkFrame(actions, fg_color="transparent")
         bottom_row.pack(fill="x", pady=(2, 0))
@@ -3401,7 +3405,14 @@ class App:
                     button_height = self._menu_aparencia_btn.winfo_height() if self._menu_aparencia_btn is not None else self._menu_config.winfo_height()
                     left_x = config_root_x - sub_width + 2
                     right_x = config_root_x + config_width - 2
-                    if left_x >= 6:
+                    if getattr(self, "_visualizacao", "complete") == "compact":
+                        if left_x >= 6:
+                            x = left_x
+                        elif right_x + sub_width <= app_width - 6:
+                            x = right_x
+                        else:
+                            x = max(6, app_width - sub_width - 6)
+                    elif left_x >= 6:
                         x = left_x
                     else:
                         x = min(right_x, max(6, app_width - sub_width - 6))
@@ -3438,7 +3449,15 @@ class App:
                     button_height = btn.winfo_height() if btn is not None else self._menu_config.winfo_height()
                     left_x = config_root_x - sub_width + 2
                     right_x = config_root_x + config_width - 2
-                    x = left_x if left_x >= 6 else min(right_x, max(6, app_width - sub_width - 6))
+                    if getattr(self, "_visualizacao", "complete") == "compact":
+                        if left_x >= 6:
+                            x = left_x
+                        elif right_x + sub_width <= app_width - 6:
+                            x = right_x
+                        else:
+                            x = max(6, app_width - sub_width - 6)
+                    else:
+                        x = left_x if left_x >= 6 else min(right_x, max(6, app_width - sub_width - 6))
                     submenu_height = max(1, self._menu_visualizacao.winfo_reqheight())
                     if getattr(self, "_visualizacao", "complete") == "compact":
                         y = max(6, min(button_y, app_height - submenu_height - 6))
