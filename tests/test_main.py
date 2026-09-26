@@ -1223,7 +1223,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
             source,
         )
         self.assertIn(
-            'HISTORICO_COL_MINS = (72, 60, 8, 60, 60, 46, 58, 16, 0)',
+            'HISTORICO_COL_MINS = (82, 68, 8, 72, 72, 52, 100, 18, 0)',
             source,
         )
         self.assertIn(
