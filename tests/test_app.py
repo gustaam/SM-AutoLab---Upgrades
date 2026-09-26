@@ -80,12 +80,22 @@ class ExecutionLifecycleTests(unittest.TestCase):
 
 
 class SeleniumWindowBehaviorTests(unittest.TestCase):
-    def test_driver_e_executa_com_janela_minimizada(self):
+    def test_driver_e_executa_com_janela_minimizada_apos_login_inicial(self):
         source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn('options.add_argument("--start-minimized")', source)
-        self.assertIn("driver.minimize_window()", source)
+        self.assertIn('options.add_argument("--disable-background-timer-throttling")', source)
+        self.assertIn('options.add_argument("--disable-renderer-backgrounding")', source)
+        self.assertIn('options.add_argument("--disable-backgrounding-occluded-windows")', source)
+        self.assertIn("def _minimizar_chrome_com_segurança", source)
+        start = source.index("def iniciar_navegador(self):")
+        end = source.index("def _fazer_login(self):", start)
+        block = source[start:end]
+        self.assertIn("self.driver.get(SITE_URL)", block)
+        self.assertIn("self._fazer_login()", block)
+        self.assertIn("self._abrir_autorizacao()", block)
+        self.assertIn("self._minimizar_chrome_com_segurança()", block)
+        self.assertLess(block.index("self._fazer_login()"), block.index("self._minimizar_chrome_com_segurança()"))
 
 
 class StorageSafeTests(unittest.TestCase):
