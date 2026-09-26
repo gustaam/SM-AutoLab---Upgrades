@@ -260,12 +260,20 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         start = source.index("def _configurar_dashboard_compacto")
         end = source.index("def _configurar_dashboard_completo", start) if "def _configurar_dashboard_completo" in source[start:] else len(source)
         block = source[start:end]
-        self.assertIn("largura, altura = 500, 270", block)
+        self.assertIn("largura, altura = 410, 330", block)
+        self.assertNotIn("largura, altura = 500, 270", block)
 
-    def test_botoes_compactos_usam_as_mesmas_dimensoes_do_modo_completo(self):
+    def test_botoes_compactos_usam_iconografia_fluent_e_hierarquia_primaria(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _configurar_dashboard_compacto")
         end = source.index("    def _abrir_historico_compacto", start)
+        block = source[start:end]
+        self.assertIn("text=icon_grid,", block, "O botão Abrir deve usar o ícone de grade/planilha.")
+        self.assertIn("width=170,\\n            height=62", block, "Abrir deve ter maior área visual que as ações secundárias.")
+        self.assertIn("text=icon_stop,", block, "Parar deve usar o símbolo de parada.")
+        self.assertIn("text=icon_play,", block, "Iniciar deve usar o símbolo de reprodução.")
+        self.assertIn("width=178,\\n            height=44", block, "Os controles de execução devem manter dimensões compactas e equilibradas.")
+    def _abrir_historico_compacto", start)
         block = source[start:end]
         self.assertIn(
             'text="Parar",',
