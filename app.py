@@ -220,17 +220,23 @@ class Automacao:
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-default-apps")
         options.add_argument("--no-first-run")
-        # Toda execução/reexecução abre o navegador minimizado.
-        options.add_argument("--start-minimized")
+        # O Chrome é minimizado somente após o login e a navegação inicial.
+        # Alguns ambientes Windows/Chrome suspendem a renderização de uma página
+        # recém-aberta quando ela nasce minimizada, fazendo o formulário de login
+        # aguardar até que a janela seja restaurada. Os flags abaixo também evitam
+        # throttling de abas/janelas que ficaram em segundo plano.
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-backgrounding-occluded-windows")
         driver = webdriver.Chrome(options=options)
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
-        try:
-            driver.minimize_window()
-        except WebDriverException:
-            # O argumento --start-minimized já cobre o Chromium quando o comando
-            # de minimizar pela API não estiver disponível no ambiente.
-            pass
         return driver
+
+    def _minimizar_chrome_com_segurança(self):
+        try:
+            self.driver.minimize_window()
+        except WebDriverException:
+            pass
 
     def iniciar_navegador(self):
         dados = _recarregar_configuracao_runtime()
@@ -240,7 +246,12 @@ class Automacao:
             raise AutomacaoError(mensagem, "configuracao")
         self._status("Abrindo o Feegow...")
         self.driver=self._criar_driver()
-        self.driver.get(SITE_URL); self._fazer_login(); self._abrir_autorizacao()
+        self.driver.get(SITE_URL)
+        self._fazer_login()
+        self._abrir_autorizacao()
+        # Depois que a navegação crítica terminou, mantém o Chrome minimizado
+        # sem bloquear a entrada do usuário/JS do portal durante o login.
+        self._minimizar_chrome_com_segurança()
     def _fazer_login(self):
         try:
             self._status("Entrando no portal...")
