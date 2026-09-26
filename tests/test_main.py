@@ -1106,7 +1106,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_fechamento_da_execucao_interna_reconstroi_codigos_do_disco_se_necessario(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _fechar_aplicativo")
-        end = source.index("def _agendar_estabilizacao_apos_retomada", start)
+        end = source.index("def mostrar_erro", start)
         block = source[start:end]
         self.assertIn("salvo = self._carregar_planilha_interna()", block)
         self.assertIn("salvar_checkpoint_interno(", block)
