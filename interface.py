@@ -6826,6 +6826,14 @@ class App:
             status = str(execucao.get("status", "")).strip().casefold()
             if status != "concluída":
                 continue
+            try:
+                erros = int(execucao.get("erros", 0) or 0)
+                sucessos = int(execucao.get("sucessos", 0) or 0)
+                total = int(execucao.get("total", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if erros != 0 or total <= 0 or sucessos < total:
+                continue
             if str(execucao.get("planilha_fingerprint", "")).strip() == fingerprint:
                 return True
         return False
@@ -6849,6 +6857,25 @@ class App:
         except Exception:
             LOGGER.exception("Falha ao registrar a planilha interna como processada.")
 
+
+    def _desmarcar_planilha_interna_processada(self):
+        """Remove o marcador de processamento concluído sem apagar os códigos salvos."""
+        try:
+            self._garantir_pasta_planilha()
+            data = read_json_with_backup(self._planilha_arquivo, {})
+            if not isinstance(data, dict):
+                data = {}
+            data["version"] = 1
+            data["cells"] = {
+                str(chave): str(valor)
+                for chave, valor in (self._planilha_data or {}).items()
+                if str(valor) != ""
+            }
+            data["processed_fingerprint"] = ""
+            data["processed_at"] = ""
+            atomic_write_json(self._planilha_arquivo, data)
+        except Exception:
+            LOGGER.exception("Falha ao remover o marcador de planilha processada.")
 
     def _planilha_atualizar_estado_salvamento(self, estado):
         label = getattr(self, "_planilha_estado_salvamento_label", None)
@@ -9103,20 +9130,33 @@ class App:
         except Exception:
             pass
 
+        processamento_concluido = (
+            not self._parar
+            and int(getattr(resultado, "erros", 0) or 0) == 0
+            and int(getattr(resultado, "sucessos", 0) or 0) >= int(getattr(resultado, "total_planejado", 0) or 0)
+        )
         if self._parar:
             self._add_activity("Processo parado. Ponto de retomada salvo.", self.WARNING)
+            self._desmarcar_planilha_interna_processada()
             self._finalizar_historico_execucao(resultado, "Parada pelo usuário")
             self._aplicar_status("Parado pelo usuário")
-        else:
+        elif processamento_concluido:
             self._add_activity("Processo finalizado.", self.SUCCESS)
-            try:
-                self._marcar_planilha_interna_processada(self._planilha_data)
-            except Exception:
-                pass
+            self._marcar_planilha_interna_processada(self._planilha_data)
             self._finalizar_historico_execucao(resultado, "Concluída")
             # Aplicar imediatamente: evita que a messagebox bloqueie a atualização
             # do cabeçalho deixando-o visualmente em "Processando".
             self._aplicar_status("Finalizado")
+        else:
+            # Uma execução com qualquer erro NÃO consome a planilha salva.
+            # Os códigos permanecem disponíveis para nova tentativa.
+            self._add_activity(
+                "Processo finalizado com erros. A planilha salva foi preservada para nova tentativa.",
+                self.WARNING,
+            )
+            self._desmarcar_planilha_interna_processada()
+            self._finalizar_historico_execucao(resultado, "Erro na execução")
+            self._aplicar_status("Processo finalizado com erros")
 
         for item in resultado.itens:
             if item.status == "Erro":
