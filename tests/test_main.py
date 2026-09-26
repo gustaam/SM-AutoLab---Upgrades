@@ -820,7 +820,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("def _centralizar_janela", source)
         for marker in (
-            "self._centralizar_janela(win, 700, 390)",
+            "self._centralizar_janela(win, 760, 390)",
             "self._centralizar_janela(janela, 430, 165)",
             "self._centralizar_janela(dialog, 340, 160)",
             "self._centralizar_janela(popup, 560, 420)",
@@ -1091,7 +1091,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
             source,
         )
         self.assertIn(
-            "HISTORICO_COL_MINS = (72, 60, 8, 60, 60, 46, 58, 16, 0)",
+            "HISTORICO_COL_MINS = (82, 68, 8, 72, 72, 52, 100, 18, 0)",
             source,
         )
         self.assertIn('headers=("Data","Hora","","Processados","Executados","Erros","Status","","")', source)
