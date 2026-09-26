@@ -270,6 +270,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("text=icon_grid,", block, "O botão Abrir deve usar o ícone de grade/planilha.")
         self.assertIn("width=170,\n            height=62", block, "Abrir deve ter maior área visual que as ações secundárias.")
+        self.assertEqual(block.count("height=28,\n            corner_radius=8"), 2)
         self.assertIn("text=icon_stop,", block, "Parar deve usar o símbolo de parada.")
         self.assertIn("text=icon_play,", block, "Iniciar deve usar o símbolo de reprodução.")
         self.assertIn("width=178,\n            height=44", block, "Os controles de execução devem manter dimensões compactas e equilibradas.")
