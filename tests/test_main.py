@@ -1112,6 +1112,49 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("salvar_checkpoint_interno(", block)
         self.assertIn("self._planilha_fingerprint(self._planilha_data)", block)
 
+    def test_checkpoint_exige_a_mesma_revisao_completa_da_planilha(self):
+        source = (self.root / "app.py").read_text(encoding="utf-8")
+        self.assertIn("planilha_fingerprint=None", source)
+        self.assertIn('"planilha_fingerprint":', source)
+        self.assertIn(
+            "if esperado and salvo and salvo != esperado:",
+            source,
+        )
+        self.assertIn(
+            "if esperado and not salvo:",
+            source,
+        )
+        self.assertIn("salvar_checkpoint_interno(codigos, indice + 1, planilha_fingerprint)", source)
+
+    def test_falha_fatal_da_automacao_permanece_pendente_apos_reinicio(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _registrar_falha_historico")
+        end = source.index("def _restaurar_historico_na_tela", start)
+        block = source[start:end]
+        self.assertIn('self._execucao_atual["status"] = "Interrompida — erro de execução"', block)
+        self.assertIn('self._execucao_atual["checkpoint"] = max(', block)
+        self.assertNotIn("self._execucao_atual = None", block)
+
+    def test_planilha_pendente_tem_prioridade_sobre_marcador_processado(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _planilha_foi_processada")
+        end = source.index("def _marcar_planilha_interna_processada", start)
+        block = source[start:end]
+        self.assertIn("pendente = getattr(self, \"_execucao_atual\", None)", block)
+        self.assertIn('and ("em andamento" in status or "interrompida" in status or "parando" in status)', block)
+        self.assertIn('and pendente_fp == fingerprint', block)
+        self.assertIn("return False", block)
+
+    def test_fechamento_da_execucao_interna_recupera_planilha_salva_antes_do_checkpoint(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _fechar_aplicativo")
+        end = source.index("def _agendar_estabilizacao_apos_retomada", start)
+        block = source[start:end]
+        self.assertIn("salvo = self._carregar_planilha_interna()", block)
+        self.assertIn("if not codigos:", block)
+        self.assertIn("salvar_checkpoint_interno(", block)
+        self.assertIn("self._planilha_fingerprint(self._planilha_data)", block)
+
     def test_execucao_recria_automacao_e_libera_referencia_ao_final(self):
         source = (self.root / "app.py").read_text(encoding="utf-8")
         start = source.index("def principal_interno")
