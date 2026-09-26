@@ -2874,8 +2874,8 @@ class App:
     def _configurar_dashboard_compacto(self):
         """Cria a dashboard mínima da visualização Compacta."""
         self.app.title("SM AutoLab")
-        # Proporção ajustada: ligeiramente mais alta e menos larga.
-        largura, altura = 500, 270
+        # Janela compacta mais quadrada, com hierarquia visual inspirada no Fluent 2.
+        largura, altura = 410, 330
         self.app.geometry(f"{largura}x{altura}")
         self.app.minsize(largura, altura)
         self.app.maxsize(largura, altura)
@@ -2894,14 +2894,25 @@ class App:
         y = max((tela_h - altura) // 2, 0)
         self.app.geometry(f"{largura}x{altura}+{x}+{y}")
 
+        # Segoe Fluent Icons é o conjunto de ícones recomendado no Windows 11.
+        # Os rótulos acessíveis continuam presentes nos tooltips dos botões.
+        icon_font = ("Segoe Fluent Icons", 18)
+        icon_font_large = ("Segoe Fluent Icons", 25)
+        icon_settings = "\ue713"
+        icon_grid = "\uf232"
+        icon_folder = "\ue8b7"
+        icon_history = "\ue81c"
+        icon_stop = "\ue71a"
+        icon_play = "\ue768"
+
         header = ctk.CTkFrame(
-            self.app, fg_color=self.CARD, corner_radius=0, height=58
+            self.app, fg_color=self.CARD, corner_radius=0, height=54
         )
         header.pack(fill="x")
         header.pack_propagate(False)
 
         title_row = ctk.CTkFrame(header, fg_color="transparent")
-        title_row.pack(side="left", anchor="w", padx=16, pady=(9, 0))
+        title_row.pack(side="left", anchor="w", padx=15, pady=(8, 0))
         ctk.CTkLabel(
             title_row, text="SM AutoLab", text_color=self.TEXT,
             font=("Segoe UI", 20, "bold")
@@ -2913,25 +2924,34 @@ class App:
 
         self.botao_configuracoes = ctk.CTkButton(
             header,
-            text="Configurações",
+            text=icon_settings,
             command=self._alternar_menu_configuracoes,
-            width=124,
-            height=36,
+            width=38,
+            height=34,
             corner_radius=8,
             fg_color=self.CARD,
             hover_color=("#EAF4FC", "#263F50"),
             border_width=1,
             border_color=self.BORDER,
             text_color=self.TEXT,
-            font=("Segoe UI", 11, "bold"),
+            font=icon_font,
         )
-        self.botao_configuracoes.pack(side="right", padx=12, pady=11)
+        self.botao_configuracoes._sm_autolab_tooltip_message = "Configurações"
+        self.botao_configuracoes.pack(side="right", padx=12, pady=10)
 
-        progress_area = ctk.CTkFrame(self.app, fg_color="transparent")
-        progress_area.pack(fill="x", padx=18, pady=(7, 0))
+        progress_card = ctk.CTkFrame(
+            self.app,
+            fg_color=self.CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=self.BORDER,
+        )
+        progress_card.pack(fill="x", padx=15, pady=(9, 0))
 
-        progress_header = ctk.CTkFrame(progress_area, fg_color="transparent", height=28)
-        progress_header.pack(fill="x")
+        progress_header = ctk.CTkFrame(
+            progress_card, fg_color="transparent", height=27
+        )
+        progress_header.pack(fill="x", padx=11, pady=(7, 0))
         progress_header.pack_propagate(False)
 
         ctk.CTkLabel(
@@ -2944,29 +2964,28 @@ class App:
         self.percentual_label = ctk.CTkLabel(
             progress_header,
             text="0%",
-            text_color=self.TEXT,
-            font=("Segoe UI", 20, "bold"),
+            text_color=self.ACCENT,
+            font=("Segoe UI", 19, "bold"),
         )
         self.percentual_label.pack(side="right")
 
-        # Mesma barra do modo completo.
         self.progresso = ctk.CTkProgressBar(
-            progress_area,
-            height=10,
-            corner_radius=5,
+            progress_card,
+            height=8,
+            corner_radius=4,
             fg_color=self.BORDER,
             progress_color=self.ACCENT,
         )
         self.progresso.set(0)
-        self.progresso.pack(fill="x", pady=(0, 2))
+        self.progresso.pack(fill="x", padx=11, pady=(2, 2))
 
         self.progresso_label = ctk.CTkLabel(
-            progress_area,
+            progress_card,
             text="0 / 0",
             text_color=self.SUBTEXT,
-            font=("Segoe UI", 12),
+            font=("Segoe UI", 11),
         )
-        self.progresso_label.pack(anchor="w")
+        self.progresso_label.pack(anchor="w", padx=11, pady=(0, 6))
 
         self._execucao_progresso_card = None
 
@@ -2981,83 +3000,102 @@ class App:
         self.status_indicator = None
 
         actions = ctk.CTkFrame(self.app, fg_color="transparent")
-        actions.pack(fill="x", padx=18, pady=(18, 10))
+        actions.pack(fill="x", padx=15, pady=(11, 7))
 
-        # Mantém os três botões como um único grupo centralizado.
-        # 3 x 130 px + 2 x 6 px de espaçamento interno + 6 px de margem
-        # em cada botão = 408 px, deixando margens externas idênticas.
-        top_row = ctk.CTkFrame(
-            actions,
-            fg_color="transparent",
-            width=408,
-            height=44,
-        )
-        top_row.pack(anchor="center")
+        # A planilha é a ação primária e recebe maior área visual.
+        top_row = ctk.CTkFrame(actions, fg_color="transparent", height=68)
+        top_row.pack(fill="x")
         top_row.pack_propagate(False)
 
-        top_buttons = []
-        for text_value, command in (
-            ("Abrir", self.abrir_planilha),
-            ("Arquivos", self.abrir_historico_planilha),
-            ("Histórico", self._abrir_historico_compacto),
-        ):
-            button = ctk.CTkButton(
-                top_row,
-                text=text_value,
-                command=command,
-                width=130,
-                height=38,
-                corner_radius=8,
-                fg_color=self.ACCENT if text_value == "Abrir" else self.CARD,
-                hover_color=self.ACCENT_HOVER if text_value == "Abrir" else ("#EAF4FC", "#263F50"),
-                border_width=0 if text_value == "Abrir" else 1,
-                border_color=self.BORDER,
-                text_color="#FFFFFF" if text_value == "Abrir" else self.TEXT,
-                font=("Segoe UI", 11, "bold"),
-            )
-            button.pack(side="left", padx=3, pady=3)
-            top_buttons.append(button)
+        self.botao_planilha = ctk.CTkButton(
+            top_row,
+            text=icon_grid,
+            command=self.abrir_planilha,
+            width=170,
+            height=62,
+            corner_radius=10,
+            fg_color=self.ACCENT,
+            hover_color=self.ACCENT_HOVER,
+            border_width=0,
+            text_color="#FFFFFF",
+            font=icon_font_large,
+        )
+        self.botao_planilha._sm_autolab_tooltip_message = "Abrir planilha"
+        self.botao_planilha.pack(side="left", padx=(0, 6), pady=3)
+
+        secondary_row = ctk.CTkFrame(top_row, fg_color="transparent")
+        secondary_row.pack(side="left", fill="both", expand=True)
+
+        self.botao_historico_planilha = ctk.CTkButton(
+            secondary_row,
+            text=icon_folder,
+            command=self.abrir_historico_planilha,
+            width=194,
+            height=29,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#EAF4FC", "#263F50"),
+            border_width=1,
+            border_color=self.BORDER,
+            text_color=self.TEXT,
+            font=icon_font_large,
+        )
+        self.botao_historico_planilha._sm_autolab_tooltip_message = "Arquivos"
+        self.botao_historico_planilha.pack(fill="x", pady=(3, 3))
+
+        self.botao_historico_compacto = ctk.CTkButton(
+            secondary_row,
+            text=icon_history,
+            command=self._abrir_historico_compacto,
+            width=194,
+            height=29,
+            corner_radius=8,
+            fg_color=self.CARD,
+            hover_color=("#EAF4FC", "#263F50"),
+            border_width=1,
+            border_color=self.BORDER,
+            text_color=self.TEXT,
+            font=icon_font_large,
+        )
+        self.botao_historico_compacto._sm_autolab_tooltip_message = "Histórico"
+        self.botao_historico_compacto.pack(fill="x", pady=(3, 3))
 
         bottom_row = ctk.CTkFrame(actions, fg_color="transparent")
-        bottom_row.pack(anchor="center", pady=(8, 0))
+        bottom_row.pack(fill="x", pady=(2, 0))
 
-        # Mantém as ações principais do modo compacto com exatamente
-        # as mesmas dimensões visuais do modo completo.
         self.botao_parar = ctk.CTkButton(
             bottom_row,
-            text="Parar",
+            text=icon_stop,
             command=self.parar,
-            width=140,
-            height=46,
-            corner_radius=8,
+            width=178,
+            height=44,
+            corner_radius=9,
             fg_color=self.CARD,
             hover_color=("#FDECEC", "#3A2424"),
             border_width=1,
             border_color=self.ERROR,
             text_color=self.ERROR,
-            font=("Segoe UI", 11, "bold"),
+            font=icon_font_large,
             state="disabled",
         )
-        self.botao_parar.pack(side="left", padx=3, pady=3)
+        self.botao_parar._sm_autolab_tooltip_message = "Parar"
+        self.botao_parar.pack(side="left", padx=(0, 6))
 
         self.botao_iniciar = ctk.CTkButton(
             bottom_row,
-            text=self.INICIAR_LABEL,
+            text=icon_play,
             command=self.iniciar_thread,
-            width=150,
-            height=46,
-            corner_radius=8,
+            width=178,
+            height=44,
+            corner_radius=9,
             fg_color=self.ACCENT,
             hover_color=self.ACCENT_HOVER,
             border_width=0,
             text_color="#FFFFFF",
-            font=("Segoe UI", 11, "bold"),
+            font=icon_font_large,
         )
-        self.botao_iniciar.pack(side="left", padx=3, pady=3)
-
-        self.botao_planilha = top_buttons[0]
-        self.botao_historico_planilha = top_buttons[1]
-        self.botao_historico_compacto = top_buttons[2]
+        self.botao_iniciar._sm_autolab_tooltip_message = "Iniciar"
+        self.botao_iniciar.pack(side="left")
 
         # Mesmo ponto vermelho real no modo compacto.
         self._historico_compacto_notificacao_badge = self._criar_ponto_notificacao(
@@ -3076,10 +3114,6 @@ class App:
         self._atualizar_badge_historico()
 
         _ui_scan_tooltips(self.app)
-        self._atualizar_contador_arquivos()
-        self.app.after(350, self._verificar_retomada_pendente)
-        self.app.after(1200, self._verificar_atualizacao_automatica)
-
     def _abrir_historico_compacto(self):
         # Recalcula antes de abrir para nunca deixar um badge órfão visível.
         self._atualizar_badge_historico()
