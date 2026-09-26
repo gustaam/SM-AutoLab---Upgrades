@@ -988,9 +988,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn('header,\n            text=icon_settings', block)
         self.assertIn('self.botao_configuracoes.pack(side="right"', block)
-        self.assertIn('icon_grid = "▦"', block)
+        self.assertIn('icon_grid = "▤"', block)
         self.assertIn('icon_folder = "📁"', block)
         self.assertIn('icon_history = "↻"', block)
+        self.assertIn('icon_history_font = ("Segoe UI Symbol", 32)', block)
         self.assertIn('icon_stop = "■"', block)
         self.assertIn('icon_play = "▶"', block)
         self.assertIn('text=icon_grid,', block)
