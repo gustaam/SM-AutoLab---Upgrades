@@ -51,6 +51,27 @@ class FakeTree:
 
 
 class PlanilhaPersistenceTests(unittest.TestCase):
+    def test_execucao_recupera_planilha_do_disco_quando_memoria_esta_vazia(self):
+        app = App.__new__(App)
+        app._planilha_data = {}
+        app._planilha_salva_data = {}
+        app._planilha_efetuou_alteracao = True
+
+        salvo = {
+            "0,0": "1",
+            "0,1": "628A73MST08C",
+            "0,2": "Item",
+        }
+        app._carregar_planilha_interna = lambda: dict(salvo)
+
+        recuperada = App._recuperar_planilha_persistida_para_execucao(app)
+
+        self.assertEqual(recuperada, salvo)
+        self.assertEqual(app._planilha_data, salvo)
+        self.assertEqual(app._planilha_salva_data, salvo)
+        self.assertFalse(app._planilha_efetuou_alteracao)
+        self.assertEqual(extract_column(recuperada, column=1), ["628A73MST08C"])
+
     def test_salvamento_da_planilha_persiste_e_reabre(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "SM AutoLab" / "planilha_interna.json"

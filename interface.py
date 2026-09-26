@@ -8868,6 +8868,7 @@ class App:
     def _planilha_salvar_e_iniciar(self):
         self._planilha_fechar_edicao()
         self._planilha_atualizar_estado_salvamento("salvando")
+        self._recuperar_planilha_persistida_para_execucao()
         if not self._validar_planilha_antes_execucao():
             return
         codigos=self._extrair_codigos_planilha()
@@ -9023,8 +9024,28 @@ class App:
             if not self._closing:
                 self.app.after(0,lambda:self._falha_geral(str(exc)))
 
+    def _recuperar_planilha_persistida_para_execucao(self):
+        """Garante que a execução use a planilha salva em disco quando a UI está vazia."""
+        try:
+            if self._planilha_data:
+                return self._planilha_data
+        except AttributeError:
+            self._planilha_data = {}
+
+        try:
+            salvo = self._carregar_planilha_interna()
+        except Exception:
+            salvo = {}
+
+        if isinstance(salvo, dict) and salvo:
+            self._planilha_data = dict(salvo)
+            self._planilha_salva_data = dict(salvo)
+            self._planilha_efetuou_alteracao = False
+        return self._planilha_data
+
     def iniciar_thread(self):
         """Inicia diretamente a partir dos códigos salvos na coluna Senha."""
+        self._recuperar_planilha_persistida_para_execucao()
         if not self._validar_planilha_antes_execucao():
             return
         codigos=self._extrair_codigos_planilha()
