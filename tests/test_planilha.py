@@ -51,6 +51,14 @@ class FakeTree:
 
 
 class PlanilhaPersistenceTests(unittest.TestCase):
+    def test_dialogo_de_recuperacao_usa_quebras_de_linha_reais(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index('"A última planilha salva ainda não foi processada.')
+        block = source[start:source.index('parent=self.app', start)]
+
+        self.assertIn('\\n\\n', block)
+        self.assertNotIn('\\\\n\\\\n', block)
+
     def test_execucao_com_erro_nao_marca_planilha_como_processada(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _finalizar(self, resultado):")
