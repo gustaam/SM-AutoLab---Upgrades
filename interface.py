@@ -3013,7 +3013,7 @@ class App:
             top_row,
             text=icon_grid,
             command=self.abrir_planilha,
-            width=170,
+            width=110,
             height=62,
             corner_radius=10,
             fg_color=self.ACCENT,
@@ -3026,7 +3026,7 @@ class App:
         self.botao_planilha.pack(side="left", padx=(0, 6), pady=3)
 
         secondary_row = ctk.CTkFrame(
-            top_row, fg_color="transparent", width=314, height=62
+            top_row, fg_color="transparent", width=238, height=62
         )
         secondary_row.pack(side="left", padx=(0, 0), pady=3)
         secondary_row.pack_propagate(False)
@@ -3035,7 +3035,7 @@ class App:
             secondary_row,
             text=icon_folder,
             command=self.abrir_historico_planilha,
-            width=154,
+            width=116,
             height=62,
             corner_radius=10,
             fg_color=self.CARD,
@@ -3052,7 +3052,7 @@ class App:
             secondary_row,
             text=icon_history,
             command=self._abrir_historico_compacto,
-            width=154,
+            width=116,
             height=62,
             corner_radius=10,
             fg_color=self.CARD,
@@ -3072,7 +3072,7 @@ class App:
             bottom_row,
             text=icon_stop,
             command=self.parar,
-            width=242,
+            width=174,
             height=44,
             corner_radius=9,
             fg_color=self.CARD,
@@ -3090,7 +3090,7 @@ class App:
             bottom_row,
             text=icon_play,
             command=self.iniciar_thread,
-            width=242,
+            width=174,
             height=44,
             corner_radius=9,
             fg_color=self.ACCENT,
