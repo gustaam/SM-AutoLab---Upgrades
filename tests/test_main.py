@@ -596,6 +596,17 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
             self.assertTrue(obj._planilha_foi_processada(cells))
 
+    def test_abrir_planilha_nao_limpa_revisao_ja_processada(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def abrir_planilha(self, dados_iniciais=None):")
+        end=source.index("def _planilha_redesenhar_viewport", start)
+        block=source[start:end]
+        processed_start=block.index("if self._planilha_foi_processada(ultima):")
+        processed_end=block.index("else:", processed_start)
+        processed_block=block[processed_start:processed_end]
+        self.assertIn("self._planilha_data = dict(ultima)", processed_block)
+        self.assertNotIn("self._planilha_data = {}", processed_block)
+
     def test_abrir_planilha_reabre_dados_processados_em_vez_de_apagar(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         start=source.index("def abrir_planilha(self, dados_iniciais=None):")
