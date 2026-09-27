@@ -9526,7 +9526,6 @@ class App:
             )
             self._status_blink_job = None
         else:
-        else:
             self._iniciar_pisca_status()
 
     def atualizar_progresso(self, processados, total, sucessos, erros, codigo):
