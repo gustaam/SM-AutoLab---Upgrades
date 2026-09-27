@@ -871,7 +871,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_contador_arquivos_usa_coluna_senha_da_planilha_salva(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _contar_codigos_salvos",source)
-        self.assertIn("return len(extract_column(cells, column=1))",source)
+        self.assertIn("return len(extract_column(fonte, column=1))",source)
         self.assertIn('return f"{valor:,}".replace(",", ".") + " códigos salvos"',source)
         self.assertNotIn("def _contar_codigos_mes",source)
         self.assertNotIn("códigos no mês",source)
@@ -1723,7 +1723,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _formatar_contador_arquivos", start)
         block = source[start:end]
         self.assertIn("self._carregar_planilha_interna()", block)
-        self.assertIn("extract_column(cells, column=1)", block)
+        self.assertIn("extract_column(fonte, column=1)", block)
         self.assertNotIn("self._historico_planilhas_visiveis()", block)
         self.assertNotIn("def _contar_codigos_mes", source)
 
