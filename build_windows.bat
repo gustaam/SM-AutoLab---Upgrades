@@ -104,7 +104,7 @@ if not exist "version_info.txt" (
 
 echo.
 echo Gerando SM AutoLab v!APP_VERSION!...
-%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-submodules selenium --collect-data selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
+%PYTHON% -m PyInstaller --noconfirm --clean --onefile --windowed --name "SM AutoLab" --noupx --version-file "version_info.txt" --collect-all selenium --collect-data customtkinter --icon "SM AutoLab.ico" --add-data "SM AutoLab.ico;." --add-data "assets;assets" --add-data "VERSION;." main.py
 if errorlevel 1 goto :erro
 
 if not exist "dist\SM AutoLab.exe" (
