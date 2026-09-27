@@ -373,7 +373,7 @@ class PlanilhaBehaviorTests(unittest.TestCase):
         app._planilha_contador_label = Label()
 
         App._planilha_atualizar_contador(app)
-        self.assertEqual(app._planilha_contador_label.text, "3 linhas preenchidas")
+        self.assertEqual(app._planilha_contador_label.text, "2 códigos")
         self.assertEqual(App._extrair_codigos_planilha(app), ["ABC", "DEF"])
 
     def test_selecionar_tudo_seleciona_apenas_celulas_preenchidas(self):
