@@ -1483,7 +1483,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _instalar_atalhos_teclado",source)
         self.assertNotIn("bind_all",source)
 
-    def test_selenium_reutiliza_driver_com_opcoes_leves(self):
+        def test_selenium_reutiliza_driver_com_opcoes_leves(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
         self.assertIn("def _criar_driver(self):",source)
         self.assertIn("--disable-extensions",source)
@@ -1491,6 +1491,30 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("self.driver=self._criar_driver()",source)
         self.assertIn("NoAlertPresentException",source)
         self.assertIn("0.18",source)
+        self.assertIn("from selenium.webdriver.chrome.options import Options as ChromeOptions",source)
+        self.assertIn("from selenium.webdriver.chrome.service import Service as ChromeService",source)
+        self.assertIn("from selenium.webdriver.chrome.webdriver import WebDriver as ChromeWebDriver",source)
+        self.assertIn("from selenium.webdriver.common.selenium_manager import SeleniumManager",source)
+        self.assertIn("def preparar_ambiente_selenium(",source)
+        self.assertIn("def aguardar_ambiente_selenium(",source)
+        self.assertIn("SeleniumManager().binary_paths(",source)
+        self.assertIn("service = ChromeService(executable_path=driver_path)",source)
+        self.assertIn("driver = ChromeWebDriver(service=service, options=options)",source)
+        self.assertNotIn("webdriver.Chrome(",source)
+        self.assertNotIn("webdriver.ChromeOptions(",source)
+
+    def test_selenium_e_preparado_antes_da_primeira_execucao(self):
+        source=(self.root/"main.py").read_text(encoding="utf-8")
+        self.assertIn("from app import preparar_ambiente_selenium",source)
+        self.assertIn("target=preparar_ambiente_selenium",source)
+        self.assertIn('name="SM-AutoLab-Selenium-Prewarm"',source)
+
+    def test_build_empacota_selenium_completo(self):
+        for filename in ("build_windows.bat", ".github/workflows/release.yml"):
+            source=(self.root/filename).read_text(encoding="utf-8")
+            self.assertIn("--collect-all selenium",source)
+            self.assertNotIn("--collect-submodules selenium --collect-data selenium",source)
+
 
     def test_indicador_de_salvamento_sem_autosave_novo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
