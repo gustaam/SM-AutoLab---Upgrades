@@ -809,9 +809,22 @@ def principal_interno(
             aplicativo.atualizar_progresso(indice_inicial, total, 0, 0, "")
         auto.iniciar_navegador()
         for indice in range(indice_inicial, total):
-            if aplicativo and aplicativo.deve_parar():
+            if aplicativo and aplicativo.deve_pausar():
                 salvar_checkpoint_interno(codigos, indice, planilha_fingerprint)
-                break
+                finalizar = aplicativo.aguardar_decisao_parada()
+                if finalizar:
+                    for restante in range(indice, total):
+                        resultados.registrar_erro(
+                            restante + 1,
+                            codigos[restante],
+                            "Automação finalizada pelo usuário antes da execução deste código.",
+                        )
+                    excluir_checkpoint_interno()
+                    resultados.finalizada_pelo_usuario = True
+                    break
+                if getattr(aplicativo, "_closing", False):
+                    break
+
             codigo = codigos[indice]
             numero = indice + 1
             try:
@@ -837,14 +850,12 @@ def principal_interno(
                     resultados.erros,
                     str(codigo),
                 )
-        interrompido = bool(aplicativo and aplicativo.deve_parar())
+        interrompido = bool(aplicativo and aplicativo.deve_finalizar())
         if not interrompido:
             excluir_checkpoint_interno()
         return resultados
     except Exception:
-        try:
-            salvar_checkpoint_interno(codigos, proximo_indice_seguro, planilha_fingerprint)
-        except Exception:
+
             pass
         raise
     finally:
