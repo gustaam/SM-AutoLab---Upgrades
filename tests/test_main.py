@@ -927,6 +927,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("win.transient(parent)", block)
         self.assertIn("win.lift()", block)
         self.assertIn("win.focus_force()", block)
+        self.assertIn("win.grab_set()", block)
         self.assertIn('win.attributes("-topmost", True)', block)
         self.assertIn('win.after(120, lambda: win.attributes("-topmost", False))', block)
 
@@ -936,7 +937,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _configurar_dashboard_compacto", start)
         block = source[start:end]
         self.assertIn("self.app.after_idle(", block)
-        self.assertIn("self._centralizar_janela(self.app, 900, 600)", block)
+        self.assertIn("self._centralizar_janela(self.app)", block)
+        self.assertIn("self.app.deiconify()", block)
+        self.assertIn("self.app.focus_force()", block)
 
     def test_janelas_secundarias_sao_centralizadas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
