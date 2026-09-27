@@ -65,7 +65,8 @@ if _restart_after_pid:
 from tkinter import Canvas, Entry, Menu, messagebox, simpledialog, ttk
 
 import customtkinter as ctk
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageTk
+from PIL import Image, ImageDraw, ImageFont, ImageTk
+from PIL import ImageFilter
 
 from app import (
     atomic_write_json,
