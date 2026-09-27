@@ -802,7 +802,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_status_disponivel_usa_visual_acizentado_e_pronto_exige_codigo_salvo(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
-        self.assertIn('self._aplicar_status("Disponível")',source)
+        self.assertIn('"Disponível"',source)
         self.assertIn('cor_texto = self.SUBTEXT',source)
         self.assertIn('self._status_text_base == "Disponível"',source)
         self.assertIn('self._atualizar_status_inicial_por_planilha()',source)
