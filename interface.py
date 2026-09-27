@@ -7071,7 +7071,17 @@ class App:
         if self._planilha_window is not None:
             try:
                 if self._planilha_window.winfo_exists():
-                    self._planilha_window.lift(); return
+                    if not self._planilha_tem_alteracoes():
+                        salva = self._carregar_planilha_interna()
+                        self._planilha_data = dict(salva or {})
+                        self._planilha_salva_data = dict(self._planilha_data)
+                        self._planilha_atualizar_contador()
+                        self._planilha_atualizar_estado_salvamento("salvo")
+                        tree = getattr(self, "_planilha_tree", None)
+                        if tree is not None:
+                            tree.refresh()
+                    self._planilha_window.lift()
+                    return
             except Exception:
                 pass
 
@@ -7331,6 +7341,17 @@ class App:
         self._planilha_row_header=row_header
         self._planilha_context_menu = self._criar_menu_contexto_planilha(tree)
         self._planilha_implementacao = "grade-virtual"
+        # Releitura final da planilha salva antes da primeira pintura da grade.
+        # O contador da dashboard usa o mesmo arquivo, então os dois visuais
+        # permanecem sincronizados mesmo após uma abertura/reabertura.
+        if dados_iniciais is None and not self._planilha_tem_alteracoes():
+            try:
+                salva = self._carregar_planilha_interna()
+                if salva:
+                    self._planilha_data = dict(salva)
+                    self._planilha_salva_data = dict(salva)
+            except Exception:
+                pass
         tree.refresh()
         # Todos os atalhos da planilha ficam limitados ao Canvas/Entry.
         # Isso evita que menus e controles externos disputem eventos globais.
@@ -9378,21 +9399,10 @@ class App:
             import math
 
             # Um callback já enfileirado pode executar mesmo após after_cancel().
-            # O estado atual precisa ter prioridade para impedir que "Disponível"
-            # volte a receber a animação verde de um estado anterior.
-            if getattr(self, "_status_text_base", "") == "Disponível" or getattr(self, "_closing", False):
+            # O estado atual precisa ter prioridade para impedir que um estado
+            # antigo altere a cor do indicador.
+            if getattr(self, "_closing", False):
                 self._status_blink_job = None
-                if getattr(self, "status_indicator", None) is not None:
-                    modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-                    self.status_indicator.configure(
-                        bg="#2B3035" if modo_escuro else self._cor(self.BG)
-                    )
-                    self.status_indicator.itemconfigure(
-                        self._status_halo, fill=self._cor(self.BORDER)
-                    )
-                    self.status_indicator.itemconfigure(
-                        self._status_dot, fill=self._cor(self.SUBTEXT)
-                    )
                 return
 
             frames = max(2, int(self._status_anim_frames))
@@ -9404,7 +9414,11 @@ class App:
             # Curva suave para manter o ponto visível mesmo no vale.
             fator = fator * fator * (3.0 - 2.0 * fator)
 
-            if self._status_blink_fast:
+            if getattr(self, "_status_text_base", "") == "Disponível":
+                # Estado neutro: pisca suavemente em tons de cinza, sem verde.
+                halo_base, halo_brilho = "#9AA0A6", "#E1E4E6"
+                dot_base, dot_brilho = "#6B7075", "#C7CBD0"
+            elif self._status_blink_fast:
                 # Azul/ciano mais discreto durante execução.
                 halo_base, halo_brilho = "#3B7285", "#8FD4EC"
                 dot_base, dot_brilho = "#2F6F87", "#65B8DB"
@@ -9416,7 +9430,9 @@ class App:
             dot = self._interpolar_cor(dot_base, dot_brilho, fator)
 
             modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-            if self._status_blink_fast:
+            if getattr(self, "_status_text_base", "") == "Disponível":
+                canvas_bg = "#2B3035" if modo_escuro else self._cor(self.BG)
+            elif self._status_blink_fast:
                 canvas_bg = "#183B54" if modo_escuro else "#E5F1FB"
             else:
                 canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
@@ -9532,7 +9548,7 @@ class App:
         canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
         self.status_indicator.configure(bg=canvas_bg)
         if self._status_text_base == "Disponível":
-            # Estado neutro: indicador cinza, estático e sem qualquer job pendente.
+            # Estado neutro: pisca suavemente em cinza; não é verde.
             self.status_indicator.configure(bg=canvas_bg)
             self.status_indicator.itemconfigure(
                 self._status_halo, fill=self._cor(self.BORDER)
@@ -9540,8 +9556,8 @@ class App:
             self.status_indicator.itemconfigure(
                 self._status_dot, fill=self._cor(self.SUBTEXT)
             )
-            self._status_blink_job = None
-            self._status_blink_visible = False
+            self._status_blink_visible = True
+            self._iniciar_pisca_status()
         else:
             self._status_blink_visible = True
             self._iniciar_pisca_status()
