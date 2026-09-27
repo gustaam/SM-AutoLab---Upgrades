@@ -9489,6 +9489,7 @@ class App:
                 text_color=self.WARNING if self._parar else self.SUCCESS
             )
         self._atualizar_botoes_execucao(pausando=False)
+        self._atualizar_botoes_execucao(pausando=False)
         self.botao_iniciar.configure(state="normal")
         self.botao_planilha.configure(state="normal")
         self.botao_parar.configure(state="disabled")
@@ -9974,7 +9975,7 @@ class App:
         """Sincroniza os botões nos modos completo e compacto."""
         try:
             is_compacto = getattr(self, "_visualizacao", "complete") == "compact"
-            stop_text = "■  Finalizar" if pausando else "■"
+            stop_text = "■  Finalizar" if pausando else "■  Parar"
             start_text = "▶  Continuar" if pausando else "Iniciar"
             if is_compacto:
                 stop_text = "■  Finalizar" if pausando else "■"
