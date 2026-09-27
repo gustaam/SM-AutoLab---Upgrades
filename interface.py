@@ -2270,8 +2270,8 @@ def _configurar_titulo_dwm(hwnd, dark: bool):
     """Define explicitamente a barra de título no azul de destaque do app."""
     if not _windows11_available():
         return False
-    # Mantém a moldura nativa coerente com o azul do cabeçalho nos dois temas.
-    cor_fundo = _windows_colorref("#0B4F82" if dark else "#1976C9")
+    # A moldura nativa permanece no azul Fluent estabelecido pelo contrato da UI.
+    cor_fundo = _windows_colorref("#0F6CBD")
     cor_texto = _windows_colorref("#FFFFFF")
     ok_fundo = _set_dwm_attribute(hwnd, DWMWA_CAPTION_COLOR, cor_fundo)
     ok_texto = _set_dwm_attribute(hwnd, DWMWA_TEXT_COLOR, cor_texto)
