@@ -2322,6 +2322,12 @@ class App:
 
     def __init__(self, startup_update_info=None, startup_update_checked=False):
         self.app = ctk.CTk()
+        try:
+            # Mantém a janela oculta durante o primeiro layout para que o usuário
+            # nunca veja o estado intermediário fora do centro.
+            self.app.withdraw()
+        except Exception:
+            pass
         self._startup_update_info = startup_update_info
         self._startup_update_checked = bool(startup_update_checked)
         self._configurar_icone_janela()
@@ -2436,20 +2442,75 @@ class App:
             pass
 
     def _centralizar_janela(self, janela, largura=None, altura=None):
-        """Centraliza uma janela no monitor em que o Tk a posicionou."""
+        """Centraliza a janela na área de trabalho do monitor correto."""
         try:
             janela.update_idletasks()
+
             if largura is None or altura is None:
                 largura = max(1, int(janela.winfo_width()))
                 altura = max(1, int(janela.winfo_height()))
             else:
                 largura = max(1, int(largura))
                 altura = max(1, int(altura))
-            tela_w = max(1, int(janela.winfo_screenwidth()))
-            tela_h = max(1, int(janela.winfo_screenheight()))
-            x = max((tela_w - largura) // 2, 0)
-            y = max((tela_h - altura) // 2, 0)
-            janela.geometry(f"{largura}x{altura}+{x}+{y}")
+
+            # Em Windows, usa o monitor que contém a janela para evitar o
+            # deslocamento observado com DPI/monitores múltiplos.
+            work_left = 0
+            work_top = 0
+            work_right = max(1, int(janela.winfo_screenwidth()))
+            work_bottom = max(1, int(janela.winfo_screenheight()))
+
+            if sys.platform.startswith("win"):
+                try:
+                    import ctypes
+
+                    class _RECT(ctypes.Structure):
+                        _fields_ = [
+                            ("left", ctypes.c_long),
+                            ("top", ctypes.c_long),
+                            ("right", ctypes.c_long),
+                            ("bottom", ctypes.c_long),
+                        ]
+
+                    class _MONITORINFO(ctypes.Structure):
+                        _fields_ = [
+                            ("cbSize", ctypes.c_ulong),
+                            ("rcMonitor", _RECT),
+                            ("rcWork", _RECT),
+                            ("dwFlags", ctypes.c_ulong),
+                        ]
+
+                    hwnd = int(janela.winfo_id())
+                    user32 = ctypes.windll.user32
+                    monitor = user32.MonitorFromWindow(hwnd, 2)  # nearest
+                    if monitor:
+                        info = _MONITORINFO()
+                        info.cbSize = ctypes.sizeof(_MONITORINFO)
+                        if user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+                            work_left = int(info.rcWork.left)
+                            work_top = int(info.rcWork.top)
+                            work_right = int(info.rcWork.right)
+                            work_bottom = int(info.rcWork.bottom)
+                except Exception:
+                    pass
+
+            # Fallback/secondary validation using Tk's virtual-root metrics.
+            if work_right <= work_left or work_bottom <= work_top:
+                work_left = int(getattr(janela, "winfo_vrootx", lambda: 0)() or 0)
+                work_top = int(getattr(janela, "winfo_vrooty", lambda: 0)() or 0)
+                work_right = work_left + max(
+                    1, int(getattr(janela, "winfo_vrootwidth", janela.winfo_screenwidth)())
+                )
+                work_bottom = work_top + max(
+                    1, int(getattr(janela, "winfo_vrootheight", janela.winfo_screenheight)())
+                )
+
+            work_width = max(1, work_right - work_left)
+            work_height = max(1, work_bottom - work_top)
+            x = work_left + max((work_width - largura) // 2, 0)
+            y = work_top + max((work_height - altura) // 2, 0)
+
+            janela.geometry(f"{largura}x{altura}+{int(x)}+{int(y)}")
             janela.update_idletasks()
         except Exception:
             pass
@@ -2870,11 +2931,21 @@ class App:
         self.app.after(350, self._verificar_retomada_pendente)
         self._agendar_verificacao_atualizacao()
 
-        # Recalcula a posição depois que todo o layout foi negociado pelo Tk.
-        # A janela abre centralizada sem interferir em redimensionamentos posteriores.
-        self.app.after_idle(
-            lambda: self._centralizar_janela(self.app, 900, 600)
-        )
+        # Recalcula a posição depois que todo o layout foi negociado pelo Tk
+        # e só então revela a janela, evitando o deslocamento inicial.
+        def _mostrar_app_centralizado():
+            try:
+                self._centralizar_janela(self.app)
+                self.app.deiconify()
+                self.app.lift()
+                self.app.focus_force()
+            except Exception:
+                try:
+                    self.app.deiconify()
+                except Exception:
+                    pass
+
+        self.app.after_idle(_mostrar_app_centralizado)
 
 
 
@@ -3140,6 +3211,21 @@ class App:
         self._atualizar_badge_historico()
 
         _ui_scan_tooltips(self.app)
+
+        def _mostrar_compacto_centralizado():
+            try:
+                self._centralizar_janela(self.app)
+                self.app.deiconify()
+                self.app.lift()
+                self.app.focus_force()
+            except Exception:
+                try:
+                    self.app.deiconify()
+                except Exception:
+                    pass
+
+        self.app.after_idle(_mostrar_compacto_centralizado)
+
     def _abrir_historico_compacto(self):
         # Recalcula antes de abrir para nunca deixar um badge órfão visível.
         self._atualizar_badge_historico()
@@ -6513,10 +6599,23 @@ class App:
         win.transient(parent)
         self._centralizar_janela(win, 680, 500)
         try:
+            parent.lift()
             win.lift()
             win.focus_force()
+            win.grab_set()
             win.attributes("-topmost", True)
-            win.after(120, lambda: win.attributes("-topmost", False))
+
+            def _fixar_ordem_janela():
+                try:
+                    if win.winfo_exists():
+                        win.lift()
+                        win.focus_force()
+                        win.attributes("-topmost", False)
+                except Exception:
+                    pass
+
+            # Permanece acima da janela-pai durante os primeiros ciclos do DWM/Tk.
+            win.after(400, _fixar_ordem_janela)
         except Exception:
             pass
         try:
@@ -6527,6 +6626,14 @@ class App:
         except Exception:
             pass
         self._preencher_detalhe_pasta(win, execucao)
+
+        def _liberar_detalhe(_event=None):
+            try:
+                win.grab_release()
+            except Exception:
+                pass
+
+        win.bind("<Destroy>", _liberar_detalhe, add="+")
         _ui_scan_tooltips(win)
 
     def _preencher_detalhe_pasta(self, parent, execucao):
