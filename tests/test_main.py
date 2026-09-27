@@ -1483,7 +1483,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _instalar_atalhos_teclado",source)
         self.assertNotIn("bind_all",source)
 
-        def test_selenium_reutiliza_driver_com_opcoes_leves(self):
+    def test_selenium_reutiliza_driver_com_opcoes_leves(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
         self.assertIn("def _criar_driver(self):",source)
         self.assertIn("--disable-extensions",source)
