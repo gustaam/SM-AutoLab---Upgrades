@@ -2333,6 +2333,7 @@ class App:
         self._log_count = 0
         self._historico_execucoes = []
         self._execucao_atual = None
+        self._configuracoes_bloqueadas_por_parada = False
         self._erros_codigos = []
         self._codigos_erros_execucao = []
         self._historico_arquivo = Path.home() / "SM AutoLab" / "historico_execucoes.json"
@@ -3991,7 +3992,9 @@ class App:
         threading.Thread(target=worker, daemon=True).start()
 
     def _configuracoes_bloqueadas(self):
-        """Bloqueia alterações enquanto a execução ainda não terminou."""
+        """Bloqueia alterações durante execução e após parada manual."""
+        if bool(getattr(self, "_configuracoes_bloqueadas_por_parada", False)):
+            return True
         execucao = getattr(self, "_execucao_atual", None)
         if not isinstance(execucao, dict):
             return False
@@ -8055,6 +8058,7 @@ class App:
             self._planilha_efetuou_alteracao = False
             self._planilha_atualizar_contador()
             self._planilha_atualizar_estado_salvamento("salvo")
+            self._add_activity("Planilha salva e pronta para iniciar a automação.", self.SUCCESS)
             self._add_activity("Planilha interna salva.", self.SUCCESS)
             return True
         except Exception as exc:
@@ -8944,7 +8948,7 @@ class App:
         header = ctk.CTkFrame(win, fg_color="transparent")
         header.pack(fill="x", padx=18, pady=(16, 8))
         ctk.CTkLabel(header, text="Arquivos", text_color=self.TEXT, font=("Segoe UI", 20, "bold")).pack(side="left")
-        self._arquivos_contador_janela = ctk.CTkLabel(header, text="0 códigos no mês", text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold"))
+        self._arquivos_contador_janela = ctk.CTkLabel(header, text="", text_color=self.SUBTEXT, font=("Segoe UI", 10, "bold"))
         self._arquivos_contador_janela.pack(side="left", padx=(10, 0))
         self._arquivos_btn_apagar_selecionados = ctk.CTkButton(
             header,
@@ -9104,6 +9108,7 @@ class App:
         self._execucao_atual["proximo_indice"] = int(start)
         self._execucao_atual["ultimo_codigo"] = ""
         self._execucao_atual["status"] = "Em andamento"
+        self._configuracoes_bloqueadas_por_parada = False
         self._checkpoint_indice_seguro = int(start)
         self._salvar_estado_persistente()
         self._parar=False
@@ -9188,6 +9193,7 @@ class App:
         self._iniciar_automacao_interna(codigos)
 
     def _falha_geral(self, msg):
+        self._configuracoes_bloqueadas_por_parada = False
         self._parar_metricas_execucao()
         if self._execucao_titulo_label is not None:
             self._execucao_titulo_label.configure(text="Execução interrompida")
@@ -9237,11 +9243,13 @@ class App:
             and int(getattr(resultado, "sucessos", 0) or 0) >= int(getattr(resultado, "total_planejado", 0) or 0)
         )
         if self._parar:
+            self._configuracoes_bloqueadas_por_parada = True
             self._add_activity("Processo parado. Ponto de retomada salvo.", self.WARNING)
             self._desmarcar_planilha_interna_processada()
             self._finalizar_historico_execucao(resultado, "Parada pelo usuário")
             self._aplicar_status("Parado pelo usuário")
         elif processamento_concluido:
+            self._configuracoes_bloqueadas_por_parada = False
             self._add_activity("Processo finalizado.", self.SUCCESS)
             self._marcar_planilha_interna_processada(self._planilha_data)
             self._finalizar_historico_execucao(resultado, "Concluída")
@@ -9249,6 +9257,7 @@ class App:
             # do cabeçalho deixando-o visualmente em "Processando".
             self._aplicar_status("Finalizado")
         else:
+            self._configuracoes_bloqueadas_por_parada = False
             # Uma execução com qualquer erro NÃO consome a planilha salva.
             # Os códigos permanecem disponíveis para nova tentativa.
             self._add_activity(
