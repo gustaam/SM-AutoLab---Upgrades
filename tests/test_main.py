@@ -929,7 +929,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("win.focus_force()", block)
         self.assertIn("win.grab_set()", block)
         self.assertIn('win.attributes("-topmost", True)', block)
-        self.assertIn('win.after(120, lambda: win.attributes("-topmost", False))', block)
+        self.assertIn("win.after(400, _fixar_ordem_janela)", block)
 
     def test_config_app_recentraliza_janela_apos_layout_inicial(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
