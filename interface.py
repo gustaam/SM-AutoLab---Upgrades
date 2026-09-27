@@ -2378,6 +2378,9 @@ class App:
         self._startup_update_checked = bool(startup_update_checked)
         self._configurar_icone_janela()
         self._parar = False
+        self._finalizar_solicitado = False
+        self._execucao_decisao_event = threading.Event()
+        self._execucao_decisao_event.set()
         self._closing = False
         self._checkpoint_indice_seguro = 0
         self._automacao_atual = None
@@ -2940,7 +2943,7 @@ class App:
         buttons = ctk.CTkFrame(actions, fg_color="transparent")
         buttons.pack(side="right", padx=20, pady=11)
         self.botao_parar = ctk.CTkButton(
-            buttons, text="■  Parar", command=self.parar,
+            buttons, text="■  Parar", command=self._acao_botao_parar,
             width=140, height=46, corner_radius=8,
             fg_color=self.CARD, hover_color=("#FDECEC", "#3A2424"),
             border_width=1, border_color=self.ERROR, text_color=self.ERROR,
@@ -2950,7 +2953,7 @@ class App:
         self.botao_iniciar = ctk.CTkButton(
             buttons,
             text=self.INICIAR_LABEL,
-            command=self.iniciar_thread,
+            command=self._acao_botao_iniciar,
             width=150,
             height=46,
             corner_radius=8,
@@ -3202,8 +3205,8 @@ class App:
 
         self.botao_parar = ctk.CTkButton(
             bottom_group,
-            text=icon_stop,
-            command=self.parar,
+            text="■  Parar",
+            command=self._acao_botao_parar,
             width=174,
             height=44,
             corner_radius=9,
@@ -3220,8 +3223,8 @@ class App:
 
         self.botao_iniciar = ctk.CTkButton(
             bottom_group,
-            text=icon_play,
-            command=self.iniciar_thread,
+            text="▶  Iniciar",
+            command=self._acao_botao_iniciar,
             width=174,
             height=44,
             corner_radius=9,
@@ -6215,6 +6218,9 @@ class App:
 
         self._execucao_atual = None
         self._codigos_erros_execucao = []
+        self._parar = False
+        self._finalizar_solicitado = False
+        self._execucao_decisao_event.set()
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
         self._atualizar_contador_arquivos()
@@ -9363,6 +9369,9 @@ class App:
         self._checkpoint_indice_seguro = int(start)
         self._salvar_estado_persistente()
         self._parar=False
+        self._finalizar_solicitado=False
+        self._execucao_decisao_event.set()
+        self._atualizar_botoes_execucao(pausando=False)
         self.botao_iniciar.configure(state="disabled")
         self.botao_planilha.configure(state="disabled")
         self.botao_parar.configure(state="normal")
@@ -9493,12 +9502,20 @@ class App:
             and int(getattr(resultado, "erros", 0) or 0) == 0
             and int(getattr(resultado, "sucessos", 0) or 0) >= int(getattr(resultado, "total_planejado", 0) or 0)
         )
-        if self._parar:
-            self._configuracoes_bloqueadas_por_parada = True
-            self._add_activity("Processo parado. Ponto de retomada salvo.", self.WARNING)
+        if getattr(resultado, "finalizada_pelo_usuario", False) or self._finalizar_solicitado:
+            self._configuracoes_bloqueadas_por_parada = False
+            self._add_activity(
+                "Processo finalizado pelo usuário. Os códigos restantes estão disponíveis para reexecução.",
+                self.WARNING,
+            )
             self._desmarcar_planilha_interna_processada()
-            self._finalizar_historico_execucao(resultado, "Parada pelo usuário")
-            self._aplicar_status("Parado pelo usuário")
+            self._finalizar_historico_execucao(resultado, "Erro na execução")
+            try:
+                from app import excluir_checkpoint_interno
+                excluir_checkpoint_interno()
+            except Exception:
+                pass
+            self._aplicar_status("Processo finalizado com erros")
         elif processamento_concluido:
             self._configuracoes_bloqueadas_por_parada = False
             self._add_activity("Processo finalizado.", self.SUCCESS)
@@ -9539,12 +9556,6 @@ class App:
                 f"Não executados: {resultado.erros}\n\n"
                 "Os códigos com erro estão disponíveis nos detalhes do histórico."
             )
-
-    def parar(self):
-        self._parar = True
-        self.atualizar_status("Parando após o código atual...")
-        self._add_activity("Solicitação de parada recebida.", self.WARNING)
-        self._add_historico("Usuário solicitou parada segura.")
 
     def atualizar_status(self, texto):
         if self._closing:
@@ -9856,14 +9867,124 @@ class App:
     def mostrar_erro(self, mensagem):
         self.app.after(0, lambda: messagebox.showerror("Erro", mensagem))
 
-    def deve_parar(self):
-        return self._parar
+    def deve_pausar(self):
+        return bool(self._parar)
+
+    def deve_finalizar(self):
+        return bool(self._finalizar_solicitado)
+
+    def aguardar_decisao_parada(self):
+        """Aguarda o usuário escolher Continuar ou Finalizar após a parada segura."""
+        if self._closing:
+            return False
+        self._execucao_atual["status"] = "Pausada — aguardando decisão"
+        self._execucao_atual["checkpoint"] = max(
+            0, int(getattr(self, "_checkpoint_indice_seguro", 0) or 0)
+        )
+        self._execucao_atual["proximo_indice"] = int(
+            self._execucao_atual["checkpoint"]
+        )
+        self._salvar_estado_persistente()
+        self._add_activity(
+            "Automação pausada após o código atual. Escolha Continuar ou Finalizar.",
+            self.WARNING,
+        )
+        self.atualizar_status("Pausado")
+        self._execucao_decisao_event.clear()
+
+        while (
+            self._parar
+            and not self._finalizar_solicitado
+            and not self._closing
+        ):
+            self._execucao_decisao_event.wait(0.25)
+
+        if self._closing:
+            return False
+        return bool(self._finalizar_solicitado)
+
+    def parar(self):
+        if not self._execucao_atual or getattr(self, "_closing", False):
+            return
+        if self._parar:
+            self._finalizar_solicitado = True
+            self._execucao_decisao_event.set()
+            self._add_activity(
+                "Finalização solicitada. A automação será encerrada após o código atual.",
+                self.WARNING,
+            )
+            self.atualizar_status("Finalizando")
+            return
+
+        self._parar = True
+        self._finalizar_solicitado = False
+        self._atualizar_botoes_execucao(pausando=True)
+        self.atualizar_status("Parando após o código atual...")
+        self._add_activity(
+            "Parada solicitada. A automação será pausada após o código atual.",
+            self.WARNING,
+        )
+
+    def continuar(self):
+        if not self._execucao_atual or getattr(self, "_closing", False):
+            return
+        self._parar = False
+        self._finalizar_solicitado = False
+        self._execucao_decisao_event.set()
+        self._atualizar_botoes_execucao(pausando=False)
+        self._add_activity("Automação retomada pelo usuário.", self.INFO)
+        self.atualizar_status("Processando")
+
+    def _finalizar_por_usuario(self):
+        if not self._execucao_atual or getattr(self, "_closing", False):
+            return
+        self._finalizar_solicitado = True
+        self._execucao_decisao_event.set()
+        self._parar = True
+
+    def _acao_botao_parar(self):
+        if self._parar:
+            self._finalizar_por_usuario()
+        else:
+            self.parar()
+
+    def _acao_botao_iniciar(self):
+        if self._parar and self._execucao_atual:
+            self.continuar()
+        else:
+            self.iniciar_thread()
+
+    def _atualizar_botoes_execucao(self, pausando=False):
+        """Sincroniza os botões nos modos completo e compacto."""
+        try:
+            is_compacto = getattr(self, "_visualizacao", "complete") == "compact"
+            stop_text = "■  Finalizar" if pausando else "■  Parar"
+            start_text = "▶  Continuar" if pausando else "Iniciar"
+            if is_compacto:
+                start_text = "▶  Continuar" if pausando else "▶  Iniciar"
+
+            self.botao_parar.configure(text=stop_text)
+            self.botao_iniciar.configure(text=start_text)
+
+            self.botao_parar._sm_autolab_tooltip_message = (
+                "Finalizar" if pausando else "Parar"
+            )
+            self.botao_iniciar._sm_autolab_tooltip_message = (
+                "Continuar" if pausando else "Iniciar"
+            )
+        except Exception:
+            pass
 
     def _fechar_aplicativo(self):
         # Salva imediatamente o último ponto confirmado antes de destruir a
         # janela. O código que estava em execução não é contabilizado como
         # concluído e será repetido na retomada.
         self._closing = True
+        try:
+            self._finalizar_solicitado = True
+            self._execucao_decisao_event.set()
+        except Exception:
+            pass
 
         if self._execucao_atual:
             try:
