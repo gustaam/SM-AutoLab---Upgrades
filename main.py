@@ -34,6 +34,7 @@ def _configurar_dpi_windows():
 _configurar_dpi_windows()
 from interface import App, SM_AUTOLAB_GRADE_VIRTUAL
 from interface import APP_VERSION, find_update
+from app import preparar_ambiente_selenium
 class StartupSplash:
     """Splash de inicialização com dissolução suave para o SM AutoLab."""
     WIDTH = 760
@@ -481,6 +482,11 @@ if __name__ == "__main__":
     threading.Thread(
         target=_preverificar_atualizacao,
         name="SM-AutoLab-Startup-Update",
+        daemon=True,
+    ).start()
+    threading.Thread(
+        target=preparar_ambiente_selenium,
+        name="SM-AutoLab-Selenium-Prewarm",
         daemon=True,
     ).start()
     run_splash(update_ready)
