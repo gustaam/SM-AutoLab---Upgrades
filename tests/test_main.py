@@ -472,22 +472,21 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text="Tempo estimado restante"', block)
         self.assertIn('font=("Segoe UI", 9, "bold")', block)
 
-    def test_planilha_recupera_ultima_apenas_quando_nao_processada(self):
+    def test_planilha_abertura_nao_depende_de_status_de_processamento(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        self.assertIn("def _planilha_fingerprint", source)
-        self.assertIn("def _planilha_foi_processada", source)
-        self.assertIn('status != "concluída"', source)
-        self.assertIn('status != "erro na execução"', source)
-        self.assertIn('"A última planilha salva ainda não foi processada.', source)
+        self.assertIn("ultima = self._carregar_planilha_interna()", source)
+        self.assertIn("self._planilha_data = dict(ultima)", source)
+        self.assertNotIn('"A última planilha salva ainda não foi processada.', source)
 
-    def test_planilha_processada_abre_nova_vazia_e_apaga_rascunho(self):
+    def test_planilha_abertura_recarrega_salvo_se_editor_existente_estiver_limpo(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def abrir_planilha(self, dados_iniciais=None):")
-        end = source.index("def _", start + 10)
+        end = source.index("def _planilha_desenhar_cabecalho_linhas", start)
         block = source[start:end]
-        self.assertIn("if self._planilha_foi_processada(ultima):", block)
-        self.assertIn("self._planilha_apagar_rascunho()", block)
-        self.assertIn("self._planilha_data = {}", block)
+        self.assertIn("if not self._planilha_tem_alteracoes():", block)
+        self.assertIn("salva = self._carregar_planilha_interna()", block)
+        self.assertIn("self._planilha_data = dict(salva or {})", block)
+        self.assertIn("tree.refresh()", block)
 
     def test_historico_de_erros_renderiza_pasta_apenas_com_erros(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -636,15 +635,16 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('dot_base, dot_brilho = "#6B7075", "#C7CBD0"', block)
         self.assertIn('canvas_bg = "#2B3035" if modo_escuro else self._cor(self.BG)', block)
 
-    def test_status_animation_callback_ignora_callback_antigo_em_disponivel(self):
+    def test_status_animation_callback_respeita_estado_atual_e_disponivel_pisca_em_cinza(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         start=source.index("def _executar_pisca_status")
         end=source.index("def _parar_pisca_status", start)
         block=source[start:end]
-        self.assertIn('if getattr(self, "_status_text_base", "") == "Disponível"', block)
-        self.assertIn("fill=self._cor(self.BORDER)", block)
-        self.assertIn("fill=self._cor(self.SUBTEXT)", block)
-        self.assertIn("return", block)
+        self.assertIn('if getattr(self, "_closing", False):', block)
+        self.assertIn('if getattr(self, "_status_text_base", "") == "Disponível":', block)
+        self.assertIn('halo_base, halo_brilho = "#9AA0A6", "#E1E4E6"', block)
+        self.assertIn('dot_base, dot_brilho = "#6B7075", "#C7CBD0"', block)
+        self.assertIn('canvas_bg = "#2B3035" if modo_escuro else self._cor(self.BG)', block)
 
     def test_planilha_processada_persiste_e_impede_reabertura_da_mesma_revisao(self):
         import interface
