@@ -1172,6 +1172,22 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("current = str(current_override or \"\").strip()", block)
         self.assertIn("find_update(current_override=APP_VERSION)", source)
 
+    def test_reinicio_usa_nova_instancia_independente_aguardando_processo_anterior(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _reiniciar_aplicativo")
+        end = source.index("def _mostrar_menu_aparencia", start)
+        block = source[start:end]
+        self.assertIn('env["SM_AUTOLAB_RESTART_AFTER_PID"] = str(os.getpid())', block)
+        self.assertIn("_fechar_aplicativo()", block)
+
+        main_source = (self.root / "main.py").read_text(encoding="utf-8")
+        self.assertIn("def _aguardar_processo_anterior", main_source)
+        self.assertIn("WaitForSingleObject", main_source)
+        main_start = main_source.index('if __name__ == "__main__":')
+        main_block = main_source[main_start:]
+        self.assertIn('SM_AUTOLAB_RESTART_AFTER_PID', main_block)
+        self.assertIn('_aguardar_processo_anterior(', main_block)
+
     def test_reinicio_usa_nova_instancia_independente(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _reiniciar_aplicativo")
