@@ -1577,7 +1577,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('fg_color=("#FFF7F7", "#3A2A2A")', block)
         self.assertIn('fg_color=("#E8F2FB", "#263B4A")', block)
         self.assertIn('state="normal",', block)
-        self.assertIn('"Continuar" if pausando else "Iniciar"', block)
+        self.assertIn('self.botao_iniciar._sm_autolab_tooltip_message = "Continuar"', block)
+        self.assertIn('self.botao_iniciar._sm_autolab_tooltip_message = "Iniciar"', block)
 
     def test_finalizar_execucao_disponibiliza_codigos_restantes(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
