@@ -1177,13 +1177,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start = source.index("def _reiniciar_aplicativo")
         end = source.index("def _mostrar_menu_aparencia", start)
         block = source[start:end]
-        self.assertIn("_prepare_independent_restart_environment()", block)
+        self.assertIn("_prepare_independent_restart_environment(", block)
+        self.assertIn("reset_pyinstaller_environment=False", block)
         self.assertIn("subprocess.Popen(", block)
         self.assertIn("sys.argv[1:]", block)
         self.assertIn("CREATE_NEW_PROCESS_GROUP", block)
         self.assertNotIn("tasklist /FI", block)
 
-    def test_tema_system_reaplica_widgets_nativos_apos_resolucao(self):
+        def test_tema_system_reaplica_widgets_nativos_apos_resolucao(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _agendar_sincronizacao_tema",source)
         self.assertIn("self.app.after(80, self._sincronizar_tema_ui)",source)
