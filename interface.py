@@ -2929,7 +2929,7 @@ class App:
         # e só então revela a janela, evitando o deslocamento inicial.
         def _mostrar_app_centralizado():
             try:
-                self._centralizar_janela(self.app)
+                self._centralizar_janela(self.app, largura=900, altura=600)
                 self.app.deiconify()
                 self.app.lift()
                 self.app.focus_force()
