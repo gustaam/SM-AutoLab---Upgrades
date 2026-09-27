@@ -770,7 +770,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
         visiveis = obj._historico_execucoes_visiveis()
 
-        self.assertEqual([item["id"] for item in visiveis], ["pendente"])
+        self.assertEqual([item["id"] for item in visiveis], ["resolvido", "pendente", "sem_codigo"])
         self.assertTrue(
             obj._historico_tem_erros_pendentes_reexecucao(
                 obj._historico_execucoes[1]
@@ -787,6 +787,49 @@ class CanonicalRuntimeTests(unittest.TestCase):
             )
         )
         self.assertTrue(obj._historico_tem_erros_pendentes())
+
+    def test_configuracoes_bloqueadas_durante_execucao_e_apos_parada(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _configuracoes_bloqueadas")
+        end=source.index("def _informar_configuracoes_bloqueadas",start)
+        block=source[start:end]
+        self.assertIn("_configuracoes_bloqueadas_por_parada",block)
+        self.assertIn('"em andamento" in status',block)
+        self.assertIn('"parando" in status',block)
+        self.assertIn('"interrompida — erro de execução" in status',block)
+        self.assertIn('"interrompida — ponto salvo" in status',block)
+        self.assertIn("self._informar_configuracoes_bloqueadas()",source)
+
+    def test_status_disponivel_usa_visual_acizentado_e_pronto_exige_codigo_salvo(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn('self._aplicar_status("Disponível")',source)
+        self.assertIn('cor_texto = self.SUBTEXT',source)
+        self.assertIn('self._status_text_base == "Disponível"',source)
+        self.assertIn('self._atualizar_status_inicial_por_planilha()',source)
+        helper_start=source.index("def _atualizar_status_inicial_por_planilha")
+        helper_end=source.index("def _contar_codigos_salvos",helper_start)
+        helper=source[helper_start:helper_end]
+        self.assertIn('"Pronto" if self._contar_codigos_salvos() > 0 else "Disponível"',helper)
+
+    def test_contador_arquivos_usa_coluna_senha_da_planilha_salva(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _contar_codigos_salvos",source)
+        self.assertIn("return len(extract_column(cells, column=1))",source)
+        self.assertIn('return f"{valor:,}".replace(",", ".") + " códigos salvos"',source)
+        self.assertNotIn("def _contar_codigos_mes",source)
+        self.assertNotIn("códigos no mês",source)
+
+    def test_salvar_e_iniciar_salva_e_depois_inicia_automacao_interna(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _planilha_salvar_e_iniciar")
+        end=source.index("def _iniciar_automacao_interna",start)
+        block=source[start:end]
+        self.assertIn("self._salvar_planilha_interna_data()",block)
+        self.assertIn("codigos_salvos = list(codigos)",block)
+        self.assertIn("self._planilha_salva_data=dict(self._planilha_data)",block)
+        self.assertIn("self._iniciar_automacao_interna(",block)
+        self.assertLess(block.index("self._salvar_planilha_interna_data()"),block.index("self._iniciar_automacao_interna("))
+        self.assertIn("principal_interno(",source[source.index("def _executar_interno"):source.index("def _recuperar_planilha_persistida_para_execucao")])
 
     def test_modo_compacto_nao_exibe_dashboard_de_metricas_nem_codigo(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
@@ -1387,16 +1430,28 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("validos = [item for item in itens if isinstance(item, dict)]",source)
         self.assertIn("Retorna todo o histórico válido de Arquivos, sem limite artificial de quantidade.",source)
 
-    def test_reexecucao_remove_do_historico_os_codigos_resolvidos(self):
+    def test_reexecucao_mantem_erros_e_separa_notificacao(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
-        self.assertIn("def _remover_erros_resolvidos_por_reexecucao", source)
         helper_start = source.index("def _remover_erros_resolvidos_por_reexecucao")
         helper_end = source.index("def _finalizar_historico_execucao", helper_start)
         block = source[helper_start:helper_end]
         self.assertIn('estado in {"sucesso", "executado", "processado"}', block)
-        self.assertIn('str(detalhe.get("codigo", "")).strip() not in resolvidos', block)
-        self.assertIn("self._historico_execucoes = [", block)
-        self.assertIn("self._erros_codigos = [", block)
+        self.assertIn("codigos_erros_reexecutados", block)
+        self.assertIn("self._salvar_erros_persistentes()", block)
+        self.assertNotIn('["codigos_erros"] = restantes', block)
+        self.assertNotIn('["erros_detalhes"] = detalhes', block)
+        self.assertNotIn("self._historico_execucoes = [", block)
+        self.assertNotIn("self._erros_codigos = [", block)
+
+        vis_start = source.index("def _historico_tem_erros_pendentes(self):")
+        vis_end = source.index("def _cor(valor):", vis_start)
+        vis_block = source[vis_start:vis_end]
+        self.assertIn("return any(", vis_block)
+        self.assertIn("def _historico_execucoes_visiveis(self):", vis_block)
+        self.assertIn("return self._historico_execucoes_com_erros()", vis_block)
+
+        rex = source[source.index("def _criar_detalhes_historico"):source.index("def _planilha_fingerprint")]
+        self.assertNotIn("atuais.update(codigos_reexecutaveis)", rex)
 
         final_start = source.index("def _finalizar_historico_execucao")
         final_end = source.index("def _registrar_falha_historico", final_start)
