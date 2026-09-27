@@ -2361,8 +2361,6 @@ class App:
     # Fluent 2: o cabeçalho usa o azul de marca e as áreas de atividade/histórico
     # usam uma superfície neutra levemente acinzentada.
     HEADER = ("#1976C9", "#0B4F82")
-    WINDOW_MATERIAL = "mica_alt"
-    WINDOW_ALPHA = 0.965
     HEADER_TEXT = ("#FFFFFF", "#FFFFFF")
     HEADER_SUBTEXT = ("#E8F3FB", "#DCEEFF")
     HEADER_BUTTON = ("#FFFFFF", "#0D3550")
@@ -2598,22 +2596,6 @@ class App:
             return
         self._fechar_menus()
 
-    def _aplicar_material_janela_principal(self):
-        """Ativa o material nativo do Windows 11 com transparência muito sutil."""
-        try:
-            aplicar_backdrop_sistema(
-                self.app,
-                self.WINDOW_MATERIAL,
-                dark=ctk.get_appearance_mode().lower() == "dark",
-            )
-        except Exception:
-            pass
-        try:
-            if _windows11_available():
-                self.app.attributes("-alpha", self.WINDOW_ALPHA)
-        except (tk.TclError, AttributeError, OSError, TypeError, ValueError):
-            pass
-
     def config_app(self):
         self.app.title("SM AutoLab")
         self.app.geometry("900x600")
@@ -2628,7 +2610,6 @@ class App:
             _configurar_titulo_dwm(int(self.app.winfo_id()), False)
         except Exception:
             pass
-        self._aplicar_material_janela_principal()
         self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")
         self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada, add="+")
 
@@ -2649,6 +2630,7 @@ class App:
         )
         header.pack(fill="x")
         header.pack_propagate(False)
+        self._configurar_material_cabecalho(header)
 
         title = ctk.CTkFrame(header, fg_color="transparent")
         title.pack(side="left", padx=20, pady=11)
@@ -3044,7 +3026,6 @@ class App:
             _configurar_titulo_dwm(int(self.app.winfo_id()), False)
         except Exception:
             pass
-        self._aplicar_material_janela_principal()
 
         self.app.update_idletasks()
         tela_w = self.app.winfo_screenwidth()
@@ -3071,6 +3052,7 @@ class App:
         )
         header.pack(fill="x")
         header.pack_propagate(False)
+        self._configurar_material_cabecalho(header)
 
         title_row = ctk.CTkFrame(header, fg_color="transparent")
         title_row.pack(side="left", anchor="w", padx=15, pady=(8, 0))
