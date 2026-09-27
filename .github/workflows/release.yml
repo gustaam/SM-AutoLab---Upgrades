@@ -42,9 +42,12 @@ jobs:
             $env:GITHUB_EVENT_NAME -eq "workflow_run" -and
             "${{ github.event.workflow_run.conclusion }}" -eq "success" -and
             "${{ github.event.workflow_run.event }}" -eq "push" -and
-            "${{ github.event.workflow_run.head_branch }}" -eq "main" -and
-            "${{ github.event.workflow_run.head_sha }}" -eq "${{ github.sha }}"
+            "${{ github.event.workflow_run.head_branch }}" -eq "main"
           ) {
+            # O workflow de release usa explicitamente o head_sha do
+            # workflow de validação concluído. Comparar esse SHA com
+            # github.sha não é confiável em workflow_run e pode bloquear
+            # releases válidas quando as referências divergem.
             $eligible = $true
           }
 
