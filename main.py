@@ -231,7 +231,7 @@ def _sinalizar_inicializacao_atualizacao_sucesso():
         )
     except OSError:
         pass
-_agendar_limpeza_atualizacao():
+def _agendar_limpeza_atualizacao():
     """Remove a pasta temporária somente após a confirmação da nova versão."""
     caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_CLEANUP_DIR", "")).strip()
     health_caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_HEALTH", "")).strip()
@@ -274,7 +274,6 @@ _agendar_limpeza_atualizacao():
         name="SM-AutoLab-Update-Cleanup",
         daemon=True,
     ).start()
-
 def run_splash(ready_event=None):
     StartupSplash(ready_event=ready_event).run()
 SM_AUTOLAB_CANONICAL_UI = "SM-AUTOLAB-CANONICAL-UI"
