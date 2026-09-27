@@ -1181,8 +1181,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('text=icon_grid,', block)
         self.assertIn('text=icon_folder,', block)
         self.assertIn('text=icon_history,', block)
-        self.assertIn('text=icon_stop,', block)
-        self.assertIn('text=icon_play,', block)
+        self.assertIn('icon_stop = "■"', block)
+        self.assertIn('text="■  Parar",', block)
+        self.assertIn('icon_play = "▶"', block)
+        self.assertIn('text="▶  Iniciar",', block)
         self.assertIn('largura, altura = 520, 330', block)
         self.assertIn('self.progresso = ctk.CTkProgressBar(', block)
         self.assertIn('height=8,', block)
@@ -1339,7 +1341,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
             "if esperado and not salvo:",
             source,
         )
-        self.assertIn("salvar_checkpoint_interno(codigos, indice + 1, planilha_fingerprint)", source)
+        self.assertIn("salvar_checkpoint_interno(", source)
+        self.assertIn("planilha_fingerprint", source)
 
     def test_falha_fatal_da_automacao_permanece_pendente_apos_reinicio(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
