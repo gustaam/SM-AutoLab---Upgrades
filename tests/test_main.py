@@ -861,6 +861,13 @@ class CanonicalRuntimeTests(unittest.TestCase):
         helper=source[helper_start:helper_end]
         self.assertIn('"Pronto" if self._contar_codigos_salvos() > 0 else "Disponível"',helper)
 
+    def test_contador_arquivos_aceita_dados_recien_salvos(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _contar_codigos_salvos(self, cells=None)", source)
+        self.assertIn("fonte = self._carregar_planilha_interna() if cells is None else cells", source)
+        self.assertIn("self._atualizar_contador_arquivos(cells=self._planilha_salva_data)", source)
+        self.assertIn('return "1 código salvo"', source)
+
     def test_contador_arquivos_usa_coluna_senha_da_planilha_salva(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("def _contar_codigos_salvos",source)
