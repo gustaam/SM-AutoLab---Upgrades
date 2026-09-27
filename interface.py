@@ -9476,7 +9476,7 @@ class App:
             self._status_text_base = "Disponível"
             self._status_blink_fast = False
             cor_texto = self.SUBTEXT
-            cor_pill = (self.BG, "#2B3035")
+            cor_pill = (self._cor(self.BG), "#2B3035")
             cor_borda = self.BORDER
         elif "finalizado" in low:
             self._status_text_base = "Finalizado"
