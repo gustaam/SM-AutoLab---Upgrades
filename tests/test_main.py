@@ -1524,6 +1524,36 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def continuar(self):", block)
         self.assertIn("self._atualizar_botoes_execucao(pausando=False)", block)
 
+    def test_finalizar_nao_cria_nova_thread_e_sinaliza_decisao(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _finalizar_por_usuario")
+        end=source.index("def _acao_botao_parar", start)
+        block=source[start:end]
+        self.assertIn("self._finalizar_solicitado = True", block)
+        self.assertIn("self._execucao_decisao_event.set()", block)
+        self.assertIn("self._parar = True", block)
+        self.assertNotIn("threading.Thread(", block)
+
+    def test_finalizar_registra_os_codigos_restantes_como_erros(self):
+        source=(self.root/"app.py").read_text(encoding="utf-8")
+        start=source.index("def principal_interno")
+        end=source.index("def principal(planilha_path", start)
+        block=source[start:end]
+        self.assertIn("for restante in range(indice, total):", block)
+        self.assertIn("resultados.registrar_erro(", block)
+        self.assertIn("resultados.finalizada_pelo_usuario = True", block)
+        self.assertIn("excluir_checkpoint_interno()", block)
+
+    def test_finalizacao_de_usuario_volta_botoes_ao_estado_normal(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _finalizar(self, resultado)")
+        end=source.index("def deve_pausar", start)
+        block=source[start:end]
+        self.assertIn("self._atualizar_botoes_execucao(pausando=False)", block)
+        self.assertIn('self._finalizar_historico_execucao(resultado, "Erro na execução")', block)
+        self.assertIn('"Processo finalizado pelo usuário. Os códigos restantes estão disponíveis para reexecução."', block)
+
+
     def test_botoes_de_execucao_usam_acoes_dinamicas(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         self.assertIn("command=self._acao_botao_parar", source)
