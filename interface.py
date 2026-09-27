@@ -9461,6 +9461,8 @@ class App:
             self._execucao_subtitulo_label.configure(text="Ocorreu um erro durante o processamento.")
         if self._execucao_indicador_label is not None:
             self._execucao_indicador_label.configure(text="●  Atenção", text_color=self.ERROR)
+        self._atualizar_botoes_execucao(pausando=False)
+        self._atualizar_botoes_execucao(pausando=False)
         self.botao_iniciar.configure(state="normal")
         self.botao_planilha.configure(state="normal")
         self.botao_parar.configure(state="disabled")
@@ -9573,6 +9575,11 @@ class App:
                 "dot": ("#2D7698", "#67BCD8"),
             },
             "Parando": {
+                "canvas": ("#FFF4CE", "#4B3A1A"),
+                "halo": ("#D7A74D", "#E8C476"),
+                "dot": ("#BF7210", "#F0AE43"),
+            },
+            "Pausado": {
                 "canvas": ("#FFF4CE", "#4B3A1A"),
                 "halo": ("#D7A74D", "#E8C476"),
                 "dot": ("#BF7210", "#F0AE43"),
@@ -9718,6 +9725,12 @@ class App:
         elif "parando" in low:
             self._status_text_base = "Parando"
             self._status_blink_fast = True
+            cor_texto = self.WARNING
+            cor_pill = ("#FFF4CE", "#4B3A1A")
+            cor_borda = ("#F0C36A", "#725B28")
+        elif "pausad" in low:
+            self._status_text_base = "Pausado"
+            self._status_blink_fast = False
             cor_texto = self.WARNING
             cor_pill = ("#FFF4CE", "#4B3A1A")
             cor_borda = ("#F0C36A", "#725B28")
