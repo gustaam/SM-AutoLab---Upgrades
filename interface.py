@@ -8999,14 +8999,18 @@ class App:
         self._recuperar_planilha_persistida_para_execucao()
 
         if not self._validar_planilha_antes_execucao():
-            # A validação foi recusada/cancelada; não deixe o editor preso em
-            # "Salvando…".
-            self._planilha_atualizar_estado_salvamento("salvo")
+            # A validação foi recusada/cancelada; preserve o estado real do
+            # editor em vez de deixá-lo preso em "Salvando…".
+            self._planilha_atualizar_estado_salvamento(
+                "alterado" if self._planilha_tem_alteracoes() else "salvo"
+            )
             return
 
         codigos = self._extrair_codigos_planilha()
         if not codigos:
-            self._planilha_atualizar_estado_salvamento("salvo")
+            self._planilha_atualizar_estado_salvamento(
+                "alterado" if self._planilha_tem_alteracoes() else "salvo"
+            )
             messagebox.showwarning(
                 "Nenhum código",
                 "Preencha os códigos na coluna 'Senha' antes de iniciar.",
