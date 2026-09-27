@@ -1180,13 +1180,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('env["SM_AUTOLAB_RESTART_AFTER_PID"] = str(os.getpid())', block)
         self.assertIn("_fechar_aplicativo()", block)
 
+        interface_source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn("def _aguardar_processo_anterior", interface_source)
+        self.assertIn("WaitForSingleObject", interface_source)
+        self.assertIn('SM_AUTOLAB_RESTART_AFTER_PID', interface_source)
+
         main_source = (self.root / "main.py").read_text(encoding="utf-8")
-        self.assertIn("def _aguardar_processo_anterior", main_source)
-        self.assertIn("WaitForSingleObject", main_source)
-        main_start = main_source.index('if __name__ == "__main__":')
-        main_block = main_source[main_start:]
-        self.assertIn('SM_AUTOLAB_RESTART_AFTER_PID', main_block)
-        self.assertIn('_aguardar_processo_anterior(', main_block)
+        self.assertNotIn("def _aguardar_processo_anterior", main_source)
+        self.assertNotIn("_restart_after_pid", main_source)
 
     def test_reinicio_usa_nova_instancia_independente(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
