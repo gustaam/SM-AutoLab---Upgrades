@@ -3205,7 +3205,7 @@ class App:
 
         self.botao_parar = ctk.CTkButton(
             bottom_group,
-            text=icon_stop + "  Parar",
+            text=icon_stop,
             command=self._acao_botao_parar,
             width=174,
             height=44,
@@ -3223,7 +3223,7 @@ class App:
 
         self.botao_iniciar = ctk.CTkButton(
             bottom_group,
-            text=icon_play + "  Iniciar",
+            text=icon_play,
             command=self._acao_botao_iniciar,
             width=174,
             height=44,
@@ -9488,6 +9488,7 @@ class App:
                 text="●  Interrompida" if self._parar else "●  Concluída",
                 text_color=self.WARNING if self._parar else self.SUCCESS
             )
+        self._atualizar_botoes_execucao(pausando=False)
         self.botao_iniciar.configure(state="normal")
         self.botao_planilha.configure(state="normal")
         self.botao_parar.configure(state="disabled")
@@ -9973,10 +9974,11 @@ class App:
         """Sincroniza os botões nos modos completo e compacto."""
         try:
             is_compacto = getattr(self, "_visualizacao", "complete") == "compact"
-            stop_text = "■  Finalizar" if pausando else "■  Parar"
+            stop_text = "■  Finalizar" if pausando else "■"
             start_text = "▶  Continuar" if pausando else "Iniciar"
             if is_compacto:
-                start_text = "▶  Continuar" if pausando else "▶  Iniciar"
+                stop_text = "■  Finalizar" if pausando else "■"
+                start_text = "▶  Continuar" if pausando else "▶"
 
             self.botao_parar.configure(text=stop_text)
             self.botao_iniciar.configure(text=start_text)
