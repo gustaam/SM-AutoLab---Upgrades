@@ -4671,7 +4671,7 @@ class App:
 
         self._fechar_aplicativo()
 
-def _mostrar_menu_aparencia(self, _event=None):
+    def _mostrar_menu_aparencia(self, _event=None):
         """Abre o submenu de aparência; um segundo clique não o fecha acidentalmente."""
         self._cancelar_fechar_menus()
         self._fechar_menu_visualizacao()
