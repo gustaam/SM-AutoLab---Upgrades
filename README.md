@@ -4,8 +4,8 @@
 
 Aplicativo Windows para automação de autorizações no Feegow, com execução de códigos a partir de planilhas, recuperação segura de execuções, histórico, atualização integrada e interface moderna.
 
-**Versão atual no código:** `2.99.102`  
-**Última correção:** a planilha persistida em disco é usada como fonte de verdade da execução e da retomada.  
+**Versão atual no código:** `3.0.0`  
+**Última atualização:** v3.0.0 consolida a interface Fluent 2, a nomenclatura da visualização e a publicação do executável Windows.  
 **Fonte de verdade da versão:** `VERSION`
 
 ## Principais recursos
@@ -159,7 +159,7 @@ O CI utiliza **Python 3.14.7** e **pip 26.2.1**. O build oficial utiliza **PyIns
 
 ## Release
 
-A versão oficial do código neste `main` é **2.99.64**.
+A versão oficial do código neste `main` é **3.0.0**.
 
 O fluxo de release possui dois caminhos:
 
@@ -167,6 +167,15 @@ O fluxo de release possui dois caminhos:
 - **Manual:** o workflow `release.yml` continua disponível por `workflow_dispatch`, exigindo a tag explícita da release.
 
 Antes da publicação, o pipeline confirma que a tag corresponde ao commit atualmente validado da `main`, executa novamente os testes, gera o executável, valida metadados e Defender, cria o manifesto e verifica remotamente os assets publicados.
+
+## Atualizações da v3.0.0
+
+A v3.0.0 consolida os ajustes visuais solicitados para a interface:
+
+- **Visualização:** o modo antes identificado como "Completa" passa a ser exibido como **"Expandida"**, mantendo o modo **"Compacta"**.
+- **Aparência:** **"Padrão do Windows"** aparece primeiro, seguido por **"Clara"** e **"Escura"**.
+- **Barra de título:** a moldura nativa do Windows usa o azul de destaque do SM AutoLab/Fluent 2 nos modos **Expandido** e **Compacto**.
+- **Validação:** a versão foi validada no CI com testes, integração, smoke test, build Windows, metadados do executável e Microsoft Defender.
 
 ## Histórico recente da versão 2.99.62
 
