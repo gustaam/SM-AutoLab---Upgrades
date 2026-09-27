@@ -4991,6 +4991,7 @@ class App:
         """
         return self._historico_execucoes_com_erros()
 
+    @staticmethod
     def _cor(valor):
         """Retorna uma cor única para widgets Tk que não aceitam tuplas."""
         if isinstance(valor, (tuple, list)):
