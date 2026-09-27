@@ -1483,6 +1483,37 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _instalar_atalhos_teclado",source)
         self.assertNotIn("bind_all",source)
 
+    def test_login_feegow_tem_fallbacks_de_submissao(self):
+        source=(self.root/"app.py").read_text(encoding="utf-8")
+        start=source.index("def _submeter_login")
+        end=source.index("def _fazer_login", start)
+        block=source[start:end]
+        self.assertIn("LOGIN_BUTTON_XPATH", block)
+        self.assertIn("button[@type=\"submit\"]", block)
+        self.assertIn("send_keys(Keys.ENTER)", block)
+        self.assertIn("requestSubmit()", block)
+        self.assertIn("arguments[0].click()", block)
+
+    def test_login_confirma_dados_e_autenticacao_sem_expor_senha(self):
+        source=(self.root/"app.py").read_text(encoding="utf-8")
+        start=source.index("def _fazer_login")
+        end=source.index("def _abrir_autorizacao", start)
+        block=source[start:end]
+        self.assertIn('get_attribute("value")', block)
+        self.assertIn("senha_preenchida", block)
+        self.assertIn("_submeter_login(u, p)", block)
+        self.assertIn("_aguardar_login_concluido", source)
+        self.assertNotIn('PORTAL_SENHA!r', block)
+
+    def test_login_erro_tem_diagnostico_de_url_e_titulo(self):
+        source=(self.root/"app.py").read_text(encoding="utf-8")
+        start=source.index("def _fazer_login")
+        end=source.index("def _abrir_autorizacao", start)
+        block=source[start:end]
+        self.assertIn("self.driver.current_url", block)
+        self.assertIn("self.driver.title", block)
+        self.assertIn("não confirmou a autenticação", block)
+
     def test_selenium_reutiliza_driver_com_opcoes_leves(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
         self.assertIn("def _criar_driver(self):",source)
