@@ -7081,8 +7081,10 @@ class App:
             ultima = self._carregar_planilha_interna()
             if ultima:
                 if self._planilha_foi_processada(ultima):
+                    # Uma planilha processada continua sendo a planilha salva atual.
+                    # O marcador de processamento não significa "apagar dados".
                     self._planilha_apagar_rascunho()
-                    self._planilha_data = {}
+                    self._planilha_data = dict(ultima)
                 else:
                     recuperar = messagebox.askyesno(
                         "Recuperar última planilha",
@@ -9451,6 +9453,18 @@ class App:
     def _aplicar_status(self, texto):
         if getattr(self, "_visualizacao", "complete") == "compact":
             return
+
+        # Sempre encerra a animação anterior antes de trocar de estado. Isso evita
+        # que uma animação verde iniciada em "Pronto" continue sobrescrevendo o
+        # indicador depois que o status mudou para "Disponível".
+        job = getattr(self, "_status_blink_job", None)
+        if job is not None:
+            try:
+                self.app.after_cancel(job)
+            except Exception:
+                pass
+            self._status_blink_job = None
+
         self.status_label.configure(text=texto.replace("Status:", "").strip())
         low = texto.lower()
 
@@ -9502,6 +9516,8 @@ class App:
         canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
         self.status_indicator.configure(bg=canvas_bg)
         if self._status_text_base == "Disponível":
+            # Estado neutro: indicador cinza, estático e sem qualquer job pendente.
+            self.status_indicator.configure(bg=canvas_bg)
             self.status_indicator.itemconfigure(
                 self._status_halo, fill=self._cor(self.BORDER)
             )
@@ -9509,6 +9525,7 @@ class App:
                 self._status_dot, fill=self._cor(self.SUBTEXT)
             )
             self._status_blink_job = None
+        else:
         else:
             self._iniciar_pisca_status()
 
