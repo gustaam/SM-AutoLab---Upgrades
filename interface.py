@@ -2943,7 +2943,7 @@ class App:
         buttons = ctk.CTkFrame(actions, fg_color="transparent")
         buttons.pack(side="right", padx=20, pady=11)
         self.botao_parar = ctk.CTkButton(
-            buttons, text="■  Parar", command=self._acao_botao_parar,
+            buttons, text="■  Pausar", command=self._acao_botao_parar,
             width=140, height=46, corner_radius=8,
             fg_color=self.CARD, hover_color=("#FDECEC", "#3A2424"),
             border_width=1, border_color=self.ERROR, text_color=self.ERROR,
@@ -3218,7 +3218,7 @@ class App:
             font=icon_font_large,
             state="disabled",
         )
-        self.botao_parar._sm_autolab_tooltip_message = "Parar"
+        self.botao_parar._sm_autolab_tooltip_message = "Pausar"
         self.botao_parar.pack(side="left", padx=(0, 6))
 
         self.botao_iniciar = ctk.CTkButton(
@@ -9726,7 +9726,7 @@ class App:
             cor_texto = self.INFO
             cor_pill = ("#E5F1FB", "#183B54")
             cor_borda = ("#B7D7EF", "#2C5E7A")
-        elif "parando" in low:
+        elif "parando" in low or "pausando" in low:
             self._status_text_base = "Parando"
             self._status_blink_fast = True
             cor_texto = self.WARNING
@@ -9936,9 +9936,9 @@ class App:
         self._parar = True
         self._finalizar_solicitado = False
         self._atualizar_botoes_execucao(pausando=True)
-        self.atualizar_status("Parando após o código atual...")
+        self.atualizar_status("Pausando após o código atual...")
         self._add_activity(
-            "Parada solicitada. A automação será pausada após o código atual.",
+            "Pausa solicitada. A automação será pausada após o código atual.",
             self.WARNING,
         )
 
@@ -9949,6 +9949,8 @@ class App:
         self._finalizar_solicitado = False
         self._execucao_decisao_event.set()
         self._atualizar_botoes_execucao(pausando=False)
+        self.botao_iniciar.configure(state="disabled")
+        self.botao_parar.configure(state="normal")
         self._add_activity("Automação retomada pelo usuário.", self.INFO)
         self.atualizar_status("Processando")
 
@@ -9972,24 +9974,68 @@ class App:
             self.iniciar_thread()
 
     def _atualizar_botoes_execucao(self, pausando=False):
-        """Sincroniza os botões nos modos completo e compacto."""
+        """Sincroniza rótulos, estados e cores dos controles de execução."""
         try:
             is_compacto = getattr(self, "_visualizacao", "complete") == "compact"
-            stop_text = "■  Finalizar" if pausando else "■  Parar"
-            start_text = "▶  Continuar" if pausando else "Iniciar"
+
+            if pausando:
+                stop_text = "■  Finalizar"
+                start_text = "▶  Continuar"
+
+                if is_compacto:
+                    stop_text = "■  Finalizar"
+                    start_text = "▶  Continuar"
+
+                # Pausa: os dois controles ficam ativos. Finalizar usa um
+                # vermelho suavizado; Continuar usa um azul distinto do Iniciar.
+                self.botao_parar.configure(
+                    text=stop_text,
+                    state="normal",
+                    fg_color=("#FFF7F7", "#3A2A2A"),
+                    hover_color=("#FBE7E7", "#4A3333"),
+                    border_color=("#D97A7A", "#B96868"),
+                    text_color=("#B42318", "#F08A8A"),
+                )
+                self.botao_iniciar.configure(
+                    text=start_text,
+                    state="normal",
+                    fg_color=("#E8F2FB", "#263B4A"),
+                    hover_color=("#D9EAF8", "#304B5E"),
+                    border_width=1,
+                    border_color=("#7AA7C7", "#5D91B3"),
+                    text_color=("#175A85", "#8BC7E8"),
+                )
+                self.botao_parar._sm_autolab_tooltip_message = "Finalizar"
+                self.botao_iniciar._sm_autolab_tooltip_message = "Continuar"
+                return
+
             if is_compacto:
-                stop_text = "■  Finalizar" if pausando else "■"
-                start_text = "▶  Continuar" if pausando else "▶"
+                stop_text = "■"
+                start_text = "▶"
+            else:
+                stop_text = "■  Pausar"
+                start_text = "Iniciar"
 
-            self.botao_parar.configure(text=stop_text)
-            self.botao_iniciar.configure(text=start_text)
-
-            self.botao_parar._sm_autolab_tooltip_message = (
-                "Finalizar" if pausando else "Parar"
+            # Estado normal/em execução: volta ao tratamento visual original.
+            self.botao_parar.configure(
+                text=stop_text,
+                state="normal" if getattr(self, "_execucao_atual", None) else "disabled",
+                fg_color=self.CARD,
+                hover_color=("#FDECEC", "#3A2424"),
+                border_color=self.ERROR,
+                text_color=self.ERROR,
             )
-            self.botao_iniciar._sm_autolab_tooltip_message = (
-                "Continuar" if pausando else "Iniciar"
+            self.botao_iniciar.configure(
+                text=start_text,
+                state="disabled" if getattr(self, "_execucao_atual", None) else "normal",
+                fg_color=self.ACCENT,
+                hover_color=self.ACCENT_HOVER,
+                border_width=0,
+                border_color=self.ACCENT,
+                text_color="#FFFFFF",
             )
+            self.botao_parar._sm_autolab_tooltip_message = "Pausar"
+            self.botao_iniciar._sm_autolab_tooltip_message = "Iniciar"
         except Exception:
             pass
 
