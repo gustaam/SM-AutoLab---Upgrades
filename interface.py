@@ -2549,15 +2549,9 @@ class App:
         self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")
         self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada, add="+")
 
-        # Abre a janela em tamanho maior e centralizada na tela.
+        # O posicionamento inicial é deixado para a centralização final,
+        # executada somente após todo o layout ser negociado pelo Tk.
         self.app.update_idletasks()
-        largura = 900
-        altura = 600
-        tela_w = self.app.winfo_screenwidth()
-        tela_h = self.app.winfo_screenheight()
-        x = max((tela_w - largura) // 2, 0)
-        y = max((tela_h - altura) // 2, 0)
-        self.app.geometry(f"{largura}x{altura}+{x}+{y}")
 
         if self._visualizacao == "compact":
             self._configurar_dashboard_compacto()
