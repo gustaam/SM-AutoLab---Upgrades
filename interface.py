@@ -2644,7 +2644,7 @@ class App:
         self.botao_historico_planilha.pack(side="left")
         self.arquivos_contador_label = ctk.CTkLabel(
             plan_buttons,
-            text="0 códigos no mês",
+            text="",
             text_color=self.SUBTEXT,
             font=("Segoe UI", 9, "bold")
         )
@@ -2864,7 +2864,8 @@ class App:
         _ui_scan_tooltips(self.app)
         self._atualizar_contador_arquivos()
         self._add_activity("Sistema pronto para iniciar.", self.INFO)
-        self._aplicar_status("Pronto")
+        status_inicial = "Pronto" if self._contar_codigos_salvos() > 0 else "Disponível"
+        self._aplicar_status(status_inicial)
         self.app.after(350, self._verificar_retomada_pendente)
         self._agendar_verificacao_atualizacao()
 
@@ -3493,6 +3494,9 @@ class App:
             pass
 
     def _fixar_menu_configuracoes(self):
+        if self._configuracoes_bloqueadas():
+            self._informar_configuracoes_bloqueadas()
+            return
         self._mostrar_menu_configuracoes()
 
     def _agendar_verificacao_atualizacao(self):
@@ -3986,7 +3990,32 @@ class App:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _configuracoes_bloqueadas(self):
+        """Bloqueia alterações enquanto a execução ainda não terminou."""
+        execucao = getattr(self, "_execucao_atual", None)
+        if not isinstance(execucao, dict):
+            return False
+        status = str(execucao.get("status", "")).strip().casefold()
+        return (
+            "em andamento" in status
+            or "parando" in status
+            or "interrompida — erro de execução" in status
+            or "interrompida — ponto salvo" in status
+        )
+
+    def _informar_configuracoes_bloqueadas(self):
+        self._fechar_menus()
+        messagebox.showinfo(
+            "Configurações indisponíveis",
+            "As configurações não podem ser alteradas durante a execução.\n\n"
+            "Aguarde o processamento ser finalizado.",
+            parent=self.app,
+        )
+
     def _alternar_menu_configuracoes(self):
+        if self._configuracoes_bloqueadas():
+            self._informar_configuracoes_bloqueadas()
+            return
         if self._menu_config is not None:
             try:
                 if self._menu_config.winfo_exists():
@@ -4165,6 +4194,9 @@ class App:
 
     def _mostrar_menu_configuracoes(self, _event=None):
         """Abre o menu principal de configurações sem bindings concorrentes."""
+        if self._configuracoes_bloqueadas():
+            self._informar_configuracoes_bloqueadas()
+            return
         self._cancelar_fechar_menus()
 
         if self._menu_config is not None:
@@ -4926,33 +4958,18 @@ class App:
         return any(codigo not in reexecutados for codigo in codigos)
 
     def _historico_tem_erros_pendentes(self):
-        return bool(self._historico_execucoes_visiveis())
-
-    def _historico_execucoes_com_erros(self):
-        """Retorna todas as execuções históricas que ainda possuem erro registrado."""
-        fontes = list(getattr(self, "_historico_execucoes", []))
-        atual = getattr(self, "_execucao_atual", None)
-        if isinstance(atual, dict):
-            fontes.append(atual)
-
-        unicos = {}
-        for item in fontes:
-            if not isinstance(item, dict):
-                continue
-            if not self._historico_execucao_tem_erros(item):
-                continue
-            unicos[self._id_historico_execucao(item)] = item
-        return list(unicos.values())
+        return any(
+            self._historico_tem_erros_pendentes_reexecucao(item)
+            for item in self._historico_execucoes_com_erros()
+        )
 
     def _historico_execucoes_visiveis(self):
-        """Retorna somente as execuções que ainda possuem códigos reexecutáveis."""
-        return [
-            item
-            for item in self._historico_execucoes_com_erros()
-            if self._historico_tem_erros_pendentes_reexecucao(item)
-        ]
+        """Retorna todas as execuções que possuem erros registrados.
 
-    @staticmethod
+        A visibilidade histórica é independente da notificação de pendências.
+        """
+        return self._historico_execucoes_com_erros()
+
     def _cor(valor):
         """Retorna uma cor única para widgets Tk que não aceitam tuplas."""
         if isinstance(valor, (tuple, list)):
@@ -5884,8 +5901,13 @@ class App:
         self._restaurar_historico_na_tela()
 
     def _remover_erros_resolvidos_por_reexecucao(self, resultado, origem_id):
-        """Retira do histórico os códigos que passaram a ser executados com sucesso."""
-        if not origem_id or not isinstance(resultado, object):
+        """Marca como resolvidos os códigos que tiveram sucesso na reexecução.
+
+        A lista histórica de erros e seus detalhes permanece intacta. O campo
+        codigos_erros_reexecutados controla somente a notificação e o botão
+        de nova tentativa.
+        """
+        if not origem_id:
             return
 
         execucao_original = next(
@@ -5913,50 +5935,15 @@ class App:
         if not resolvidos:
             return
 
-        codigos_originais = self._historico_codigos_de_erro(execucao_original)
-        restantes = [codigo for codigo in codigos_originais if codigo not in resolvidos]
+        atuais = {
+            str(c).strip()
+            for c in (execucao_original.get("codigos_erros_reexecutados") or [])
+            if str(c).strip()
+        }
+        atuais.update(resolvidos)
+        execucao_original["codigos_erros_reexecutados"] = sorted(atuais)
 
-        detalhes = execucao_original.get("erros_detalhes") or []
-        if isinstance(detalhes, list):
-            detalhes = [
-                detalhe
-                for detalhe in detalhes
-                if not isinstance(detalhe, dict)
-                or str(detalhe.get("codigo", "")).strip() not in resolvidos
-            ]
-
-        execucao_original["codigos_erros"] = restantes
-        execucao_original["erros_detalhes"] = detalhes
-        execucao_original["erros"] = max(
-            0,
-            len(restantes),
-            len(
-                [
-                    detalhe
-                    for detalhe in detalhes
-                    if isinstance(detalhe, dict)
-                    and str(detalhe.get("codigo", "")).strip()
-                ]
-            ),
-        )
-        execucao_original["codigos_erros_reexecutados"] = [
-            codigo
-            for codigo in (execucao_original.get("codigos_erros_reexecutados") or [])
-            if str(codigo).strip() not in resolvidos
-        ]
-
-        if not restantes and execucao_original.get("erros", 0) <= 0:
-            self._historico_execucoes = [
-                item
-                for item in self._historico_execucoes
-                if self._id_historico_execucao(item) != str(origem_id)
-            ]
-
-        self._erros_codigos = [
-            codigo
-            for codigo in self._erros_codigos
-            if codigo not in resolvidos
-        ]
+        # O histórico de erros e seus detalhes não são apagados.
         self._salvar_erros_persistentes()
 
     def _finalizar_historico_execucao(self, resultado, status="Concluída"):
@@ -6606,22 +6593,6 @@ class App:
                 if not codigos_reexecutaveis:
                     return "break"
 
-                # Marca a execução original antes de iniciar a nova tentativa,
-                # evitando que o botão volte a aparecer após o fechamento/
-                # reabertura da janela.
-                atuais = set(
-                    str(c).strip()
-                    for c in (execucao.get("codigos_erros_reexecutados") or [])
-                    if str(c).strip()
-                )
-                atuais.update(codigos_reexecutaveis)
-                execucao["codigos_erros_reexecutados"] = sorted(atuais)
-
-                for item in self._historico_execucoes:
-                    if self._id_historico_execucao(item) == self._id_historico_execucao(execucao):
-                        item["codigos_erros_reexecutados"] = list(execucao["codigos_erros_reexecutados"])
-                        break
-
                 self._salvar_estado_persistente()
                 self._restaurar_historico_na_tela()
                 try:
@@ -6641,7 +6612,7 @@ class App:
                 )
                 return "break"
 
-            reexecutar_btn = ctk.CTkButton(
+        reexecutar_btn = ctk.CTkButton(
                 header,
                 text=(
                     f"Reexecutar {len(codigos_reexecutaveis)} erro"
@@ -8417,58 +8388,42 @@ class App:
         self._arquivos_data_selecionada = None
         self._renderizar_calendario_arquivos()
 
-    def _contar_codigos_mes(self, referencia=None):
-        """Retorna a quantidade de códigos efetivamente registrados em Arquivos no mês exibido.
-
-        O contador do calendário deve refletir a mesma fonte usada para os
-        destaques dos dias: o histórico de planilhas salvas. Execuções sem um
-        snapshot salvo não criam indicação no calendário e, portanto, não entram
-        neste contador.
-        """
-        referencia = referencia or datetime.now()
-        if hasattr(referencia, "year") and hasattr(referencia, "month"):
-            ano = int(referencia.year)
-            mes = int(referencia.month)
-        else:
-            hoje = datetime.now()
-            ano, mes = hoje.year, hoje.month
-
-        total = 0
+    def _contar_codigos_salvos(self):
+        """Conta células preenchidas da coluna Senha na planilha atualmente salva."""
         try:
-            for item in self._historico_planilhas_visiveis():
-                try:
-                    salvo = datetime.fromisoformat(str(item.get("saved_at", "")))
-                except Exception:
-                    continue
-                if salvo.year != ano or salvo.month != mes:
-                    continue
-                try:
-                    preenchidas = int(item.get("filled", 0) or 0)
-                except Exception:
-                    preenchidas = 0
-                total += max(0, preenchidas)
+            cells = self._carregar_planilha_interna()
+            return len(extract_column(cells, column=1))
         except Exception:
             return 0
-        return total
 
-    def _formatar_contador_arquivos(self, referencia=None):
-        valor = self._contar_codigos_mes(referencia)
-        return f"{valor:,}".replace(",", ".") + " códigos no mês"
+    def _formatar_contador_arquivos(self):
+        valor = self._contar_codigos_salvos()
+        if valor <= 0:
+            return ""
+        return f"{valor:,}".replace(",", ".") + " códigos salvos"
 
     def _atualizar_contador_arquivos(self, referencia=None):
-        """Atualiza os contadores. O contador da janela usa o mês exibido no calendário."""
-        texto_main = self._formatar_contador_arquivos()
+        """Atualiza a contagem de códigos salvos da planilha atual."""
+        texto = self._formatar_contador_arquivos()
+
         if self.arquivos_contador_label is not None:
             try:
-                self.arquivos_contador_label.configure(text=texto_main)
+                if texto:
+                    self.arquivos_contador_label.configure(text=texto)
+                    self.arquivos_contador_label.pack(side="left", padx=(8, 0))
+                else:
+                    self.arquivos_contador_label.pack_forget()
             except Exception:
                 pass
 
         label = getattr(self, "_arquivos_contador_janela", None)
         if label is not None:
             try:
-                texto_janela = self._formatar_contador_arquivos(referencia)
-                label.configure(text=texto_janela)
+                if texto:
+                    label.configure(text=texto)
+                    label.pack(side="left", padx=(10, 0))
+                else:
+                    label.pack_forget()
             except Exception:
                 pass
 
@@ -9039,6 +8994,7 @@ class App:
             self._salvar_planilha_interna_data()
             self._registrar_historico_planilha(self._planilha_data)
             self._planilha_salva_data=dict(self._planilha_data)
+            codigos_salvos = list(codigos)
             self._planilha_apagar_rascunho()
             self._planilha_efetuou_alteracao=False
             self._planilha_atualizar_contador()
@@ -9079,7 +9035,10 @@ class App:
             except Exception:
                 pass
 
-            self._iniciar_automacao_interna(codigos)
+            self._iniciar_automacao_interna(
+                codigos_salvos,
+                ignorar_checkpoint=False,
+            )
 
         try:
             self.app.after_idle(iniciar_depois_de_fechar)
@@ -9448,6 +9407,12 @@ class App:
             cor_texto = self.ERROR
             cor_pill = ("#FDE7E9", "#4B2529")
             cor_borda = ("#F1A6AA", "#7A3D42")
+        elif "disponível" in low:
+            self._status_text_base = "Disponível"
+            self._status_blink_fast = False
+            cor_texto = self.SUBTEXT
+            cor_pill = (self.BG, "#2B3035")
+            cor_borda = self.BORDER
         elif "finalizado" in low:
             self._status_text_base = "Finalizado"
             self._status_blink_fast = False
@@ -9471,7 +9436,16 @@ class App:
         modo = ctk.get_appearance_mode().lower()
         canvas_bg = cor_pill[1] if modo == "dark" else cor_pill[0]
         self.status_indicator.configure(bg=canvas_bg)
-        self._iniciar_pisca_status()
+        if self._status_text_base == "Disponível":
+            self.status_indicator.itemconfigure(
+                self._status_halo, fill=self._cor(self.BORDER)
+            )
+            self.status_indicator.itemconfigure(
+                self._status_dot, fill=self._cor(self.SUBTEXT)
+            )
+            self._status_blink_job = None
+        else:
+            self._iniciar_pisca_status()
 
     def atualizar_progresso(self, processados, total, sucessos, erros, codigo):
         if self._closing:
