@@ -808,10 +808,16 @@ def principal_interno(
         if aplicativo:
             aplicativo.atualizar_progresso(indice_inicial, total, 0, 0, "")
         auto.iniciar_navegador()
+
         for indice in range(indice_inicial, total):
             if aplicativo and aplicativo.deve_pausar():
-                salvar_checkpoint_interno(codigos, indice, planilha_fingerprint)
+                salvar_checkpoint_interno(
+                    codigos,
+                    indice,
+                    planilha_fingerprint,
+                )
                 finalizar = aplicativo.aguardar_decisao_parada()
+
                 if finalizar:
                     for restante in range(indice, total):
                         resultados.registrar_erro(
@@ -822,6 +828,7 @@ def principal_interno(
                     excluir_checkpoint_interno()
                     resultados.finalizada_pelo_usuario = True
                     break
+
                 if getattr(aplicativo, "_closing", False):
                     break
 
@@ -833,15 +840,25 @@ def principal_interno(
             except AutomacaoError as exc:
                 resultados.registrar_erro(numero, codigo, str(exc))
                 if aplicativo:
-                    registrar = getattr(aplicativo, "_registrar_codigo_erro_historico", None)
+                    registrar = getattr(
+                        aplicativo,
+                        "_registrar_codigo_erro_historico",
+                        None,
+                    )
                     if callable(registrar):
                         registrar(codigo, numero, str(exc))
                     aplicativo._add_activity(
                         f"Erro ({exc.tipo}) no código {codigo}. Indo para o próximo...",
                         aplicativo.ERROR,
                     )
-            salvar_checkpoint_interno(codigos, indice + 1, planilha_fingerprint)
+
+            salvar_checkpoint_interno(
+                codigos,
+                indice + 1,
+                planilha_fingerprint,
+            )
             proximo_indice_seguro = indice + 1
+
             if aplicativo:
                 aplicativo.atualizar_progresso(
                     indice + 1,
@@ -850,19 +867,33 @@ def principal_interno(
                     resultados.erros,
                     str(codigo),
                 )
-        interrompido = bool(aplicativo and aplicativo.deve_finalizar())
+
+        interrompido = bool(
+            aplicativo and aplicativo.deve_finalizar()
+        )
         if not interrompido:
             excluir_checkpoint_interno()
         return resultados
-    except Exception:
 
+    except Exception:
+        try:
+            salvar_checkpoint_interno(
+                codigos,
+                proximo_indice_seguro,
+                planilha_fingerprint,
+            )
+        except Exception:
             pass
         raise
+
     finally:
         auto.fechar()
-        if aplicativo is not None and getattr(aplicativo, "_automacao_atual", None) is auto:
+        if aplicativo is not None and getattr(
+            aplicativo,
+            "_automacao_atual",
+            None,
+        ) is auto:
             aplicativo._automacao_atual = None
-
 
 def principal(planilha_path, sheet, aplicativo=None, indice_inicial=0):
     resultados = Resultados()
