@@ -7152,7 +7152,7 @@ class App:
             b=ctk.CTkButton(undo_row,text=glyph,command=cmd,width=34,height=34,corner_radius=8,fg_color="transparent",hover_color=("#EAF4FC","#263F50"),text_color=self.TEXT,font=("Segoe UI Symbol",20,"bold"))
             b.pack(side="left", padx=1)
             b.configure(cursor="hand2")
-        self._planilha_contador_label=ctk.CTkLabel(title_bar,text="0 preenchidas",text_color=self.SUBTEXT,font=("Segoe UI",10))
+        self._planilha_contador_label=ctk.CTkLabel(title_bar,text="",text_color=self.SUBTEXT,font=("Segoe UI",10))
         self._planilha_contador_label.pack(side="left", padx=(10,0))
         tem_dados = any(
             str(valor or "").strip()
@@ -7686,9 +7686,15 @@ class App:
         return "break"
 
     def _planilha_atualizar_contador(self):
-        n = filled_row_count(self._planilha_data)
+        n = self._contar_codigos_salvos(self._planilha_data)
         if self._planilha_contador_label is not None:
-            self._planilha_contador_label.configure(text=f"{n} linhas preenchidas")
+            if n == 0:
+                texto = ""
+            elif n == 1:
+                texto = "1 código"
+            else:
+                texto = f"{n:,}".replace(",", ".") + " códigos"
+            self._planilha_contador_label.configure(text=texto)
         try:
             if hasattr(self, "planilha_estado_label"):
                 self.planilha_estado_label.configure(text="Planilha pronta" if n > 0 else "")
@@ -8087,6 +8093,7 @@ class App:
             self._planilha_efetuou_alteracao = False
             self._planilha_atualizar_contador()
             self._planilha_atualizar_estado_salvamento("salvo")
+            self._atualizar_contador_arquivos(cells=self._planilha_salva_data)
             self._atualizar_status_inicial_por_planilha()
             self._add_activity("Planilha interna salva.", self.SUCCESS)
             return True
@@ -8430,25 +8437,28 @@ class App:
         except Exception:
             pass
 
-    def _contar_codigos_salvos(self):
-        """Conta células preenchidas da coluna Senha na planilha atualmente salva."""
+    def _contar_codigos_salvos(self, cells=None):
+        """Conta células preenchidas da coluna Senha na planilha salva atual."""
         try:
-            cells = self._carregar_planilha_interna()
-            return len(extract_column(cells, column=1))
+            fonte = self._carregar_planilha_interna() if cells is None else cells
+            return len(extract_column(fonte, column=1))
         except Exception:
             return 0
 
-    def _formatar_contador_arquivos(self):
-        valor = self._contar_codigos_salvos()
+    def _formatar_contador_arquivos(self, cells=None):
+        valor = self._contar_codigos_salvos(cells)
         if valor <= 0:
             return ""
+        if valor == 1:
+            return "1 código salvo"
         return f"{valor:,}".replace(",", ".") + " códigos salvos"
 
-    def _atualizar_contador_arquivos(self, referencia=None):
-        """Atualiza a contagem de códigos salvos da planilha atual.
-        O parâmetro de compatibilidade é ignorado deliberadamente.
+    def _atualizar_contador_arquivos(self, referencia=None, cells=None):
+        """Atualiza a contagem de códigos salvos.
+        referencia permanece por compatibilidade com a janela Arquivos;
+        cells permite atualização imediata após salvamento confirmado.
         """
-        texto = self._formatar_contador_arquivos()
+        texto = self._formatar_contador_arquivos(cells)
 
         if self.arquivos_contador_label is not None:
             try:
