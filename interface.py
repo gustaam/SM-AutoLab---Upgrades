@@ -2870,6 +2870,12 @@ class App:
         self.app.after(350, self._verificar_retomada_pendente)
         self._agendar_verificacao_atualizacao()
 
+        # Recalcula a posição depois que todo o layout foi negociado pelo Tk.
+        # A janela abre centralizada sem interferir em redimensionamentos posteriores.
+        self.app.after_idle(
+            lambda: self._centralizar_janela(self.app, 900, 600)
+        )
+
 
 
 
@@ -6489,14 +6495,30 @@ class App:
         self.atualizar_status("Seleções apagadas")
 
     def _abrir_detalhe_historico(self, execucao):
-        win = ctk.CTkToplevel(self.app)
+        # O detalhe pertence à janela do Histórico quando esta estiver aberta.
+        # Assim ele não fica atrás da janela-pai ao ser aberto pelo clique na pasta.
+        parent = getattr(self, "_historico_compacto_window", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.app
+        except Exception:
+            parent = self.app
+
+        win = ctk.CTkToplevel(parent)
         self._configurar_icone_janela(win)
         win.title("Execução — SM AutoLab")
         win.geometry("680x500")
         win.minsize(560, 400)
         win.resizable(True, True)
-        win.transient(self.app)
+        win.transient(parent)
         self._centralizar_janela(win, 680, 500)
+        try:
+            win.lift()
+            win.focus_force()
+            win.attributes("-topmost", True)
+            win.after(120, lambda: win.attributes("-topmost", False))
+        except Exception:
+            pass
         try:
             aplicar_backdrop_sistema(
                 win, "acrylic",
