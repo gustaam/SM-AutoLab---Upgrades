@@ -662,13 +662,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
     def test_status_disponivel_usa_pisca_em_cinza(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
-        start=source.index("def _executar_pisca_status")
-        end=source.index("def _parar_pisca_status", start)
+        start=source.index("def _cores_indicador_status")
+        end=source.index("def _iniciar_pisca_status", start)
         block=source[start:end]
-        self.assertIn('if getattr(self, "_status_text_base", "") == "Disponível":', block)
-        self.assertIn('halo_base, halo_brilho = "#9AA0A6", "#E1E4E6"', block)
-        self.assertIn('dot_base, dot_brilho = "#6B7075", "#C7CBD0"', block)
-        self.assertIn('canvas_bg = "#2B3035" if modo_escuro else self._cor(self.BG)', block)
+        self.assertIn('"Disponível"', block)
+        self.assertIn('"canvas": (self._cor(self.BG), "#2B3035")', block)
+        self.assertIn('"halo": ("#9AA0A6", "#E1E4E6")', block)
+        self.assertIn('"dot": ("#6B7075", "#C7CBD0")', block)
+
 
     def test_status_animation_callback_respeita_estado_atual_e_disponivel_pisca_em_cinza(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
@@ -676,10 +677,11 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _parar_pisca_status", start)
         block=source[start:end]
         self.assertIn('if getattr(self, "_closing", False):', block)
-        self.assertIn('if getattr(self, "_status_text_base", "") == "Disponível":', block)
-        self.assertIn('halo_base, halo_brilho = "#9AA0A6", "#E1E4E6"', block)
-        self.assertIn('dot_base, dot_brilho = "#6B7075", "#C7CBD0"', block)
-        self.assertIn('canvas_bg = "#2B3035" if modo_escuro else self._cor(self.BG)', block)
+        self.assertIn("paleta = self._cores_indicador_status()", block)
+        self.assertIn("canvas_bg = paleta[\"canvas\"][1] if modo_escuro else paleta[\"canvas\"][0]", block)
+        self.assertIn("halo_base, halo_brilho = paleta[\"halo\"]", block)
+        self.assertIn("dot_base, dot_brilho = paleta[\"dot\"]", block)
+
 
     def test_planilha_processada_persiste_e_impede_reabertura_da_mesma_revisao(self):
         import interface
