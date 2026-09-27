@@ -614,6 +614,41 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn('messagebox.askyesno("Recuperar última planilha"', block)
         self.assertNotIn("self._planilha_data = {}", block[block.index("if ultima:"):block.index("else:", block.index("if ultima:"))])
 
+    def test_indicador_usa_a_mesma_paleta_do_status(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _cores_indicador_status")
+        end = source.index("def _iniciar_pisca_status", start)
+        block = source[start:end]
+        self.assertIn('"Processando"', block)
+        self.assertIn('"Parando"', block)
+        self.assertIn('"Atenção"', block)
+        self.assertIn('"Disponível"', block)
+        self.assertIn('"Finalizado"', block)
+        self.assertIn('"Pronto"', block)
+        self.assertIn('"canvas": ("#FDE7E9", "#4B2529")', block)
+        self.assertIn('"canvas": ("#FFF4CE", "#4B3A1A")', block)
+        self.assertIn('"canvas": ("#E5F1FB", "#183B54")', block)
+        self.assertIn('self._cor(self.BG)', block)
+
+    def test_indicador_nao_reaproveita_azul_ou_verde_em_outros_status(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _executar_pisca_status")
+        end = source.index("def _aplicar_status", start)
+        block = source[start:end]
+        self.assertIn("paleta = self._cores_indicador_status()", block)
+        self.assertNotIn('elif self._status_blink_fast:', block)
+        self.assertIn('self.status_indicator.configure(bg=canvas_bg)', block)
+
+    def test_indicador_estatico_respeita_a_cor_do_status(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _parar_pisca_status")
+        end = source.index("def _aplicar_status", start)
+        block = source[start:end]
+        self.assertIn("paleta = self._cores_indicador_status()", block)
+        self.assertIn("self.status_indicator.configure(bg=canvas_bg)", block)
+        self.assertIn("self.status_indicator.itemconfigure(self._status_halo, fill=halo)", block)
+        self.assertIn("self.status_indicator.itemconfigure(self._status_dot, fill=dot)", block)
+
     def test_status_disponivel_cancela_animacao_verde_e_fica_estatico(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
         start=source.index("def _aplicar_status")
