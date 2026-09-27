@@ -4967,9 +4967,11 @@ class App:
         )
 
     def _historico_execucoes_visiveis(self):
-        """Retorna todas as execuções que possuem erros registrados.
+        """Retorna todas as execuções com erros, resolvidos ou pendentes.
 
-        A visibilidade histórica é independente da notificação de pendências.
+        A visibilidade histórica é independente da notificação de pendências;
+        _historico_tem_erros_pendentes() controla somente a notificação e a
+        disponibilidade do comando "Reexecutar".
         """
         return self._historico_execucoes_com_erros()
 
@@ -5946,7 +5948,8 @@ class App:
         atuais.update(resolvidos)
         execucao_original["codigos_erros_reexecutados"] = sorted(atuais)
 
-        # O histórico de erros e seus detalhes não são apagados.
+        # Somente a lista de pendências é atualizada. A lista histórica de erros
+        # e seus detalhes permanecem intactos, mesmo depois de resolvidos.
         self._salvar_erros_persistentes()
 
     def _finalizar_historico_execucao(self, resultado, status="Concluída"):
@@ -8416,7 +8419,9 @@ class App:
         return f"{valor:,}".replace(",", ".") + " códigos salvos"
 
     def _atualizar_contador_arquivos(self, referencia=None):
-        """Atualiza a contagem de códigos salvos da planilha atual."""
+        """Atualiza a contagem de códigos salvos da planilha atual.
+        O parâmetro de compatibilidade é ignorado deliberadamente.
+        """
         texto = self._formatar_contador_arquivos()
 
         if self.arquivos_contador_label is not None:
@@ -8992,10 +8997,16 @@ class App:
         self._planilha_fechar_edicao()
         self._planilha_atualizar_estado_salvamento("salvando")
         self._recuperar_planilha_persistida_para_execucao()
+
         if not self._validar_planilha_antes_execucao():
+            # A validação foi recusada/cancelada; não deixe o editor preso em
+            # "Salvando…".
+            self._planilha_atualizar_estado_salvamento("salvo")
             return
-        codigos=self._extrair_codigos_planilha()
+
+        codigos = self._extrair_codigos_planilha()
         if not codigos:
+            self._planilha_atualizar_estado_salvamento("salvo")
             messagebox.showwarning(
                 "Nenhum código",
                 "Preencha os códigos na coluna 'Senha' antes de iniciar.",
@@ -9005,14 +9016,28 @@ class App:
 
         try:
             self._salvar_planilha_interna_data()
-            self._registrar_historico_planilha(self._planilha_data)
-            self._planilha_salva_data=dict(self._planilha_data)
-            codigos_salvos = list(codigos)
+
+            # Releia a revisão recém-gravada. O Selenium deve receber exatamente
+            # os códigos que foram confirmados no arquivo persistido, evitando
+            # divergência entre a grade e a fonte usada pela automação.
+            persistida = self._carregar_planilha_interna()
+            codigos_salvos = extract_column(persistida, column=1)
+            if not codigos_salvos:
+                raise IOError(
+                    "A planilha foi salva, mas nenhum código foi encontrado na "
+                    "coluna 'Senha' do arquivo persistido."
+                )
+
+            self._registrar_historico_planilha(persistida)
+            self._planilha_data = dict(persistida)
+            self._planilha_salva_data = dict(persistida)
             self._planilha_apagar_rascunho()
-            self._planilha_efetuou_alteracao=False
+            self._planilha_efetuou_alteracao = False
             self._planilha_atualizar_contador()
             self._planilha_atualizar_estado_salvamento("salvo")
+            self._atualizar_status_inicial_por_planilha()
         except Exception as exc:
+            self._planilha_atualizar_estado_salvamento("erro")
             messagebox.showerror(
                 "Não foi possível salvar",
                 str(exc),
