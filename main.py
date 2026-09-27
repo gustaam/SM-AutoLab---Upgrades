@@ -232,8 +232,7 @@ def _sinalizar_inicializacao_atualizacao_sucesso():
     except OSError:
         pass
 
-
-def _agendar_limpeza_atualizacao():
+_agendar_limpeza_atualizacao():
     """Remove a pasta temporária somente após a confirmação da nova versão."""
     caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_CLEANUP_DIR", "")).strip()
     health_caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_HEALTH", "")).strip()
