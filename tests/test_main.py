@@ -1450,7 +1450,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("def _historico_execucoes_visiveis(self):", vis_block)
         self.assertIn("return self._historico_execucoes_com_erros()", vis_block)
 
-        rex = source[source.index("def _criar_detalhes_historico"):source.index("def _planilha_fingerprint")]
+        rex_start = source.index("def _preencher_detalhe_pasta")
+        rex_end = source.index("def _planilha_fingerprint", rex_start)
+        rex = source[rex_start:rex_end]
         self.assertNotIn("atuais.update(codigos_reexecutaveis)", rex)
 
         final_start = source.index("def _finalizar_historico_execucao")
@@ -1458,6 +1460,39 @@ class CanonicalRuntimeTests(unittest.TestCase):
         final_block = source[final_start:final_end]
         self.assertIn('origem_reexecucao = self._execucao_atual.get("reexecucao_de")', final_block)
         self.assertIn("self._remover_erros_resolvidos_por_reexecucao(", final_block)
+
+    def test_reexecucao_preserva_codigos_historicos_e_marca_somente_sucesso(self):
+        import interface
+
+        class Resultado:
+            itens = [
+                type("Item", (), {"codigo": "100", "status": "Sucesso"})(),
+                type("Item", (), {"codigo": "200", "status": "Erro"})(),
+            ]
+
+        obj = object.__new__(interface.App)
+        obj._historico_execucoes = [{
+            "id": "origem",
+            "codigos_erros": ["100", "200"],
+            "erros_detalhes": [
+                {"codigo": "100", "erro": "falha"},
+                {"codigo": "200", "erro": "falha"},
+            ],
+            "erros": 2,
+            "codigos_erros_reexecutados": [],
+        }]
+        obj._salvar_erros_persistentes = lambda: None
+
+        obj._remover_erros_resolvidos_por_reexecucao(Resultado(), "origem")
+
+        execucao = obj._historico_execucoes[0]
+        self.assertEqual(execucao["codigos_erros"], ["100", "200"])
+        self.assertEqual(
+            [d["codigo"] for d in execucao["erros_detalhes"]],
+            ["100", "200"],
+        )
+        self.assertEqual(execucao["erros"], 2)
+        self.assertEqual(execucao["codigos_erros_reexecutados"], ["100"])
 
     def test_atualizador_sinaliza_inicio_saudavel_e_reseta_ambiente(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
