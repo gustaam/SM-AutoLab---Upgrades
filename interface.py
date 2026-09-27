@@ -7080,24 +7080,10 @@ class App:
             self._preparar_planilha_do_dia()
             ultima = self._carregar_planilha_interna()
             if ultima:
-                if self._planilha_foi_processada(ultima):
-                    # Uma planilha processada continua sendo a planilha salva atual.
-                    # O marcador de processamento não significa "apagar dados".
-                    self._planilha_apagar_rascunho()
-                    self._planilha_data = dict(ultima)
-                else:
-                    recuperar = messagebox.askyesno(
-                        "Recuperar última planilha",
-                        "A última planilha salva ainda não foi processada.\n\n"
-                        "Deseja recuperá-la?",
-                        parent=self.app,
-                    )
-                    if recuperar:
-                        self._planilha_data = dict(ultima)
-                        recuperar_rascunho = True
-                    else:
-                        self._planilha_apagar_rascunho()
-                        self._planilha_data = {}
+                # A planilha salva é sempre a fonte canônica da janela de edição.
+                # Uma revisão salva nunca deve ser descartada só por ainda não
+                # ter sido processada ou por uma escolha no diálogo de recuperação.
+                self._planilha_data = dict(ultima)
             else:
                 self._planilha_data = {}
                 recuperar_rascunho = True
@@ -9391,6 +9377,24 @@ class App:
         try:
             import math
 
+            # Um callback já enfileirado pode executar mesmo após after_cancel().
+            # O estado atual precisa ter prioridade para impedir que "Disponível"
+            # volte a receber a animação verde de um estado anterior.
+            if getattr(self, "_status_text_base", "") == "Disponível" or getattr(self, "_closing", False):
+                self._status_blink_job = None
+                if getattr(self, "status_indicator", None) is not None:
+                    modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+                    self.status_indicator.configure(
+                        bg="#2B3035" if modo_escuro else self._cor(self.BG)
+                    )
+                    self.status_indicator.itemconfigure(
+                        self._status_halo, fill=self._cor(self.BORDER)
+                    )
+                    self.status_indicator.itemconfigure(
+                        self._status_dot, fill=self._cor(self.SUBTEXT)
+                    )
+                return
+
             frames = max(2, int(self._status_anim_frames))
             idx = self._status_anim_frame % frames
 
@@ -9442,11 +9446,23 @@ class App:
             self._status_blink_job = None
 
             if manter_estado and getattr(self, "status_indicator", None) is not None:
-                modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
-                self.status_indicator.configure(bg=canvas_bg)
-                self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
-                self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
+                if getattr(self, "_status_text_base", "") == "Disponível":
+                    modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+                    self.status_indicator.configure(
+                        bg="#2B3035" if modo_escuro else self._cor(self.BG)
+                    )
+                    self.status_indicator.itemconfigure(
+                        self._status_halo, fill=self._cor(self.BORDER)
+                    )
+                    self.status_indicator.itemconfigure(
+                        self._status_dot, fill=self._cor(self.SUBTEXT)
+                    )
+                else:
+                    modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+                    canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
+                    self.status_indicator.configure(bg=canvas_bg)
+                    self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
+                    self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
         except Exception:
             self._status_blink_job = None
 
@@ -9525,7 +9541,9 @@ class App:
                 self._status_dot, fill=self._cor(self.SUBTEXT)
             )
             self._status_blink_job = None
+            self._status_blink_visible = False
         else:
+            self._status_blink_visible = True
             self._iniciar_pisca_status()
 
     def atualizar_progresso(self, processados, total, sucessos, erros, codigo):
