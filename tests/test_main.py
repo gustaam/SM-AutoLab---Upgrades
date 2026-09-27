@@ -917,6 +917,27 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("menu_y = max(0, by)", block)
         self.assertIn("O menu é sempre ancorado ao botão Configurações.", block)
 
+    def test_detalhe_historico_usa_janela_historico_como_pai_e_fica_na_frente(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _abrir_detalhe_historico")
+        end = source.index("def _preencher_detalhe_pasta", start)
+        block = source[start:end]
+        self.assertIn('parent = getattr(self, "_historico_compacto_window", None)', block)
+        self.assertIn("win = ctk.CTkToplevel(parent)", block)
+        self.assertIn("win.transient(parent)", block)
+        self.assertIn("win.lift()", block)
+        self.assertIn("win.focus_force()", block)
+        self.assertIn('win.attributes("-topmost", True)', block)
+        self.assertIn('win.after(120, lambda: win.attributes("-topmost", False))', block)
+
+    def test_config_app_recentraliza_janela_apos_layout_inicial(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def config_app(self):")
+        end = source.index("def _configurar_dashboard_compacto", start)
+        block = source[start:end]
+        self.assertIn("self.app.after_idle(", block)
+        self.assertIn("self._centralizar_janela(self.app, 900, 600)", block)
+
     def test_janelas_secundarias_sao_centralizadas(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn("def _centralizar_janela", source)
