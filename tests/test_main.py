@@ -1556,7 +1556,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         vis_end=source.index("def _cor(valor)", vis_start)
         self.assertIn("return self._historico_execucoes_com_erros()", source[vis_start:vis_end])
 
-    def test_reexecucao_preserva_codigos_historicos_e_marca_somente_sucesso(self):
+    def test_reexecucao_preserva_codigos_historicos_e_marca_todas_as_tentativas(self):
         import interface
 
         class Resultado:
@@ -1587,7 +1587,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
             ["100", "200"],
         )
         self.assertEqual(execucao["erros"], 2)
-        self.assertEqual(execucao["codigos_erros_reexecutados"], ["100"])
+        self.assertEqual(execucao["codigos_erros_reexecutados"], ["100", "200"])
 
     def test_atualizador_sinaliza_inicio_saudavel_e_reseta_ambiente(self):
         source=(self.root/"interface.py").read_text(encoding="utf-8")
