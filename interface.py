@@ -6009,11 +6009,12 @@ class App:
         self._restaurar_historico_na_tela()
 
     def _remover_erros_resolvidos_por_reexecucao(self, resultado, origem_id):
-        """Marca como resolvidos os códigos que tiveram sucesso na reexecução.
+        """Marca os códigos efetivamente reexecutados na execução de origem.
 
-        A lista histórica de erros e seus detalhes permanece intacta. O campo
-        codigos_erros_reexecutados controla somente a notificação e o botão
-        de nova tentativa.
+        O histórico original mantém os códigos e seus detalhes, mas deixa de
+        oferecer nova tentativa para qualquer código que já foi reexecutado.
+        Se o código falhar novamente, ele permanece disponível na nova execução
+        criada pela própria reexecução.
         """
         if not origem_id:
             return
@@ -6029,18 +6030,16 @@ class App:
         if not isinstance(execucao_original, dict):
             return
 
-        resolvidos = set()
+        reexecutados = set()
         for item in getattr(resultado, "itens", []) or []:
             if isinstance(item, dict):
                 codigo = str(item.get("codigo") or item.get("code") or "").strip()
-                estado = str(item.get("status", "")).strip().casefold()
             else:
                 codigo = str(getattr(item, "codigo", "")).strip()
-                estado = str(getattr(item, "status", "")).strip().casefold()
-            if codigo and estado in {"sucesso", "executado", "processado"}:
-                resolvidos.add(codigo)
+            if codigo:
+                reexecutados.add(codigo)
 
-        if not resolvidos:
+        if not reexecutados:
             return
 
         atuais = {
@@ -6048,11 +6047,11 @@ class App:
             for c in (execucao_original.get("codigos_erros_reexecutados") or [])
             if str(c).strip()
         }
-        atuais.update(resolvidos)
+        atuais.update(reexecutados)
         execucao_original["codigos_erros_reexecutados"] = sorted(atuais)
 
         # Somente a lista de pendências é atualizada. A lista histórica de erros
-        # e seus detalhes permanecem intactos, mesmo depois de resolvidos.
+        # e seus detalhes permanecem intactos.
         self._salvar_erros_persistentes()
 
     def _finalizar_historico_execucao(self, resultado, status="Concluída"):
