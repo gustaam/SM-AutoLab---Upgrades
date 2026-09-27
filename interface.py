@@ -2270,9 +2270,8 @@ def _configurar_titulo_dwm(hwnd, dark: bool):
     """Define explicitamente a barra de título no azul de destaque do app."""
     if not _windows11_available():
         return False
-    # Mantém a moldura nativa coerente com o azul Fluent 2 já usado pelo app.
-    # A cor é fixa nos dois temas para preservar a identidade visual.
-    cor_fundo = _windows_colorref("#0F6CBD")
+    # Mantém a moldura nativa coerente com o azul do cabeçalho nos dois temas.
+    cor_fundo = _windows_colorref("#0B4F82" if dark else "#1976C9")
     cor_texto = _windows_colorref("#FFFFFF")
     ok_fundo = _set_dwm_attribute(hwnd, DWMWA_CAPTION_COLOR, cor_fundo)
     ok_texto = _set_dwm_attribute(hwnd, DWMWA_TEXT_COLOR, cor_texto)
@@ -2361,7 +2360,9 @@ class App:
     # Superfícies específicas do dashboard, seguindo a hierarquia de cor do
     # Fluent 2: o cabeçalho usa o azul de marca e as áreas de atividade/histórico
     # usam uma superfície neutra levemente acinzentada.
-    HEADER = ("#4A9BD3", "#06324D")
+    HEADER = ("#1976C9", "#0B4F82")
+    WINDOW_MATERIAL = "mica_alt"
+    WINDOW_ALPHA = 0.965
     HEADER_TEXT = ("#FFFFFF", "#FFFFFF")
     HEADER_SUBTEXT = ("#E8F3FB", "#DCEEFF")
     HEADER_BUTTON = ("#FFFFFF", "#0D3550")
@@ -2597,6 +2598,22 @@ class App:
             return
         self._fechar_menus()
 
+    def _aplicar_material_janela_principal(self):
+        """Ativa o material nativo do Windows 11 com transparência muito sutil."""
+        try:
+            aplicar_backdrop_sistema(
+                self.app,
+                self.WINDOW_MATERIAL,
+                dark=ctk.get_appearance_mode().lower() == "dark",
+            )
+        except Exception:
+            pass
+        try:
+            if _windows11_available():
+                self.app.attributes("-alpha", self.WINDOW_ALPHA)
+        except (tk.TclError, AttributeError, OSError, TypeError, ValueError):
+            pass
+
     def config_app(self):
         self.app.title("SM AutoLab")
         self.app.geometry("900x600")
@@ -2608,9 +2625,13 @@ class App:
         # minimizar/restaurar. Desabilitamos essa transição somente nesta janela.
         try:
             desabilitar_transicoes_dwm(self.app)
-            _configurar_titulo_dwm(int(self.app.winfo_id()), False)
+            _configurar_titulo_dwm(
+                int(self.app.winfo_id()),
+                str(ctk.get_appearance_mode()).lower() == "dark",
+            )
         except Exception:
             pass
+        self._aplicar_material_janela_principal()
         self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")
         self.app.bind("<Map>", self._agendar_estabilizacao_apos_retomada, add="+")
 
