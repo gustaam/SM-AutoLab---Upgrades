@@ -502,6 +502,10 @@ def install_ui(App):
     App._ui_runtime_mode = "canonical"
     App._ui_runtime_marker = SM_AUTOLAB_CANONICAL_UI
 if __name__ == "__main__":
+    _restart_after_pid = os.environ.pop("SM_AUTOLAB_RESTART_AFTER_PID", "").strip()
+    if _restart_after_pid:
+        _aguardar_processo_anterior(_restart_after_pid)
+
     if _update_installer_mode():
         raise SystemExit(0)
     _agendar_limpeza_atualizacao()
