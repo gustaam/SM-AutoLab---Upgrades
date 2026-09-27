@@ -596,6 +596,27 @@ class CanonicalRuntimeTests(unittest.TestCase):
 
             self.assertTrue(obj._planilha_foi_processada(cells))
 
+    def test_abrir_planilha_reabre_dados_processados_em_vez_de_apagar(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def abrir_planilha(self, dados_iniciais=None):")
+        end=source.index("def _planilha_redesenhar_viewport", start)
+        block=source[start:end]
+        self.assertIn("if self._planilha_foi_processada(ultima):", block)
+        self.assertIn("self._planilha_data = dict(ultima)", block)
+        self.assertNotIn("self._planilha_data = {}", block[block.index("if self._planilha_foi_processada(ultima):"):block.index("else:", block.index("if self._planilha_foi_processada(ultima):"))])
+
+    def test_status_disponivel_cancela_animacao_verde_e_fica_estatico(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def _aplicar_status")
+        end=source.index("def atualizar_progresso", start)
+        block=source[start:end]
+        self.assertIn("self.app.after_cancel(job)", block)
+        self.assertIn('self._status_text_base == "Disponível"', block)
+        self.assertIn("fill=self._cor(self.BORDER)", block)
+        self.assertIn("fill=self._cor(self.SUBTEXT)", block)
+        self.assertIn("self._status_blink_job = None", block)
+        self.assertIn("self._iniciar_pisca_status()", block)
+
     def test_planilha_processada_persiste_e_impede_reabertura_da_mesma_revisao(self):
         import interface
         import tempfile
