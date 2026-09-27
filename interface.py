@@ -2362,7 +2362,7 @@ class App:
         "system": "Padrão do Windows",
     }
     VIEW_LABELS = {
-        "complete": "Completa",
+        "complete": "Expandida",
         "compact": "Compacta",
     }
 
@@ -3529,7 +3529,7 @@ class App:
 
                 # O menu é sempre ancorado ao botão Configurações.
                 # Assim, a posição não muda incorretamente ao alternar entre
-                # a visualização Completa e a Compacta.
+                # a visualização Expandida e a Compacta.
                 menu_x = bx
                 if menu_x + menu_width > app_width - 6:
                     menu_x = max(6, app_width - menu_width - 6)
@@ -4715,7 +4715,7 @@ class App:
             anchor="w",
         ).pack(fill="x", padx=12, pady=(9, 4))
 
-        for modo in ("light", "dark", "system"):
+        for modo in ("system", "light", "dark"):
             rotulo = self.THEME_LABELS[modo]
             marcado = "✓  " if modo == self._tema else "    "
             btn = ctk.CTkButton(
