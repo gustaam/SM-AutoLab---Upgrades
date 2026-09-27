@@ -1514,6 +1514,46 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("self.driver.title", block)
         self.assertIn("não confirmou a autenticação", block)
 
+    def test_parar_troca_botoes_para_finalizar_e_continuar(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        start=source.index("def parar(self):")
+        end=source.index("def _fechar_aplicativo", start)
+        block=source[start:end]
+        self.assertIn("self._atualizar_botoes_execucao(pausando=True)", block)
+        self.assertIn("self._finalizar_por_usuario()", block)
+        self.assertIn("def continuar(self):", block)
+        self.assertIn("self._atualizar_botoes_execucao(pausando=False)", block)
+
+    def test_botoes_de_execucao_usam_acoes_dinamicas(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn("command=self._acao_botao_parar", source)
+        self.assertIn("command=self._acao_botao_iniciar", source)
+        start=source.index("def _atualizar_botoes_execucao")
+        end=source.index("def _fechar_aplicativo", start)
+        block=source[start:end]
+        self.assertIn('stop_text = "■  Finalizar" if pausando else "■  Parar"', block)
+        self.assertIn('start_text = "▶  Continuar" if pausando else "Iniciar"', block)
+        self.assertIn('"Finalizar" if pausando else "Parar"', block)
+        self.assertIn('"Continuar" if pausando else "Iniciar"', block)
+
+    def test_finalizar_execucao_disponibiliza_codigos_restantes(self):
+        source=(self.root/"app.py").read_text(encoding="utf-8")
+        start=source.index("def principal_interno")
+        end=source.index("def principal(planilha_path", start)
+        block=source[start:end]
+        self.assertIn("aguardar_decisao_parada()", block)
+        self.assertIn("resultados.finalizada_pelo_usuario = True", block)
+        self.assertIn("for restante in range(indice, total):", block)
+        self.assertIn('"Automação finalizada pelo usuário antes da execução deste código."', block)
+        self.assertIn("excluir_checkpoint_interno()", block)
+        self.assertIn("deve_finalizar()", block)
+
+    def test_status_pausado_usa_paleta_de_parada(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        self.assertIn('"Pausado": {', source)
+        self.assertIn('elif "pausad" in low:', source)
+        self.assertIn('self._status_text_base = "Pausado"', source)
+
     def test_selenium_reutiliza_driver_com_opcoes_leves(self):
         source=(self.root/"app.py").read_text(encoding="utf-8")
         self.assertIn("def _criar_driver(self):",source)
