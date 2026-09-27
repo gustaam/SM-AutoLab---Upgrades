@@ -1568,7 +1568,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         start=source.index("def _atualizar_botoes_execucao")
         end=source.index("def _fechar_aplicativo", start)
         block=source[start:end]
-        self.assertIn('stop_text = "■  Finalizar" if pausando else "■  Parar"', block)
+        self.assertIn('stop_text = "■  Finalizar" if pausando else "■  Pausar"', block)
         self.assertIn('start_text = "▶  Continuar"', block)
         self.assertIn('state="normal"', block)
         self.assertIn('self.botao_parar._sm_autolab_tooltip_message = "Pausar"', block)
