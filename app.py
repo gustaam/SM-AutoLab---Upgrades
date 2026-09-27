@@ -75,6 +75,7 @@ def _selenium_assets_valid():
 def preparar_ambiente_selenium(force=False, attempts=3):
     """Resolve e prepara Chrome/ChromeDriver sem depender da primeira execução."""
     if not force and _selenium_assets_valid():
+        _SELENIUM_PREPARE_READY.set()
         return (
             str(_SELENIUM_ASSETS["driver_path"]),
             str(_SELENIUM_ASSETS.get("browser_path") or ""),
