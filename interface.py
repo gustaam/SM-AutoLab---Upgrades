@@ -2904,7 +2904,7 @@ class App:
         # Activity tab
         self.atividade = ctk.CTkTextbox(
             self.aba_atividade, height=90, corner_radius=8,
-            fg_color=("#FAFAFA", "#252A2F"), border_width=1, border_color=self.BORDER,
+            fg_color=self.ACTIVITY_SURFACE, border_width=1, border_color=self.BORDER,
             text_color=self.TEXT, font=("Consolas", 10), wrap="word"
         )
         self.atividade.pack(fill="both", expand=True)
@@ -2933,7 +2933,7 @@ class App:
         self.botao_limpar_historico.pack(side="right")
 
         self.historico_lista = ctk.CTkScrollableFrame(
-            self.aba_historico, fg_color=("#FAFAFA", "#252A2F"),
+            self.aba_historico, fg_color=self.ACTIVITY_SURFACE,
             corner_radius=8, border_width=1, border_color=self.BORDER
         )
         self.historico_lista.pack(fill="both", expand=True)
