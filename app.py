@@ -888,11 +888,7 @@ def principal_interno(
 
     finally:
         auto.fechar()
-        if aplicativo is not None and getattr(
-            aplicativo,
-            "_automacao_atual",
-            None,
-        ) is auto:
+        if aplicativo is not None and getattr(aplicativo, "_automacao_atual", None) is auto:
             aplicativo._automacao_atual = None
 
 def principal(planilha_path, sheet, aplicativo=None, indice_inicial=0):
