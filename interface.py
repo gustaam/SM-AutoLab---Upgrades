@@ -6220,7 +6220,9 @@ class App:
         self._codigos_erros_execucao = []
         self._parar = False
         self._finalizar_solicitado = False
-        self._execucao_decisao_event.set()
+        evento_decisao = getattr(self, "_execucao_decisao_event", None)
+        if evento_decisao is not None:
+            evento_decisao.set()
         self._salvar_estado_persistente()
         self._restaurar_historico_na_tela()
         self._atualizar_contador_arquivos()
