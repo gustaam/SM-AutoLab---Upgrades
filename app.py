@@ -354,17 +354,183 @@ class Automacao:
         # Depois que a navegação crítica terminou, mantém o Chrome minimizado
         # sem bloquear a entrada do usuário/JS do portal durante o login.
         self._minimizar_chrome_com_segurança()
+    def _aguardar_login_concluido(self, timeout=LOGIN_TIMEOUT):
+        """Confirma o login por qualquer sinal confiável da tela autenticada."""
+        def autenticado(driver):
+            try:
+                if driver.find_elements(By.XPATH, PAGE_LINK_XPATH):
+                    return True
+            except WebDriverException:
+                pass
+
+            try:
+                # Alguns ciclos do Feegow mantêm a mesma URL por alguns instantes.
+                # Nesse caso, o desaparecimento dos campos de login é um sinal
+                # melhor do que depender exclusivamente da URL.
+                campos_login = driver.find_elements(
+                    By.XPATH,
+                    LOGIN_USER_XPATH + " | " + LOGIN_PASSWORD_XPATH,
+                )
+                visiveis = [el for el in campos_login if el.is_displayed()]
+                if not visiveis:
+                    return True
+            except WebDriverException:
+                pass
+            return False
+
+        WebDriverWait(
+            self.driver,
+            max(1, int(timeout)),
+            poll_frequency=0.2,
+        ).until(autenticado)
+
+
+    def _submeter_login(self, usuario_element, senha_element):
+        """Submete o formulário usando fallbacks para o formulário do Feegow."""
+        xpaths = (
+            LOGIN_BUTTON_XPATH,
+            '//button[@type="submit"]',
+            '//input[@type="button" and contains(translate(@value, "ENTRAR", "entrar"), "entrar")]',
+            '//*[@role="button" and contains(normalize-space(.), "Entrar")]',
+        )
+
+        botao = None
+        for xpath in xpaths:
+            try:
+                botao = WebDriverWait(
+                    self.driver,
+                    5,
+                    poll_frequency=0.2,
+                ).until(
+                    EC.element_to_be_clickable((By.XPATH, xpath))
+                )
+                if botao:
+                    break
+            except TimeoutException:
+                continue
+
+        if botao is not None:
+            try:
+                self.driver.execute_script(
+                    "arguments[0].scrollIntoView({block:'center',inline:'center'});",
+                    botao,
+                )
+            except WebDriverException:
+                pass
+
+            try:
+                botao.click()
+            except WebDriverException:
+                # Fallback para um clique DOM quando a camada visual do navegador
+                # intercepta o clique WebDriver sem gerar submissão do formulário.
+                try:
+                    self.driver.execute_script("arguments[0].click();", botao)
+                except WebDriverException:
+                    pass
+
+            try:
+                self._aguardar_login_concluido(timeout=4)
+                return
+            except TimeoutException:
+                pass
+
+        # Segundo fallback: Enter no campo de senha, acionando o submit nativo
+        # do formulário sem depender do elemento visual do botão.
+        try:
+            senha_element.click()
+            senha_element.send_keys(Keys.ENTER)
+            self._aguardar_login_concluido(timeout=6)
+            return
+        except (TimeoutException, WebDriverException):
+            pass
+
+        # Último fallback: requestSubmit() preserva a validação HTML e dispara
+        # o submit/onsubmit do formulário, ao contrário de form.submit().
+        try:
+            self.driver.execute_script(
+                """
+                const input = arguments[0];
+                const form = input.form || input.closest('form');
+                if (form) {
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else if (typeof form.submit === 'function') {
+                        form.submit();
+                    }
+                }
+                """,
+                senha_element,
+            )
+            self._aguardar_login_concluido(timeout=LOGIN_TIMEOUT)
+            return
+        except (TimeoutException, WebDriverException):
+            pass
+
+        raise TimeoutException("O formulário de login não foi submetido ou aceito pelo portal.")
+
+
     def _fazer_login(self):
         try:
             self._status("Entrando no portal...")
-            u=WebDriverWait(self.driver,LOGIN_TIMEOUT,poll_frequency=.2).until(EC.visibility_of_element_located((By.XPATH,LOGIN_USER_XPATH)))
-            p=WebDriverWait(self.driver,LOGIN_TIMEOUT,poll_frequency=.2).until(EC.visibility_of_element_located((By.XPATH,LOGIN_PASSWORD_XPATH)))
-            u.clear(); u.send_keys(PORTAL_USUARIO); p.clear(); p.send_keys(PORTAL_SENHA)
-            WebDriverWait(self.driver,LOGIN_TIMEOUT,poll_frequency=.2).until(EC.element_to_be_clickable((By.XPATH,LOGIN_BUTTON_XPATH))).click()
-            WebDriverWait(self.driver,PAGE_LOAD_TIMEOUT,poll_frequency=.2).until(EC.presence_of_element_located((By.XPATH,PAGE_LINK_XPATH)))
-        except TimeoutException as e: raise AutomacaoError("Falha no login: tempo excedido.","login") from e
-        except WebDriverException as e: raise AutomacaoError("Falha no navegador durante o login.","navegador") from e
-        except Exception as e: raise AutomacaoError(f"Falha no login: {e}","login") from e
+            u=WebDriverWait(
+                self.driver,
+                LOGIN_TIMEOUT,
+                poll_frequency=.2,
+            ).until(
+                EC.visibility_of_element_located(
+                    (By.XPATH, LOGIN_USER_XPATH)
+                )
+            )
+            p=WebDriverWait(
+                self.driver,
+                LOGIN_TIMEOUT,
+                poll_frequency=.2,
+            ).until(
+                EC.visibility_of_element_located(
+                    (By.XPATH, LOGIN_PASSWORD_XPATH)
+                )
+            )
+
+            u.click()
+            u.clear()
+            u.send_keys(PORTAL_USUARIO)
+            p.click()
+            p.clear()
+            p.send_keys(PORTAL_SENHA)
+
+            # Confirma que o navegador realmente recebeu os dados antes de
+            # submeter. Nunca registra a senha em logs.
+            usuario_preenchido = str(u.get_attribute("value") or "").strip()
+            senha_preenchida = bool(str(p.get_attribute("value") or ""))
+            if not usuario_preenchido or not senha_preenchida:
+                raise AutomacaoError(
+                    "O formulário de login não recebeu os dados de acesso.",
+                    "login",
+                )
+
+            self._submeter_login(u, p)
+        except TimeoutException as e:
+            detalhes = ""
+            try:
+                detalhes = (
+                    f" URL atual: {self.driver.current_url!r}; "
+                    f"título: {self.driver.title!r}."
+                )
+            except WebDriverException:
+                pass
+            raise AutomacaoError(
+                "Falha no login: o portal não confirmou a autenticação antes do tempo limite."
+                + detalhes,
+                "login",
+            ) from e
+        except WebDriverException as e:
+            raise AutomacaoError(
+                "Falha no navegador durante o login.",
+                "navegador",
+            ) from e
+        except Exception as e:
+            raise AutomacaoError(f"Falha no login: {e}", "login") from e
+
     def _abrir_autorizacao(self):
         try:
             self._status("Abrindo Autorizar Procedimento...")
