@@ -825,8 +825,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _iniciar_automacao_interna",start)
         block=source[start:end]
         self.assertIn("self._salvar_planilha_interna_data()",block)
-        self.assertIn("codigos_salvos = list(codigos)",block)
-        self.assertIn("self._planilha_salva_data=dict(self._planilha_data)",block)
+        self.assertIn("persistida = self._carregar_planilha_interna()",block)
+        self.assertIn("codigos_salvos = extract_column(persistida, column=1)",block)
+        self.assertIn("self._planilha_salva_data = dict(persistida)",block)
         self.assertIn("self._iniciar_automacao_interna(",block)
         self.assertLess(block.index("self._salvar_planilha_interna_data()"),block.index("self._iniciar_automacao_interna("))
         self.assertIn("principal_interno(",source[source.index("def _executar_interno"):source.index("def _recuperar_planilha_persistida_para_execucao")])
@@ -1460,6 +1461,18 @@ class CanonicalRuntimeTests(unittest.TestCase):
         final_block = source[final_start:final_end]
         self.assertIn('origem_reexecucao = self._execucao_atual.get("reexecucao_de")', final_block)
         self.assertIn("self._remover_erros_resolvidos_por_reexecucao(", final_block)
+
+    def test_reexecucao_preserva_lista_de_erros_e_atualiza_apenas_pendencias(self):
+        source=(self.root/"interface.py").read_text(encoding="utf-8")
+        helper_start=source.index("def _remover_erros_resolvidos_por_reexecucao")
+        helper_end=source.index("def _finalizar_historico_execucao", helper_start)
+        helper=source[helper_start:helper_end]
+        self.assertIn('execucao_original["codigos_erros_reexecutados"] = sorted(atuais)', helper)
+        self.assertNotIn('execucao_original["codigos_erros"] = restantes', helper)
+        self.assertNotIn('execucao_original["erros_detalhes"] = detalhes', helper)
+        vis_start=source.index("def _historico_execucoes_visiveis")
+        vis_end=source.index("def _cor(valor)", vis_start)
+        self.assertIn("return self._historico_execucoes_com_erros()", source[vis_start:vis_end])
 
     def test_reexecucao_preserva_codigos_historicos_e_marca_somente_sucesso(self):
         import interface
