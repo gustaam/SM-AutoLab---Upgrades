@@ -2358,6 +2358,19 @@ class App:
     WARNING = ("#CA5010", "#F4B65F")
     INFO = ("#0F6CBD", "#4CC2FF")
 
+    # Superfícies específicas do dashboard, seguindo a hierarquia de cor do
+    # Fluent 2: o cabeçalho usa o azul de marca e as áreas de atividade/histórico
+    # usam uma superfície neutra levemente acinzentada.
+    HEADER = ("#0F6CBD", "#115EA3")
+    HEADER_TEXT = ("#FFFFFF", "#FFFFFF")
+    HEADER_SUBTEXT = ("#E8F3FB", "#DCEEFF")
+    HEADER_BUTTON = ("#FFFFFF", "#0D3550")
+    HEADER_BUTTON_HOVER = ("#F3F8FC", "#164765")
+    HEADER_BUTTON_BORDER = ("#C7DDF0", "#3275A3")
+    ACTIVITY_CARD = ("#F7F8F9", "#30353A")
+    ACTIVITY_TABS = ("#EAEDF0", "#353B41")
+    ACTIVITY_SURFACE = ("#F2F3F5", "#272C31")
+
     THEME_LABELS = {
         "light": "Clara",
         "dark": "Escura",
@@ -2612,7 +2625,7 @@ class App:
         # Cabeçalho Fluent 2: maior e com ações de configuração.
         header = ctk.CTkFrame(
             self.app,
-            fg_color=self.CARD,
+            fg_color=self.HEADER,
             corner_radius=0,
             height=84
         )
@@ -2628,21 +2641,21 @@ class App:
         ctk.CTkLabel(
             title_row,
             text="SM AutoLab",
-            text_color=self.TEXT,
+            text_color=self.HEADER_TEXT,
             font=("Segoe UI", 23, "bold")
         ).pack(side="left")
 
         ctk.CTkLabel(
             title_row,
             text=f"v{APP_VERSION}",
-            text_color=self.SUBTEXT,
+            text_color=self.HEADER_SUBTEXT,
             font=("Segoe UI", 11, "bold")
         ).pack(side="left", padx=(9, 0), pady=(7, 0))
 
         ctk.CTkLabel(
             title,
             text="Automação de lançamentos Feegow",
-            text_color=self.SUBTEXT,
+            text_color=self.HEADER_SUBTEXT,
             font=("Segoe UI", 13)
         ).pack(anchor="w", pady=(1, 0))
 
@@ -2837,6 +2850,7 @@ class App:
         self._execucao_progresso_card = None
 
         activity_card = self._card(main)
+        activity_card.configure(fg_color=self.ACTIVITY_CARD)
         activity_card.pack(fill="x", pady=(0, 6))
         # Altura adaptável: preserva espaço para o histórico sem esconder
         # conteúdo quando a janela principal fica maior ou menor.
@@ -2846,7 +2860,7 @@ class App:
         self.app.bind("<Configure>", self._ajustar_altura_acompanhamento, add="+")
 
         # Fluent-inspired tab row, like the reference image.
-        tabs = ctk.CTkFrame(activity_card, fg_color=("#F3F3F3", "#343A40"), corner_radius=8,
+        tabs = ctk.CTkFrame(activity_card, fg_color=self.ACTIVITY_TABS, corner_radius=8,
                            border_width=1, border_color=self.BORDER)
         tabs.pack(pady=(5, 5), padx=14)
 
