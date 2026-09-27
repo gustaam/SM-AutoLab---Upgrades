@@ -1158,10 +1158,15 @@ def _sanitize_pyinstaller_environment(environ: dict[str, str] | None = None) -> 
         if not key.upper().startswith("_PYI_") and key.upper() != "_MEIPASS2"
     }
 
-def _prepare_independent_restart_environment(environ: dict[str, str] | None = None) -> dict[str, str]:
-    """Prepara o ambiente para que a nova onefile seja tratada como instância independente."""
+def _prepare_independent_restart_environment(
+    environ: dict[str, str] | None = None,
+    *,
+    reset_pyinstaller_environment: bool = True,
+) -> dict[str, str]:
+    """Prepara o ambiente de uma nova instância do executável."""
     env = _sanitize_pyinstaller_environment(environ)
-    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    if reset_pyinstaller_environment:
+        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     return env
 
 def _schedule_replace_after_exit(
@@ -4601,7 +4606,9 @@ class App:
                     "O reinício automático exige a versão executável do SM AutoLab."
                 )
 
-            env = _prepare_independent_restart_environment()
+            env = _prepare_independent_restart_environment(
+                reset_pyinstaller_environment=False,
+            )
             flags = 0
             startupinfo = None
             if os.name == "nt":
