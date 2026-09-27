@@ -1157,6 +1157,32 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertLess(block.index('text="Visualização  ›"'), block.index('text="Ajustes do Feegow"'))
         self.assertLess(block.index('text="Ajustes do Feegow"'), block.index('text="Verificar atualizações"'))
 
+    def test_barra_titulo_principal_usa_azul_fluente_nos_dois_modos(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _configurar_titulo_dwm")
+        end = source.index("def aplicar_backdrop_sistema", start)
+        block = source[start:end]
+        self.assertIn('_windows_colorref("#0F6CBD")', block)
+        self.assertIn('_windows_colorref("#FFFFFF")', block)
+        self.assertNotIn('_windows_colorref("#F5F5F5")', block)
+        self.assertNotIn('_windows_colorref("#252A2E")', block)
+
+        expanded = source[source.index("def config_app(self):"):source.index("def _configurar_dashboard_compacto")]
+        compact = source[source.index("def _configurar_dashboard_compacto"):source.index("def _abrir_historico_compacto")]
+        self.assertIn("_configurar_titulo_dwm(int(self.app.winfo_id()), False)", expanded)
+        self.assertIn("_configurar_titulo_dwm(int(self.app.winfo_id()), False)", compact)
+
+    def test_menu_visualizacao_exibe_expandida_e_aparencia_comeca_no_padrao_windows(self):
+        source = (self.root / "interface.py").read_text(encoding="utf-8")
+        self.assertIn('"complete": "Expandida"', source)
+        self.assertNotIn('"complete": "Completa"', source)
+
+        appearance_start = source.index('for modo in ("system", "light", "dark"):')
+        appearance_end = source.index('self._configurar_hover_menu(sub)', appearance_start)
+        appearance_block = source[appearance_start:appearance_end]
+        self.assertLess(appearance_block.index('"system"'), appearance_block.index('"light"'))
+        self.assertLess(appearance_block.index('"light"'), appearance_block.index('"dark"'))
+
     def test_labels_de_aparencia_e_visualizacao(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         self.assertIn('text="Aparência  ›"', source)
