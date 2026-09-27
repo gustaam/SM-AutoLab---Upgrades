@@ -2625,10 +2625,7 @@ class App:
         # minimizar/restaurar. Desabilitamos essa transição somente nesta janela.
         try:
             desabilitar_transicoes_dwm(self.app)
-            _configurar_titulo_dwm(
-                int(self.app.winfo_id()),
-                str(ctk.get_appearance_mode()).lower() == "dark",
-            )
+            _configurar_titulo_dwm(int(self.app.winfo_id()), False)
         except Exception:
             pass
         self._aplicar_material_janela_principal()
@@ -3047,6 +3044,7 @@ class App:
             _configurar_titulo_dwm(int(self.app.winfo_id()), False)
         except Exception:
             pass
+        self._aplicar_material_janela_principal()
 
         self.app.update_idletasks()
         tela_w = self.app.winfo_screenwidth()
