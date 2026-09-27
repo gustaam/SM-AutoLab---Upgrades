@@ -3205,7 +3205,7 @@ class App:
 
         self.botao_parar = ctk.CTkButton(
             bottom_group,
-            text="■  Parar",
+            text=icon_stop + "  Parar",
             command=self._acao_botao_parar,
             width=174,
             height=44,
@@ -3223,7 +3223,7 @@ class App:
 
         self.botao_iniciar = ctk.CTkButton(
             bottom_group,
-            text="▶  Iniciar",
+            text=icon_play + "  Iniciar",
             command=self._acao_botao_iniciar,
             width=174,
             height=44,
