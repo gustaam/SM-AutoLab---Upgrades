@@ -2597,14 +2597,14 @@ class App:
         self._fechar_menus()
 
     def _configurar_material_cabecalho(self, header):
-        """Renderiza uma camada Mica Alt-inspired somente no cabeçalho azul."""
-        canvas = getattr(self, "_header_material_canvas", None)
+        """Aplica um acabamento de vidro inspirado no Mica Alt somente ao cabeçalho."""
         try:
             largura = max(int(header.winfo_width()), 320)
             altura = max(int(header.winfo_height()), 54)
         except (AttributeError, TypeError, ValueError):
             largura, altura = 900, 84
 
+        canvas = getattr(self, "_header_material_canvas", None)
         if canvas is None or not canvas.winfo_exists() or canvas.master is not header:
             canvas = Canvas(
                 header,
@@ -2614,41 +2614,76 @@ class App:
             )
             canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
             self._header_material_canvas = canvas
-        else:
-            canvas.delete("all")
 
+        self._header_material_header = header
         dark = str(ctk.get_appearance_mode()).lower() == "dark"
-        start = "#1976C9" if not dark else "#0B4F82"
-        end = "#0F6CBD" if not dark else "#082F49"
+        base = (11, 79, 130) if dark else (25, 118, 201)
+        bottom = (8, 47, 73) if dark else (15, 108, 189)
 
-        def rgb(hex_color):
-            value = hex_color.lstrip("#")
-            return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
-
-        r1, g1, b1 = rgb(start)
-        r2, g2, b2 = rgb(end)
+        # Base com variação vertical discreta.
+        image = Image.new("RGBA", (largura, altura), base + (255,))
+        pixels = image.load()
         for y in range(altura):
             t = y / max(altura - 1, 1)
             t = t * t * (3.0 - 2.0 * t)
-            cor = "#{:02X}{:02X}{:02X}".format(
-                round(r1 + (r2 - r1) * t),
-                round(g1 + (g2 - g1) * t),
-                round(b1 + (b2 - b1) * t),
-            )
-            canvas.create_line(0, y, largura, y, fill=cor)
+            r = round(base[0] + (bottom[0] - base[0]) * t)
+            g = round(base[1] + (bottom[1] - base[1]) * t)
+            b = round(base[2] + (bottom[2] - base[2]) * t)
+            for x in range(largura):
+                pixels[x, y] = (r, g, b, 255)
 
-        canvas.create_line(
-            0, 1, largura, 1,
-            fill="#78B9E5" if not dark else "#2B6590",
-        )
-        canvas.create_line(
-            0, max(altura - 1, 1), largura, max(altura - 1, 1),
-            fill="#0E5F9E" if not dark else "#06263B",
-        )
+        # "Frosted glass": manchas grandes e suaves, mais visíveis que antes,
+        # mas ainda suficientemente difusas para não formar faixas.
+        glow = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(glow)
+        if dark:
+            light_fill = (135, 196, 232, 42)
+            light_fill_2 = (91, 160, 205, 28)
+            shade_fill = (0, 18, 31, 52)
+        else:
+            light_fill = (255, 255, 255, 52)
+            light_fill_2 = (218, 240, 255, 38)
+            shade_fill = (8, 75, 125, 30)
 
-        # Rebaixa o widget inteiro na pilha Tk (e não um item interno do Canvas).
-        # Assim a camada material fica atrás de TODOS os controles do cabeçalho,
-        # evitando faixas/retângulos contrastantes.
+        draw.ellipse(
+            (-int(largura * 0.22), -int(altura * 0.62),
+             int(largura * 0.40), int(altura * 0.92)),
+            fill=light_fill,
+        )
+        draw.ellipse(
+            (int(largura * 0.38), -int(altura * 0.75),
+             int(largura * 1.03), int(altura * 0.83)),
+            fill=light_fill_2,
+        )
+        draw.ellipse(
+            (int(largura * 0.60), int(altura * 0.20),
+             int(largura * 1.24), int(altura * 1.28)),
+            fill=shade_fill,
+        )
+        glow = glow.filter(ImageFilter.GaussianBlur(max(10, int(altura * 0.22))))
+        image = Image.alpha_composite(image, glow)
+
+        # Granulação microscópica para evitar a aparência de cor chapada.
+        noise = Image.effect_noise((largura, altura), 7).convert("L")
+        noise = noise.point(lambda value: 118 + int(value * 0.02))
+        noise_rgba = Image.new("RGBA", (largura, altura), (255, 255, 255, 0))
+        noise_rgba.putalpha(noise)
+        noise_tint = Image.new(
+            "RGBA",
+            (largura, altura),
+            ((255, 255, 255, 255) if not dark else (170, 205, 225, 255)),
+        )
+        noise_tint.putalpha(noise_rgba.getchannel("A").point(lambda value: value // 12))
+        image = Image.alpha_composite(image, noise_tint)
+
+        photo = ImageTk.PhotoImage(image)
+        self._header_material_photo = photo
+
+        canvas.delete("all")
+        canvas.create_image(0, 0, anchor="nw", image=photo)
+
+        # O canvas é criado antes dos controles; portanto fica naturalmente atrás
+        # dos elementos interativos do cabeçalho.
         try:
             header.tk.call("lower", canvas._w)
         except (AttributeError, OSError, tk.TclError):
@@ -4905,6 +4940,9 @@ class App:
                     continue
                 _ui_refresh_all_windows_scrollbars(win)
                 atualizar_backdrop_tema(win, dark)
+            header = getattr(self, "_header_material_header", None)
+            if header is not None:
+                self._configurar_material_cabecalho(header)
             self._atualizar_icones_cards_estatistica()
             self._sincronizar_pontos_notificacao()
             self._planilha_desenhar_cabecalho_linhas()
