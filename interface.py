@@ -9551,25 +9551,6 @@ class App:
             return
         self.app.after(0, lambda: self._aplicar_status(texto))
 
-    def _iniciar_pisca_status(self, rapido=None):
-        if rapido is not None:
-            self._status_blink_fast = bool(rapido)
-
-        if self._status_blink_job is not None:
-            try:
-                self.app.after_cancel(self._status_blink_job)
-            except Exception:
-                pass
-            self._status_blink_job = None
-
-        # Muitos frames + intervalo curto = pulso visual contínuo, em vez de
-        # aparência de GIF. A geometria permanece idêntica.
-        self._status_anim_frame = 0
-        self._status_anim_frames = 28 if self._status_blink_fast else 36
-        self._status_anim_interval = 28 if self._status_blink_fast else 32
-        self._executar_pisca_status()
-
-    @staticmethod
     def _cores_indicador_status(self):
         """Retorna a paleta do indicador de acordo com o status atual."""
         status = str(getattr(self, "_status_text_base", "") or "").strip()
