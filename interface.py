@@ -2596,6 +2596,68 @@ class App:
             return
         self._fechar_menus()
 
+    def _configurar_material_cabecalho(self, header):
+        """Renderiza uma camada Mica Alt-inspired somente no cabeçalho azul."""
+        canvas = getattr(self, "_header_material_canvas", None)
+        try:
+            largura = max(int(header.winfo_width()), 320)
+            altura = max(int(header.winfo_height()), 54)
+        except (AttributeError, TypeError, ValueError):
+            largura, altura = 900, 84
+
+        if canvas is None or not canvas.winfo_exists() or canvas.master is not header:
+            canvas = Canvas(
+                header,
+                bd=0,
+                highlightthickness=0,
+                relief="flat",
+            )
+            canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
+            self._header_material_canvas = canvas
+        else:
+            canvas.delete("all")
+
+        dark = str(ctk.get_appearance_mode()).lower() == "dark"
+        start = "#1976C9" if not dark else "#0B4F82"
+        end = "#0F6CBD" if not dark else "#082F49"
+
+        def rgb(hex_color):
+            value = hex_color.lstrip("#")
+            return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+
+        r1, g1, b1 = rgb(start)
+        r2, g2, b2 = rgb(end)
+        for y in range(altura):
+            t = y / max(altura - 1, 1)
+            t = t * t * (3.0 - 2.0 * t)
+            cor = "#{:02X}{:02X}{:02X}".format(
+                round(r1 + (r2 - r1) * t),
+                round(g1 + (g2 - g1) * t),
+                round(b1 + (b2 - b1) * t),
+            )
+            canvas.create_line(0, y, largura, y, fill=cor)
+
+        canvas.create_line(
+            0, 1, largura, 1,
+            fill="#78B9E5" if not dark else "#2B6590",
+        )
+        canvas.create_line(
+            0, max(altura - 1, 1), largura, max(altura - 1, 1),
+            fill="#0E5F9E" if not dark else "#06263B",
+        )
+        canvas.lower()
+
+        if not getattr(header, "_sm_mica_bound", False):
+            try:
+                header.bind(
+                    "<Configure>",
+                    lambda _event: self._configurar_material_cabecalho(header),
+                    add="+",
+                )
+                header._sm_mica_bound = True
+            except Exception:
+                pass
+
     def config_app(self):
         self.app.title("SM AutoLab")
         self.app.geometry("900x600")
