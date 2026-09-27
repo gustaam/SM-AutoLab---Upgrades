@@ -2669,10 +2669,10 @@ class App:
             width=128,
             height=40,
             corner_radius=8,
-            fg_color=self.CARD,
-            hover_color=("#EAF4FC", "#263F50"),
+            fg_color=self.HEADER_BUTTON,
+            hover_color=self.HEADER_BUTTON_HOVER,
             border_width=1,
-            border_color=self.BORDER,
+            border_color=self.HEADER_BUTTON_BORDER,
             text_color=self.TEXT,
             font=("Segoe UI", 13, "bold")
         )
@@ -3048,7 +3048,7 @@ class App:
         icon_play = "▶"
 
         header = ctk.CTkFrame(
-            self.app, fg_color=self.CARD, corner_radius=0, height=54
+            self.app, fg_color=self.HEADER, corner_radius=0, height=54
         )
         header.pack(fill="x")
         header.pack_propagate(False)
@@ -3056,11 +3056,11 @@ class App:
         title_row = ctk.CTkFrame(header, fg_color="transparent")
         title_row.pack(side="left", anchor="w", padx=15, pady=(8, 0))
         ctk.CTkLabel(
-            title_row, text="SM AutoLab", text_color=self.TEXT,
+            title_row, text="SM AutoLab", text_color=self.HEADER_TEXT,
             font=("Segoe UI", 20, "bold")
         ).pack(side="left")
         ctk.CTkLabel(
-            title_row, text=f"v{APP_VERSION}", text_color=self.SUBTEXT,
+            title_row, text=f"v{APP_VERSION}", text_color=self.HEADER_SUBTEXT,
             font=("Segoe UI", 10, "bold")
         ).pack(side="left", padx=(8, 0), pady=(6, 0))
 
@@ -3071,10 +3071,10 @@ class App:
             width=38,
             height=34,
             corner_radius=8,
-            fg_color=self.CARD,
-            hover_color=("#EAF4FC", "#263F50"),
+            fg_color=self.HEADER_BUTTON,
+            hover_color=self.HEADER_BUTTON_HOVER,
             border_width=1,
-            border_color=self.BORDER,
+            border_color=self.HEADER_BUTTON_BORDER,
             text_color=self.TEXT,
             font=icon_font,
         )
