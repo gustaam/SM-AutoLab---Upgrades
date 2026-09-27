@@ -2267,11 +2267,13 @@ def _windows_colorref(hex_color):
 
 
 def _configurar_titulo_dwm(hwnd, dark: bool):
-    """Define explicitamente a cor da barra de título e do texto no Windows 11."""
+    """Define explicitamente a barra de título no azul de destaque do app."""
     if not _windows11_available():
         return False
-    cor_fundo = _windows_colorref("#252A2E" if dark else "#F5F5F5")
-    cor_texto = _windows_colorref("#FFFFFF" if dark else "#1F1F1F")
+    # Mantém a moldura nativa coerente com o azul Fluent 2 já usado pelo app.
+    # A cor é fixa nos dois temas para preservar a identidade visual.
+    cor_fundo = _windows_colorref("#0F6CBD")
+    cor_texto = _windows_colorref("#FFFFFF")
     ok_fundo = _set_dwm_attribute(hwnd, DWMWA_CAPTION_COLOR, cor_fundo)
     ok_texto = _set_dwm_attribute(hwnd, DWMWA_TEXT_COLOR, cor_texto)
     return ok_fundo and ok_texto
@@ -2593,6 +2595,7 @@ class App:
         # minimizar/restaurar. Desabilitamos essa transição somente nesta janela.
         try:
             desabilitar_transicoes_dwm(self.app)
+            _configurar_titulo_dwm(int(self.app.winfo_id()), False)
         except Exception:
             pass
         self.app.bind("<Unmap>", self._preparar_minimizacao, add="+")
@@ -3006,6 +3009,7 @@ class App:
         self.app.protocol("WM_DELETE_WINDOW", self._fechar_aplicativo)
         try:
             desabilitar_transicoes_dwm(self.app)
+            _configurar_titulo_dwm(int(self.app.winfo_id()), False)
         except Exception:
             pass
 
