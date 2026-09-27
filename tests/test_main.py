@@ -1525,6 +1525,8 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _fechar_aplicativo", start)
         block=source[start:end]
         self.assertIn("self._atualizar_botoes_execucao(pausando=True)", block)
+        self.assertIn('state="normal"', block)
+        self.assertIn('"Pausa solicitada. A automação será pausada após o código atual."', block)
         self.assertIn("self._finalizar_por_usuario()", block)
         self.assertIn("def continuar(self):", block)
         self.assertIn("self._atualizar_botoes_execucao(pausando=False)", block)
@@ -1567,8 +1569,10 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def _fechar_aplicativo", start)
         block=source[start:end]
         self.assertIn('stop_text = "■  Finalizar" if pausando else "■  Parar"', block)
-        self.assertIn('start_text = "▶  Continuar" if pausando else "Iniciar"', block)
-        self.assertIn('"Finalizar" if pausando else "Parar"', block)
+        self.assertIn('start_text = "▶  Continuar"', block)
+            self.assertIn('state="normal"', block)
+        self.assertIn('self.botao_parar._sm_autolab_tooltip_message = "Pausar"', block)
+        self.assertIn('self.botao_parar._sm_autolab_tooltip_message = "Finalizar"', block)
         self.assertIn('"Continuar" if pausando else "Iniciar"', block)
 
     def test_finalizar_execucao_disponibiliza_codigos_restantes(self):
