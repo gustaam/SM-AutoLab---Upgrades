@@ -9570,6 +9570,63 @@ def _mostrar_menu_aparencia(self, _event=None):
         self._executar_pisca_status()
 
     @staticmethod
+    def _cores_indicador_status(self):
+        """Retorna a paleta do indicador de acordo com o status atual."""
+        status = str(getattr(self, "_status_text_base", "") or "").strip()
+
+        paletas = {
+            "Processando": {
+                "canvas": ("#E5F1FB", "#183B54"),
+                "halo": ("#6FA9C5", "#9FD7E9"),
+                "dot": ("#2D7698", "#67BCD8"),
+            },
+            "Parando": {
+                "canvas": ("#FFF4CE", "#4B3A1A"),
+                "halo": ("#D7A74D", "#E8C476"),
+                "dot": ("#BF7210", "#F0AE43"),
+            },
+            "Atenção": {
+                "canvas": ("#FDE7E9", "#4B2529"),
+                "halo": ("#E57E84", "#F3B8BC"),
+                "dot": ("#C93640", "#F17076"),
+            },
+            "Disponível": {
+                "canvas": (self._cor(self.BG), "#2B3035"),
+                "halo": ("#9AA0A6", "#E1E4E6"),
+                "dot": ("#6B7075", "#C7CBD0"),
+            },
+            "Finalizado": {
+                "canvas": ("#E7F5E7", "#21482A"),
+                "halo": ("#4E8054", "#C9F0CC"),
+                "dot": ("#2F7437", "#6ECB72"),
+            },
+            "Pronto": {
+                "canvas": ("#E7F5E7", "#21482A"),
+                "halo": ("#4E8054", "#C9F0CC"),
+                "dot": ("#2F7437", "#6ECB72"),
+            },
+        }
+        return paletas.get(status, paletas["Pronto"])
+
+    def _iniciar_pisca_status(self, rapido=None):
+        if rapido is not None:
+            self._status_blink_fast = bool(rapido)
+
+        if self._status_blink_job is not None:
+            try:
+                self.app.after_cancel(self._status_blink_job)
+            except Exception:
+                pass
+            self._status_blink_job = None
+
+        # Muitos frames + intervalo curto = pulso visual contínuo, em vez de
+        # aparência de GIF. A geometria permanece idêntica.
+        self._status_anim_frame = 0
+        self._status_anim_frames = 28 if self._status_blink_fast else 36
+        self._status_anim_interval = 28 if self._status_blink_fast else 32
+        self._executar_pisca_status()
+
+    @staticmethod
     def _interpolar_cor(c1, c2, fator):
         def rgb(hex_color):
             hex_color = hex_color.lstrip("#")
@@ -9597,40 +9654,20 @@ def _mostrar_menu_aparencia(self, _event=None):
             # Seno suavizado: sobe e desce sem saltos perceptíveis.
             fase = (2.0 * math.pi * idx) / frames
             fator = (math.sin(fase - math.pi / 2.0) + 1.0) / 2.0
-            # Curva suave para manter o ponto visível mesmo no vale.
             fator = fator * fator * (3.0 - 2.0 * fator)
 
-            if getattr(self, "_status_text_base", "") == "Disponível":
-                # Estado neutro: pisca suavemente em tons de cinza, sem verde.
-                halo_base, halo_brilho = "#9AA0A6", "#E1E4E6"
-                dot_base, dot_brilho = "#6B7075", "#C7CBD0"
-            elif self._status_blink_fast:
-                # Azul/ciano mais discreto durante execução.
-                halo_base, halo_brilho = "#3B7285", "#8FD4EC"
-                dot_base, dot_brilho = "#2F6F87", "#65B8DB"
-            else:
-                halo_base, halo_brilho = "#4E8054", "#C9F0CC"
-                dot_base, dot_brilho = "#2F7437", "#6ECB72"
+            paleta = self._cores_indicador_status()
+            modo_escuro = ctk.get_appearance_mode().lower() == "dark"
 
+            canvas_bg = paleta["canvas"][1] if modo_escuro else paleta["canvas"][0]
+            halo_base, halo_brilho = paleta["halo"]
+            dot_base, dot_brilho = paleta["dot"]
             halo = self._interpolar_cor(halo_base, halo_brilho, fator)
             dot = self._interpolar_cor(dot_base, dot_brilho, fator)
 
-            modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-            if getattr(self, "_status_text_base", "") == "Disponível":
-                canvas_bg = "#2B3035" if modo_escuro else self._cor(self.BG)
-            elif self._status_blink_fast:
-                canvas_bg = "#183B54" if modo_escuro else "#E5F1FB"
-            else:
-                canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
             self.status_indicator.configure(bg=canvas_bg)
-            self.status_indicator.itemconfigure(
-                self._status_halo,
-                fill=halo
-            )
-            self.status_indicator.itemconfigure(
-                self._status_dot,
-                fill=dot
-            )
+            self.status_indicator.itemconfigure(self._status_halo, fill=halo)
+            self.status_indicator.itemconfigure(self._status_dot, fill=dot)
 
             self._status_anim_frame = idx + 1
             self._status_blink_job = self.app.after(
@@ -9648,23 +9685,17 @@ def _mostrar_menu_aparencia(self, _event=None):
             self._status_blink_job = None
 
             if manter_estado and getattr(self, "status_indicator", None) is not None:
-                if getattr(self, "_status_text_base", "") == "Disponível":
-                    modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-                    self.status_indicator.configure(
-                        bg="#2B3035" if modo_escuro else self._cor(self.BG)
-                    )
-                    self.status_indicator.itemconfigure(
-                        self._status_halo, fill=self._cor(self.BORDER)
-                    )
-                    self.status_indicator.itemconfigure(
-                        self._status_dot, fill=self._cor(self.SUBTEXT)
-                    )
-                else:
-                    modo_escuro = ctk.get_appearance_mode().lower() == "dark"
-                    canvas_bg = "#21482A" if modo_escuro else "#E7F5E7"
-                    self.status_indicator.configure(bg=canvas_bg)
-                    self.status_indicator.itemconfigure(self._status_halo, fill="#4E8054")
-                    self.status_indicator.itemconfigure(self._status_dot, fill="#2F7437")
+                paleta = self._cores_indicador_status()
+                modo_escuro = ctk.get_appearance_mode().lower() == "dark"
+                canvas_bg = paleta["canvas"][1] if modo_escuro else paleta["canvas"][0]
+                self.status_indicator.configure(bg=canvas_bg)
+
+                # Estado estático: usa o valor de brilho final de cada estado,
+                # sem reaproveitar verde para outros status.
+                halo = paleta["halo"][1 if modo_escuro else 0]
+                dot = paleta["dot"][1 if modo_escuro else 0]
+                self.status_indicator.itemconfigure(self._status_halo, fill=halo)
+                self.status_indicator.itemconfigure(self._status_dot, fill=dot)
         except Exception:
             self._status_blink_job = None
 
