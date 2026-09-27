@@ -284,7 +284,7 @@ _REQUIRED_BASE_METHODS = (
     "abrir_historico_planilha",
     "_renderizar_calendario_arquivos",
     "_mostrar_planilhas_do_dia",
-    "_contar_codigos_mes",
+    "_contar_codigos_salvos",
     "_selecionar_tema",
     "_mostrar_menu_configuracoes",
     "_mostrar_menu_aparencia",
