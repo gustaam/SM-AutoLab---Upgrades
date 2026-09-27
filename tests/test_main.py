@@ -1166,17 +1166,16 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('"dark": "Escura"', source)
         self.assertIn('"system": "Padrão do Windows"', source)
         self.assertIn('"complete": "Expandida"', source)
-        self.assertNotIn('"complete": "Expandida"', source)
+        self.assertNotIn('"complete": "Completa"', source)
 
-        appearance_start = source.index('for modo in ("system", "light", "dark"):')
-        self.assertIn('rotulo = self.THEME_LABELS[modo]', source[appearance_start:appearance_start + 300])
-        self.assertLess(
-            appearance_start,
-            source.index('"system": "Padrão do Windows"', appearance_start + 1)
-            if source.find('"system": "Padrão do Windows"', appearance_start + 1) >= 0
-            else appearance_start + 1
+        appearance_loop = 'for modo in ("system", "light", "dark"):'
+        self.assertIn(appearance_loop, source)
+        self.assertIn(
+            'rotulo = self.THEME_LABELS[modo]',
+            source[source.index(appearance_loop):source.index(appearance_loop) + 400],
         )
 
+    
     def test_visualizacao_compacta_posiciona_configuracoes_no_cabecalho(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _configurar_dashboard_compacto")
