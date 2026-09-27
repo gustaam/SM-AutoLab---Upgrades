@@ -6615,7 +6615,7 @@ class App:
                 )
                 return "break"
 
-        reexecutar_btn = ctk.CTkButton(
+            reexecutar_btn = ctk.CTkButton(
                 header,
                 text=(
                     f"Reexecutar {len(codigos_reexecutaveis)} erro"
