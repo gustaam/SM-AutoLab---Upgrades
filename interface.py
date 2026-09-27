@@ -4585,30 +4585,21 @@ class App:
         """Reinicia a mesma instalação em uma nova instância independente."""
         try:
             self._salvar_estado_persistente()
-
-            # Encerra o navegador antes de iniciar a nova instância.
-            # Ao alternar a visualização, a instância atual pode ter deixado o
-            # Chrome/ChromeDriver encerrando em segundo plano. Iniciar o novo
-            # processo imediatamente pode fazer a primeira criação do Selenium
-            # concorrer com esse encerramento e falhar apenas na primeira tentativa.
-            auto = getattr(self, "_automacao_atual", None)
-            if auto is not None:
-                try:
-                    auto.fechar()
-                except Exception:
-                    pass
-                self._automacao_atual = None
-                time.sleep(1.0)
-
             executable = Path(sys.executable).resolve()
             if executable.suffix.lower() != ".exe" or not getattr(sys, "frozen", False):
                 raise RuntimeError(
                     "O reinício automático exige a versão executável do SM AutoLab."
                 )
 
+            # A nova instância é iniciada em modo de espera. Ela só entra no
+            # bootstrap normal depois que este processo terminar completamente.
+            # Isso evita concorrência entre duas instâncias do PyInstaller e,
+            # principalmente, entre dois ciclos de inicialização do Selenium.
             env = _prepare_independent_restart_environment(
                 reset_pyinstaller_environment=False,
             )
+            env["SM_AUTOLAB_RESTART_AFTER_PID"] = str(os.getpid())
+
             flags = 0
             startupinfo = None
             if os.name == "nt":
