@@ -209,44 +209,6 @@ class StartupSplash:
         self._start = time.perf_counter()
         self.root.after(0, self._tick)
         self.root.mainloop()
-def _aguardar_processo_anterior(pid: int, timeout_ms: int = 30000):
-    """Aguarda o processo anterior encerrar antes de iniciar a nova instância."""
-    if not sys.platform.startswith("win"):
-        return
-    try:
-        pid = int(pid)
-    except (TypeError, ValueError):
-        return
-    if pid <= 0 or pid == os.getpid():
-        return
-
-    SYNCHRONIZE = 0x00100000
-    WAIT_OBJECT_0 = 0x00000000
-    WAIT_TIMEOUT = 0x00000102
-
-    try:
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_bool, ctypes.c_uint32]
-        kernel32.OpenProcess.restype = ctypes.c_void_p
-        kernel32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-        kernel32.WaitForSingleObject.restype = ctypes.c_uint32
-        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-        kernel32.CloseHandle.restype = ctypes.c_bool
-
-        handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
-        if not handle:
-            return
-
-        try:
-            result = kernel32.WaitForSingleObject(handle, max(0, int(timeout_ms)))
-            if result not in (WAIT_OBJECT_0, WAIT_TIMEOUT):
-                return
-        finally:
-            kernel32.CloseHandle(handle)
-    except (AttributeError, OSError, TypeError, ValueError):
-        return
-
-
 def _sinalizar_inicializacao_atualizacao_sucesso():
     """Sinaliza somente depois que o loop Tk já estiver ativo."""
     caminho = str(os.environ.get("SM_AUTOLAB_UPDATE_HEALTH", "")).strip()
@@ -502,10 +464,6 @@ def install_ui(App):
     App._ui_runtime_mode = "canonical"
     App._ui_runtime_marker = SM_AUTOLAB_CANONICAL_UI
 if __name__ == "__main__":
-    _restart_after_pid = os.environ.pop("SM_AUTOLAB_RESTART_AFTER_PID", "").strip()
-    if _restart_after_pid:
-        _aguardar_processo_anterior(_restart_after_pid)
-
     if _update_installer_mode():
         raise SystemExit(0)
     _agendar_limpeza_atualizacao()
