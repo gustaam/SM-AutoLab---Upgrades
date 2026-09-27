@@ -2361,7 +2361,7 @@ class App:
     # Superfícies específicas do dashboard, seguindo a hierarquia de cor do
     # Fluent 2: o cabeçalho usa o azul de marca e as áreas de atividade/histórico
     # usam uma superfície neutra levemente acinzentada.
-    HEADER = ("#1976C9", "#0B4F82")
+    HEADER = ("#4A9BD3", "#06324D")
     HEADER_TEXT = ("#FFFFFF", "#FFFFFF")
     HEADER_SUBTEXT = ("#E8F3FB", "#DCEEFF")
     HEADER_BUTTON = ("#FFFFFF", "#0D3550")
