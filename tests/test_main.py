@@ -121,7 +121,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
     def test_validacao_pre_execucao_da_planilha_estah_integrada(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _validar_planilha_antes_execucao")
-        end = source.index("def _contar_codigos_mes", start)
+        end = source.index("def _contar_codigos_salvos", start)
         block = source[start:end]
         self.assertIn("rows = {}", block)
         self.assertIn("codigos_por_chave", block)
@@ -1660,14 +1660,15 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn('execucao.get("codigos_erro")', block)
         self.assertIn('item.get("codigo")', block)
 
-    def test_contador_arquivos_ignora_execucoes_sem_planilha_salva(self):
+    def test_contador_arquivos_usa_planilha_salva_atual(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
-        start = source.index("def _contar_codigos_mes")
+        start = source.index("def _contar_codigos_salvos")
         end = source.index("def _formatar_contador_arquivos", start)
         block = source[start:end]
-        self.assertIn("self._historico_planilhas_visiveis()", block)
-        self.assertNotIn("self._historico_execucoes", block)
-        self.assertIn('int(item.get("filled", 0) or 0)', block)
+        self.assertIn("self._carregar_planilha_interna()", block)
+        self.assertIn("extract_column(cells, column=1)", block)
+        self.assertNotIn("self._historico_planilhas_visiveis()", block)
+        self.assertNotIn("def _contar_codigos_mes", source)
 
     def test_calendar_aceita_ctrl_multiseleção_e_hit_test_exato(self):
         source = (self.root / "interface.py").read_text(encoding="utf-8")
