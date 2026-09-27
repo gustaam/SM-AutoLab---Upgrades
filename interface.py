@@ -8058,7 +8058,7 @@ class App:
             self._planilha_efetuou_alteracao = False
             self._planilha_atualizar_contador()
             self._planilha_atualizar_estado_salvamento("salvo")
-            self._add_activity("Planilha salva e pronta para iniciar a automação.", self.SUCCESS)
+            self._atualizar_status_inicial_por_planilha()
             self._add_activity("Planilha interna salva.", self.SUCCESS)
             return True
         except Exception as exc:
@@ -8391,6 +8391,15 @@ class App:
         self._salvar_historico_planilhas([])
         self._arquivos_data_selecionada = None
         self._renderizar_calendario_arquivos()
+
+    def _atualizar_status_inicial_por_planilha(self):
+        """Mostra Pronto somente quando existem códigos na planilha salva."""
+        try:
+            self._aplicar_status(
+                "Pronto" if self._contar_codigos_salvos() > 0 else "Disponível"
+            )
+        except Exception:
+            pass
 
     def _contar_codigos_salvos(self):
         """Conta células preenchidas da coluna Senha na planilha atualmente salva."""
@@ -9096,6 +9105,7 @@ class App:
                     "Retomada recusada. Começando do primeiro código.",self.INFO
                 )
 
+        self._fechar_menus()
         self._iniciar_historico_execucao("Planilha interna",0,start)
         self._execucao_atual["origem"] = getattr(self, "_origem_reexecucao", "planilha_interna")
         if getattr(self, "_reexecucao_origem_id", None):
