@@ -2645,9 +2645,14 @@ class App:
             0, max(altura - 1, 1), largura, max(altura - 1, 1),
             fill="#0E5F9E" if not dark else "#06263B",
         )
-        # O canvas é criado antes dos controles do cabeçalho; por isso ele
-        # permanece naturalmente atrás dos textos e botões, sem alterar o restante
-        # da janela.
+
+        # Rebaixa o widget inteiro na pilha Tk (e não um item interno do Canvas).
+        # Assim a camada material fica atrás de TODOS os controles do cabeçalho,
+        # evitando faixas/retângulos contrastantes.
+        try:
+            header.tk.call("lower", canvas._w)
+        except (AttributeError, OSError, tk.TclError):
+            pass
 
         if not getattr(header, "_sm_mica_bound", False):
             try:
