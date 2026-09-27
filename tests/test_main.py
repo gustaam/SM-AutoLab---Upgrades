@@ -937,7 +937,7 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end = source.index("def _configurar_dashboard_compacto", start)
         block = source[start:end]
         self.assertIn("self.app.after_idle(", block)
-        self.assertIn("self._centralizar_janela(self.app)", block)
+        self.assertIn("self._centralizar_janela(self.app, largura=900, altura=600)", block)
         self.assertIn("self.app.deiconify()", block)
         self.assertIn("self.app.focus_force()", block)
 
