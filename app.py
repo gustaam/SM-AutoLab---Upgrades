@@ -14,8 +14,12 @@ from typing import Any
 import pandas as pd
 
 from time import sleep
-from selenium import webdriver
+import threading
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.chrome.webdriver import WebDriver as ChromeWebDriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.selenium_manager import SeleniumManager
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
@@ -45,6 +49,97 @@ INPUT_DELAY = 0.08
 CODE_COLUMN = "Codigos"
 
 _CONFIG_FILE = Path.home() / "SM AutoLab" / "feegow_config.json"
+
+# O Selenium Manager é preparado durante a inicialização do aplicativo, antes
+# de o usuário iniciar a primeira automação. Isso evita que a primeira execução
+# fique responsável pela descoberta/download do Chrome for Testing e do driver.
+_SELENIUM_PREPARE_LOCK = threading.Lock()
+_SELENIUM_PREPARE_READY = threading.Event()
+_SELENIUM_ASSETS = {
+    "driver_path": "",
+    "browser_path": "",
+    "error": None,
+}
+
+
+def _selenium_assets_valid():
+    driver_path = str(_SELENIUM_ASSETS.get("driver_path") or "").strip()
+    browser_path = str(_SELENIUM_ASSETS.get("browser_path") or "").strip()
+    if not driver_path or not Path(driver_path).is_file():
+        return False
+    if browser_path and not Path(browser_path).is_file():
+        return False
+    return True
+
+
+def preparar_ambiente_selenium(force=False, attempts=3):
+    """Resolve e prepara Chrome/ChromeDriver sem depender da primeira execução."""
+    if not force and _selenium_assets_valid():
+        return (
+            str(_SELENIUM_ASSETS["driver_path"]),
+            str(_SELENIUM_ASSETS.get("browser_path") or ""),
+        )
+
+    with _SELENIUM_PREPARE_LOCK:
+        if not force and _selenium_assets_valid():
+            return (
+                str(_SELENIUM_ASSETS["driver_path"]),
+                str(_SELENIUM_ASSETS.get("browser_path") or ""),
+            )
+
+        _SELENIUM_PREPARE_READY.clear()
+        last_error = None
+        try:
+            for tentativa in range(max(1, int(attempts))):
+                try:
+                    resolved = SeleniumManager().binary_paths(
+                        ["--browser", "chrome"]
+                    )
+                    driver_path = str(resolved.get("driver_path") or "").strip()
+                    browser_path = str(resolved.get("browser_path") or "").strip()
+
+                    if not driver_path or not Path(driver_path).is_file():
+                        raise WebDriverException(
+                            "O Selenium Manager não retornou um ChromeDriver válido."
+                        )
+                    if browser_path and not Path(browser_path).is_file():
+                        raise WebDriverException(
+                            "O Selenium Manager retornou um Chrome for Testing inválido."
+                        )
+
+                    _SELENIUM_ASSETS["driver_path"] = driver_path
+                    _SELENIUM_ASSETS["browser_path"] = browser_path
+                    _SELENIUM_ASSETS["error"] = None
+                    return driver_path, browser_path
+                except Exception as exc:
+                    last_error = exc
+                    if tentativa + 1 < max(1, int(attempts)):
+                        sleep(1.0)
+        finally:
+            _SELENIUM_PREPARE_READY.set()
+
+        _SELENIUM_ASSETS["driver_path"] = ""
+        _SELENIUM_ASSETS["browser_path"] = ""
+        _SELENIUM_ASSETS["error"] = last_error
+
+        if isinstance(last_error, WebDriverException):
+            raise last_error
+        raise WebDriverException(
+            f"Não foi possível preparar o Chrome/ChromeDriver: {last_error}"
+        )
+
+
+def aguardar_ambiente_selenium(timeout=180):
+    """Aguarda a preparação de inicialização e tenta novamente no mesmo processo."""
+    _SELENIUM_PREPARE_READY.wait(max(1, int(timeout)))
+    if _selenium_assets_valid():
+        return (
+            str(_SELENIUM_ASSETS["driver_path"]),
+            str(_SELENIUM_ASSETS.get("browser_path") or ""),
+        )
+
+    return preparar_ambiente_selenium(force=True, attempts=3)
+
 
 
 def _caminho_config():
@@ -215,7 +310,12 @@ class Automacao:
         if self.status_callback: self.status_callback(t)
 
     def _criar_driver(self):
-        options = webdriver.ChromeOptions()
+        self._status("Preparando Chrome for Testing...")
+        driver_path, browser_path = aguardar_ambiente_selenium(timeout=180)
+
+        options = ChromeOptions()
+        if browser_path:
+            options.binary_location = browser_path
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-default-apps")
@@ -228,7 +328,8 @@ class Automacao:
         options.add_argument("--disable-background-timer-throttling")
         options.add_argument("--disable-renderer-backgrounding")
         options.add_argument("--disable-backgrounding-occluded-windows")
-        driver = webdriver.Chrome(options=options)
+        service = ChromeService(executable_path=driver_path)
+        driver = ChromeWebDriver(service=service, options=options)
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
         return driver
 
