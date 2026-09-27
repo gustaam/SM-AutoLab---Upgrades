@@ -4966,6 +4966,22 @@ class App:
             for item in self._historico_execucoes_com_erros()
         )
 
+    def _historico_execucoes_com_erros(self):
+        """Retorna todas as execuções históricas que possuem erros registrados."""
+        fontes = list(getattr(self, "_historico_execucoes", []))
+        atual = getattr(self, "_execucao_atual", None)
+        if isinstance(atual, dict):
+            fontes.append(atual)
+
+        unicos = {}
+        for item in fontes:
+            if not isinstance(item, dict):
+                continue
+            if not self._historico_execucao_tem_erros(item):
+                continue
+            unicos[self._id_historico_execucao(item)] = item
+        return list(unicos.values())
+
     def _historico_execucoes_visiveis(self):
         """Retorna todas as execuções com erros, resolvidos ou pendentes.
 
