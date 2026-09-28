@@ -469,6 +469,9 @@ if __name__ == "__main__":
     _validar_base_aplicacao()
     startup_update = {"info": None}
     update_ready = threading.Event()
+    selenium_ready = threading.Event()
+    startup_ready = threading.Event()
+
     def _preverificar_atualizacao():
         try:
             startup_update["info"] = find_update(current_override=APP_VERSION)
@@ -476,17 +479,41 @@ if __name__ == "__main__":
             startup_update["info"] = None
         finally:
             update_ready.set()
+
+    def _preparar_selenium_inicial():
+        try:
+            preparar_ambiente_selenium()
+        except Exception:
+            # A execução poderá tentar novamente pelo fluxo normal. O objetivo
+            # aqui é eliminar a corrida entre o prewarm e o primeiro "Iniciar".
+            pass
+        finally:
+            selenium_ready.set()
+
+    def _aguardar_bootstrap():
+        update_ready.wait()
+        selenium_ready.wait()
+        startup_ready.set()
+
     threading.Thread(
         target=_preverificar_atualizacao,
         name="SM-AutoLab-Startup-Update",
         daemon=True,
     ).start()
     threading.Thread(
-        target=preparar_ambiente_selenium,
+        target=_preparar_selenium_inicial,
         name="SM-AutoLab-Selenium-Prewarm",
         daemon=True,
     ).start()
-    run_splash(update_ready)
+    threading.Thread(
+        target=_aguardar_bootstrap,
+        name="SM-AutoLab-Startup-Ready",
+        daemon=True,
+    ).start()
+    # O splash só libera a interface principal depois que o Selenium terminou
+    # a preparação inicial. Isso evita a primeira execução competir pelo mesmo
+    # cache/driver enquanto o prewarm ainda está em andamento.
+    run_splash(startup_ready)
     app = App(
         startup_update_info=startup_update["info"],
         startup_update_checked=update_ready.is_set(),
