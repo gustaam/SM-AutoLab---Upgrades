@@ -2596,154 +2596,30 @@ class App:
             return
         self._fechar_menus()
 
-    def _reposicionar_header_overlay(self, _event=None):
-        """Mantém o overlay Mica Alt exatamente sobre a faixa do cabeçalho."""
-        overlay = getattr(self, "_header_overlay", None)
-        host = getattr(self, "_header_overlay_host", None)
-        if overlay is None or host is None:
-            return
-        try:
-            if (
-                self._closing
-                or str(self.app.state()).lower() in ("iconic", "withdrawn")
-                or not self.app.winfo_viewable()
-            ):
-                overlay.withdraw()
-                return
-
-            host.update_idletasks()
-            largura = max(1, int(host.winfo_width()))
-            altura = max(1, int(host.winfo_height()))
-            x = int(host.winfo_rootx())
-            y = int(host.winfo_rooty())
-            overlay.geometry(f"{largura}x{altura}+{x}+{y}")
-
-            if str(overlay.state()).lower() == "withdrawn":
-                overlay.deiconify()
-
-            # Mantém o material acima do host, mas não transforma o overlay
-            # em uma janela topmost global.
-            overlay.lift(self.app)
-        except (AttributeError, OSError, TypeError, ValueError, tk.TclError):
-            pass
-
-    def _mostrar_header_overlay(self, _event=None):
-        overlay = getattr(self, "_header_overlay", None)
-        if overlay is None or self._closing:
-            return
-        try:
-            overlay.deiconify()
-            self._reposicionar_header_overlay()
-        except (AttributeError, OSError, tk.TclError):
-            pass
-
-    def _ocultar_header_overlay(self, _event=None):
-        overlay = getattr(self, "_header_overlay", None)
-        if overlay is None:
-            return
-        try:
-            overlay.withdraw()
-        except (AttributeError, OSError, tk.TclError):
-            pass
-
-    def _destruir_header_overlay(self):
-        overlay = getattr(self, "_header_overlay", None)
-        if overlay is not None:
-            try:
-                overlay.destroy()
-            except Exception:
-                pass
-        self._header_overlay = None
-        self._header_overlay_host = None
-        self._header_material_header = None
-
-    def _configurar_material_cabecalho(self, header_host):
+    def _aplicar_material_janela_principal(self):
         """
-        Aplica Mica Alt nativo somente ao cabeçalho.
+        Aplica o mesmo Mica Alt que funcionou anteriormente no SM AutoLab.
 
-        A versão que funcionou anteriormente usava Mica Alt no DWM com
-        transparência global de 0.965. Aqui preservamos exatamente esse nível
-        no overlay, mas o overlay ocupa apenas a área do cabeçalho. A janela
-        principal e o restante do dashboard permanecem opacos.
+        O DWM material fica na janela principal, sem criar uma segunda janela
+        sobre o aplicativo. Isso elimina o flicker e os problemas de DPI/z-order
+        do overlay. O cabeçalho continua sendo a área visualmente destacada por
+        não haver outra superfície acima dele.
         """
-        self._header_material_header = header_host
+        try:
+            aplicar_backdrop_sistema(
+                self.app,
+                "mica_alt",
+                dark=ctk.get_appearance_mode().lower() == "dark",
+            )
+        except Exception:
+            pass
 
-        if os.name != "nt" or not _windows11_backdrops_available():
-            header_host.configure(fg_color=self.HEADER)
-            return header_host
-
-        overlay = getattr(self, "_header_overlay", None)
-        if overlay is None or not overlay.winfo_exists():
-            try:
-                overlay = ctk.CTkToplevel(self.app)
-                overlay.withdraw()
-                overlay.overrideredirect(True)
-                overlay.transient(self.app)
-                overlay.configure(
-                    fg_color=self.HEADER,
-                    corner_radius=0,
-                )
-
-                # Mesma transparência usada na implementação anterior que
-                # funcionava: 96,5% de opacidade.
-                overlay.attributes("-alpha", 0.965)
-
-                aplicar_backdrop_sistema(
-                    overlay,
-                    "mica_alt",
-                    dark=ctk.get_appearance_mode().lower() == "dark",
-                )
-
-                self._header_overlay = overlay
-                self._header_overlay_host = header_host
-
-                # O overlay participa da mesma árvore de vida da janela
-                # principal para não sobrar uma janela fantasma ao minimizar,
-                # restaurar ou fechar.
-                self.app.bind(
-                    "<Configure>",
-                    self._reposicionar_header_overlay,
-                    add="+",
-                )
-                self.app.bind(
-                    "<Map>",
-                    self._mostrar_header_overlay,
-                    add="+",
-                )
-                self.app.bind(
-                    "<Unmap>",
-                    self._ocultar_header_overlay,
-                    add="+",
-                )
-                header_host.bind(
-                    "<Configure>",
-                    self._reposicionar_header_overlay,
-                    add="+",
-                )
-
-                # Oculto até a janela principal ser efetivamente exibida.
-                self.app.after_idle(self._reposicionar_header_overlay)
-            except (AttributeError, OSError, tk.TclError, TypeError, ValueError):
-                header_host.configure(fg_color=self.HEADER)
-                self._destruir_header_overlay()
-                return header_host
-        else:
-            self._header_overlay_host = header_host
-            try:
-                overlay.configure(
-                    fg_color=self.HEADER,
-                    corner_radius=0,
-                )
-                overlay.attributes("-alpha", 0.965)
-                atualizar_backdrop_tema(
-                    overlay,
-                    ctk.get_appearance_mode().lower() == "dark",
-                )
-            except Exception:
-                pass
-            self.app.after_idle(self._reposicionar_header_overlay)
-
-        return overlay
+        try:
+            # Mesmo nível da implementação anterior que funcionava.
+            if _windows11_available():
+                self.app.attributes("-alpha", 0.965)
+        except (AttributeError, OSError, tk.TclError, TypeError, ValueError):
+            pass
 
     def config_app(self):
         self.app.title("SM AutoLab")
@@ -2770,16 +2646,18 @@ class App:
             self._configurar_dashboard_compacto()
             return
 
+        # Material Mica Alt nativo: o mesmo mecanismo estável usado anteriormente.
+        self._aplicar_material_janela_principal()
+
         # Cabeçalho Fluent 2: maior e com ações de configuração.
-        header_host = ctk.CTkFrame(
+        header = ctk.CTkFrame(
             self.app,
-            fg_color=self.BG,
+            fg_color=self.HEADER,
             corner_radius=0,
             height=84
         )
-        header_host.pack(fill="x")
-        header_host.pack_propagate(False)
-        header = self._configurar_material_cabecalho(header_host)
+        header.pack(fill="x")
+        header.pack_propagate(False)
 
         title = ctk.CTkFrame(header, fg_color="transparent")
         title.pack(side="left", padx=20, pady=11)
@@ -3192,16 +3070,18 @@ class App:
         icon_stop = "■"
         icon_play = "▶"
 
-        header_host = ctk.CTkFrame(
+        # O material Mica Alt é aplicado na mesma janela principal; nenhum
+        # Toplevel auxiliar é criado no modo compacto.
+        self._aplicar_material_janela_principal()
+
+        header = ctk.CTkFrame(
             self.app,
-            fg_color=self.BG,
+            fg_color=self.HEADER,
             corner_radius=0,
             height=54
         )
-        header_host.pack(fill="x")
-        header_host.pack_propagate(False)
-        header_host._sm_autolab_compact_header = True
-        header = self._configurar_material_cabecalho(header_host)
+        header.pack(fill="x")
+        header.pack_propagate(False)
 
         title_row = ctk.CTkFrame(header, fg_color="transparent")
         title_row.pack(side="left", anchor="w", padx=15, pady=(8, 0))
@@ -4987,9 +4867,7 @@ class App:
                     continue
                 _ui_refresh_all_windows_scrollbars(win)
                 atualizar_backdrop_tema(win, dark)
-            overlay = getattr(self, "_header_overlay", None)
-            if overlay is not None:
-                atualizar_backdrop_tema(overlay, dark)
+            atualizar_backdrop_tema(self.app, dark)
             self._atualizar_icones_cards_estatistica()
             self._sincronizar_pontos_notificacao()
             self._planilha_desenhar_cabecalho_linhas()
@@ -10304,7 +10182,6 @@ class App:
             except Exception:
                 pass
             self._historico_compacto_window = None
-        self._destruir_header_overlay()
         self.app.destroy()
 
     def run(self):
