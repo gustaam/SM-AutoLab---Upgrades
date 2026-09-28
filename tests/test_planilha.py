@@ -54,6 +54,73 @@ class FakeTree:
 
 
 class PlanilhaPersistenceTests(unittest.TestCase):
+    def test_inicio_conclui_limpeza_pendente_sem_apagar_snapshot(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            obj = App.__new__(App)
+            obj._planilha_arquivo = root / "SM AutoLab" / "planilha_interna.json"
+            obj._planilha_historico_arquivo = root / "SM AutoLab" / "planilha_historico.json"
+            obj._planilha_historico_cache = None
+            obj._planilha_historico_cache_signature = None
+            obj._planilha_data = {}
+            obj._planilha_salva_data = {}
+            obj._planilha_limpar_ao_fechar = False
+            obj._historico_execucoes = []
+            obj._execucao_atual = None
+            obj._garantir_pasta_planilha = lambda: obj._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
+            obj._registrar_historico_planilha = lambda cells: self.assertEqual(
+                cells, {"0,0": "1", "0,1": "ABC", "0,2": "Item"}
+            )
+            obj._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
+            interface.atomic_write_json(
+                obj._planilha_arquivo,
+                {
+                    "version": 1,
+                    "updated_at": datetime.now().isoformat(timespec="seconds"),
+                    "cleanup_on_close": True,
+                    "cells": {"0,0": "1", "0,1": "ABC", "0,2": "Item"},
+                },
+            )
+
+            with patch("app.excluir_checkpoint_interno"):
+                App._limpar_planilha_pendente_no_inicio(obj)
+
+            dados = interface.read_json_with_backup(obj._planilha_arquivo, {})
+            self.assertEqual(dados.get("cells"), {})
+            self.assertFalse(dados.get("cleanup_on_close"))
+            self.assertEqual(obj._planilha_data, {})
+            self.assertFalse(obj._planilha_limpar_ao_fechar)
+
+    def test_inicio_nao_limpa_execucao_interrompida(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            obj = App.__new__(App)
+            obj._planilha_arquivo = root / "SM AutoLab" / "planilha_interna.json"
+            obj._planilha_data = {}
+            obj._planilha_salva_data = {}
+            obj._planilha_limpar_ao_fechar = False
+            obj._execucao_atual = {
+                "origem": "planilha_interna",
+                "status": "Interrompida — erro de execução",
+            }
+            obj._garantir_pasta_planilha = lambda: obj._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
+            obj._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
+            interface.atomic_write_json(
+                obj._planilha_arquivo,
+                {
+                    "version": 1,
+                    "updated_at": datetime.now().isoformat(timespec="seconds"),
+                    "cleanup_on_close": True,
+                    "cells": {"0,0": "1", "0,1": "ABC"},
+                },
+            )
+
+            App._limpar_planilha_pendente_no_inicio(obj)
+
+            dados = interface.read_json_with_backup(obj._planilha_arquivo, {})
+            self.assertEqual(dados.get("cells"), {"0,0": "1", "0,1": "ABC"})
+            self.assertTrue(dados.get("cleanup_on_close"))
+
     def test_editor_recupera_apenas_rascunho_nao_salvo(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _planilha_recuperar_rascunho_se_houver")
