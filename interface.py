@@ -2343,6 +2343,8 @@ HISTORICO_COL_MINS = (82, 68, 8, 72, 72, 52, 100, 18, 0)
 
 class App:
     INICIAR_LABEL = "Iniciar"
+    HEADER_GLASS_ALPHA = 0.965
+    HEADER_TRANSPARENT_COLOR = "#010203"
 
     # Fluent 2 palettes. Dark mode usa um grafite próximo ao chrome moderno
     # do Windows/Edge, evitando preto puro.
@@ -2787,112 +2789,126 @@ class App:
         except (AttributeError, TypeError, ValueError):
             return None
 
-    def _configurar_material_cabecalho(self, header):
-        """Aplica vidro translúcido baseado no wallpaper real somente ao cabeçalho."""
+    def _reposicionar_header_overlay(self, _event=None):
+        """Mantém o vidro nativo exatamente sobre a faixa reservada do cabeçalho."""
+        overlay = getattr(self, "_header_overlay", None)
+        host = getattr(self, "_header_overlay_host", None)
+        if overlay is None or host is None:
+            return
         try:
-            largura = max(int(header.winfo_width()), 320)
-            altura = max(int(header.winfo_height()), 54)
-        except (AttributeError, TypeError, ValueError):
-            largura, altura = 900, 84
+            if self._closing or str(self.app.state()).lower() in ("iconic", "withdrawn") or not self.app.winfo_viewable():
+                overlay.withdraw()
+                return
+            host.update_idletasks()
+            largura = max(1, int(host.winfo_width()))
+            altura = max(1, int(host.winfo_height()))
+            x = int(host.winfo_rootx())
+            y = int(host.winfo_rooty())
+            overlay.geometry(f"{largura}x{altura}+{x}+{y}")
+            if str(overlay.state()).lower() == "withdrawn":
+                overlay.deiconify()
+            overlay.lift(self.app)
+        except (AttributeError, OSError, TypeError, ValueError, tk.TclError):
+            pass
 
-        canvas = getattr(self, "_header_material_canvas", None)
-        if canvas is None or not canvas.winfo_exists() or canvas.master is not header:
-            canvas = Canvas(
-                header,
-                bd=0,
-                highlightthickness=0,
-                relief="flat",
-            )
-            canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
-            self._header_material_canvas = canvas
-
-        self._header_material_header = header
-        dark = str(ctk.get_appearance_mode()).lower() == "dark"
-        fundo = self._obter_fundo_cabecalho(header, largura, altura)
-
-        if fundo is None:
-            base = (11, 79, 130) if dark else (25, 118, 201)
-            bottom = (8, 47, 73) if dark else (15, 108, 189)
-            image = Image.new("RGBA", (1, altura), (0, 0, 0, 0))
-            pixels = image.load()
-            for y_pos in range(altura):
-                t = y_pos / max(1, altura - 1)
-                t = t * t * (3.0 - 2.0 * t)
-                pixels[0, y_pos] = (
-                    round(base[0] + (bottom[0] - base[0]) * t),
-                    round(base[1] + (bottom[1] - base[1]) * t),
-                    round(base[2] + (bottom[2] - base[2]) * t),
-                    255,
-                )
-            image = image.resize((largura, altura))
-        else:
-            # O Mica Alt é baseado no wallpaper; aqui reproduzimos isso no cabeçalho
-            # com blur + tint sobre pixels reais do desktop, sem tornar o restante da
-            # janela translúcido.
-            image = fundo.filter(ImageFilter.GaussianBlur(11 if not dark else 9))
-            tint_color = (25, 118, 201) if not dark else (11, 79, 130)
-            tint_alpha = 106 if not dark else 118
-            tint = Image.new("RGBA", (largura, altura), tint_color + (tint_alpha,))
-            image = Image.alpha_composite(image, tint)
-
-            sheen = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(sheen)
-            if dark:
-                draw.ellipse(
-                    (-int(largura * 0.18), -int(altura * 0.78),
-                     int(largura * 0.44), int(altura * 0.92)),
-                    fill=(145, 199, 231, 44),
-                )
-                draw.ellipse(
-                    (int(largura * 0.40), -int(altura * 0.72),
-                     int(largura * 1.12), int(altura * 0.90)),
-                    fill=(92, 160, 205, 28),
-                )
-            else:
-                draw.ellipse(
-                    (-int(largura * 0.18), -int(altura * 0.78),
-                     int(largura * 0.44), int(altura * 0.92)),
-                    fill=(255, 255, 255, 46),
-                )
-                draw.ellipse(
-                    (int(largura * 0.40), -int(altura * 0.72),
-                     int(largura * 1.12), int(altura * 0.90)),
-                    fill=(218, 240, 255, 34),
-                )
-            sheen = sheen.filter(ImageFilter.GaussianBlur(max(9, int(altura * 0.20))))
-            image = Image.alpha_composite(image, sheen)
-
-            noise = Image.effect_noise((largura, altura), 5).convert("L")
-            noise_alpha = noise.point(lambda value: 5 + int(value * 0.02))
-            noise_layer = Image.new(
-                "RGBA",
-                (largura, altura),
-                ((255, 255, 255, 255) if not dark else (180, 208, 225, 255)),
-            )
-            noise_layer.putalpha(noise_alpha)
-            image = Image.alpha_composite(image, noise_layer)
-
-        photo = ImageTk.PhotoImage(image)
-        self._header_material_photo = photo
-
-        canvas.delete("all")
-        canvas.create_image(0, 0, anchor="nw", image=photo)
-
+    def _mostrar_header_overlay(self, _event=None):
+        overlay = getattr(self, "_header_overlay", None)
+        if overlay is None or self._closing:
+            return
         try:
-            header.tk.call("lower", canvas._w)
+            overlay.deiconify()
+            self._reposicionar_header_overlay()
         except (AttributeError, OSError, tk.TclError):
             pass
 
-        if not getattr(header, "_sm_mica_bound", False):
+    def _ocultar_header_overlay(self, _event=None):
+        overlay = getattr(self, "_header_overlay", None)
+        if overlay is None:
+            return
+        try:
+            overlay.withdraw()
+        except (AttributeError, OSError, tk.TclError):
+            pass
+
+    def _destruir_header_overlay(self):
+        overlay = getattr(self, "_header_overlay", None)
+        if overlay is not None:
             try:
-                header.bind(
-                    "<Configure>",
-                    lambda _event: self._configurar_material_cabecalho(header),
-                    add="+",
-                )
-                header._sm_mica_bound = True
+                overlay.destroy()
             except Exception:
                 pass
+        self._header_overlay = None
+        self._header_overlay_host = None
+        self._header_material_header = None
+
+    def _configurar_material_cabecalho(self, header_host):
+        """Cria vidro Mica Alt real somente na faixa do cabeçalho no Windows."""
+        self._header_material_header = header_host
+
+        # Em sistemas sem a composição do Windows, preserva o cabeçalho sólido
+        # existente sem criar uma janela auxiliar.
+        if os.name != "nt":
+            header_host.configure(fg_color=self.HEADER)
+            return header_host
+
+        try:
+            # O transparentcolor cria um recorte real SOMENTE onde o host do
+            # cabeçalho pinta esta cor. O restante da janela continua opaco.
+            transparente = getattr(self, "HEADER_TRANSPARENT_COLOR", "#010203")
+            self.app.attributes("-transparentcolor", transparente)
+            header_host.configure(fg_color=transparente)
+        except (AttributeError, OSError, tk.TclError, TypeError, ValueError):
+            header_host.configure(fg_color=self.HEADER)
+            return header_host
+
+        overlay = getattr(self, "_header_overlay", None)
+        if overlay is None or not overlay.winfo_exists():
+            try:
+                overlay = ctk.CTkToplevel(self.app)
+                overlay.withdraw()
+                overlay.overrideredirect(True)
+                overlay.transient(self.app)
+                overlay.configure(
+                    fg_color=self.HEADER,
+                    corner_radius=0,
+                )
+                overlay.attributes("-alpha", float(self.HEADER_GLASS_ALPHA))
+                overlay.bind("<Escape>", lambda _e: "break", add="+")
+                self._header_overlay = overlay
+                self._header_overlay_host = header_host
+
+                try:
+                    aplicar_backdrop_sistema(
+                        overlay,
+                        "mica_alt",
+                        dark=ctk.get_appearance_mode().lower() == "dark",
+                    )
+                except Exception:
+                    pass
+
+                self.app.bind("<Configure>", self._reposicionar_header_overlay, add="+")
+                self.app.bind("<Map>", self._mostrar_header_overlay, add="+")
+                self.app.bind("<Unmap>", self._ocultar_header_overlay, add="+")
+                header_host.bind("<Configure>", self._reposicionar_header_overlay, add="+")
+                self.app.after_idle(self._reposicionar_header_overlay)
+            except (AttributeError, OSError, tk.TclError, TypeError, ValueError):
+                header_host.configure(fg_color=self.HEADER)
+                self._destruir_header_overlay()
+                return header_host
+        else:
+            self._header_overlay_host = header_host
+            try:
+                overlay.configure(fg_color=self.HEADER)
+                overlay.attributes("-alpha", float(self.HEADER_GLASS_ALPHA))
+                atualizar_backdrop_tema(
+                    overlay,
+                    ctk.get_appearance_mode().lower() == "dark",
+                )
+            except Exception:
+                pass
+            self.app.after_idle(self._reposicionar_header_overlay)
+
+        return overlay
 
     def config_app(self):
         self.app.title("SM AutoLab")
@@ -2920,15 +2936,15 @@ class App:
             return
 
         # Cabeçalho Fluent 2: maior e com ações de configuração.
-        header = ctk.CTkFrame(
+        header_host = ctk.CTkFrame(
             self.app,
-            fg_color=self.HEADER,
+            fg_color=self.HEADER_TRANSPARENT_COLOR if os.name == "nt" else self.HEADER,
             corner_radius=0,
             height=84
         )
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        self._configurar_material_cabecalho(header)
+        header_host.pack(fill="x")
+        header_host.pack_propagate(False)
+        header = self._configurar_material_cabecalho(header_host)
 
         title = ctk.CTkFrame(header, fg_color="transparent")
         title.pack(side="left", padx=20, pady=11)
@@ -3345,12 +3361,15 @@ class App:
         icon_stop = "■"
         icon_play = "▶"
 
-        header = ctk.CTkFrame(
-            self.app, fg_color=self.HEADER, corner_radius=0, height=54
+        header_host = ctk.CTkFrame(
+            self.app,
+            fg_color=self.HEADER_TRANSPARENT_COLOR if os.name == "nt" else self.HEADER,
+            corner_radius=0,
+            height=54
         )
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        self._configurar_material_cabecalho(header)
+        header_host.pack(fill="x")
+        header_host.pack_propagate(False)
+        header = self._configurar_material_cabecalho(header_host)
 
         title_row = ctk.CTkFrame(header, fg_color="transparent")
         title_row.pack(side="left", anchor="w", padx=15, pady=(8, 0))
@@ -10451,6 +10470,7 @@ class App:
             except Exception:
                 pass
             self._historico_compacto_window = None
+        self._destruir_header_overlay()
         self.app.destroy()
 
     def run(self):
