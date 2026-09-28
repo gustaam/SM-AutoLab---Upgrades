@@ -2597,8 +2597,198 @@ class App:
             return
         self._fechar_menus()
 
+    def _capturar_fundo_desktop(self, x, y, largura, altura):
+        """Captura o wallpaper do Desktop Window sem copiar a janela do próprio app."""
+        if os.name != "nt":
+            return None
+        largura = max(1, int(largura))
+        altura = max(1, int(altura))
+        desktop = desktop_dc = memory_dc = bitmap = previous = None
+        try:
+            user32 = ctypes.windll.user32
+            gdi32 = ctypes.windll.gdi32
+
+            user32.GetDesktopWindow.restype = wintypes.HWND
+            user32.GetDC.argtypes = [wintypes.HWND]
+            user32.GetDC.restype = wintypes.HDC
+            user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+            user32.ReleaseDC.restype = ctypes.c_int
+
+            gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
+            gdi32.CreateCompatibleDC.restype = wintypes.HDC
+            gdi32.CreateCompatibleBitmap.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int]
+            gdi32.CreateCompatibleBitmap.restype = wintypes.HBITMAP
+            gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
+            gdi32.SelectObject.restype = wintypes.HGDIOBJ
+            gdi32.BitBlt.argtypes = [
+                wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                wintypes.HDC, ctypes.c_int, ctypes.c_int, wintypes.DWORD,
+            ]
+            gdi32.BitBlt.restype = wintypes.BOOL
+            gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
+            gdi32.DeleteObject.restype = wintypes.BOOL
+            gdi32.DeleteDC.argtypes = [wintypes.HDC]
+            gdi32.DeleteDC.restype = wintypes.BOOL
+
+            desktop = user32.GetDesktopWindow()
+            desktop_dc = user32.GetDC(desktop)
+            if not desktop_dc:
+                return None
+
+            memory_dc = gdi32.CreateCompatibleDC(desktop_dc)
+            if not memory_dc:
+                return None
+
+            bitmap = gdi32.CreateCompatibleBitmap(desktop_dc, largura, altura)
+            if not bitmap:
+                return None
+
+            previous = gdi32.SelectObject(memory_dc, bitmap)
+            if not gdi32.BitBlt(
+                memory_dc,
+                0, 0,
+                largura, altura,
+                desktop_dc,
+                int(x), int(y),
+                0x00CC0020,  # SRCCOPY
+            ):
+                return None
+
+            class _BITMAPINFOHEADER(ctypes.Structure):
+                _fields_ = [
+                    ("biSize", wintypes.DWORD),
+                    ("biWidth", wintypes.LONG),
+                    ("biHeight", wintypes.LONG),
+                    ("biPlanes", wintypes.WORD),
+                    ("biBitCount", wintypes.WORD),
+                    ("biCompression", wintypes.DWORD),
+                    ("biSizeImage", wintypes.DWORD),
+                    ("biXPelsPerMeter", wintypes.LONG),
+                    ("biYPelsPerMeter", wintypes.LONG),
+                    ("biClrUsed", wintypes.DWORD),
+                    ("biClrImportant", wintypes.DWORD),
+                ]
+
+            class _BITMAPINFO(ctypes.Structure):
+                _fields_ = [
+                    ("bmiHeader", _BITMAPINFOHEADER),
+                    ("bmiColors", wintypes.DWORD * 3),
+                ]
+
+            gdi32.GetDIBits.argtypes = [
+                wintypes.HDC,
+                wintypes.HBITMAP,
+                wintypes.UINT,
+                wintypes.UINT,
+                ctypes.c_void_p,
+                ctypes.POINTER(_BITMAPINFO),
+                wintypes.UINT,
+            ]
+            gdi32.GetDIBits.restype = ctypes.c_int
+
+            info = _BITMAPINFO()
+            info.bmiHeader.biSize = ctypes.sizeof(_BITMAPINFOHEADER)
+            info.bmiHeader.biWidth = largura
+            info.bmiHeader.biHeight = -altura
+            info.bmiHeader.biPlanes = 1
+            info.bmiHeader.biBitCount = 32
+            info.bmiHeader.biCompression = 0  # BI_RGB
+
+            buffer = ctypes.create_string_buffer(largura * altura * 4)
+            copied = gdi32.GetDIBits(
+                memory_dc,
+                bitmap,
+                0,
+                altura,
+                buffer,
+                ctypes.byref(info),
+                0,
+            )
+            if int(copied or 0) != altura:
+                return None
+
+            return Image.frombuffer(
+                "RGBA",
+                (largura, altura),
+                buffer,
+                "raw",
+                "BGRA",
+                0,
+                1,
+            ).copy()
+        except (AttributeError, OSError, TypeError, ValueError, ctypes.ArgumentError):
+            return None
+        finally:
+            try:
+                if memory_dc and previous:
+                    gdi32.SelectObject(memory_dc, previous)
+            except Exception:
+                pass
+            try:
+                if bitmap:
+                    gdi32.DeleteObject(bitmap)
+            except Exception:
+                pass
+            try:
+                if memory_dc:
+                    gdi32.DeleteDC(memory_dc)
+            except Exception:
+                pass
+            try:
+                if desktop_dc and desktop:
+                    user32.ReleaseDC(desktop, desktop_dc)
+            except Exception:
+                pass
+
+    def _capturar_papel_de_parede(self):
+        """Fallback para o arquivo de wallpaper configurado no Windows."""
+        if os.name != "nt":
+            return None
+        try:
+            buffer = ctypes.create_unicode_buffer(32768)
+            ok = ctypes.windll.user32.SystemParametersInfoW(
+                0x0073,  # SPI_GETDESKWALLPAPER
+                len(buffer),
+                buffer,
+                0,
+            )
+            if not ok or not str(buffer.value or "").strip():
+                return None
+            with Image.open(str(buffer.value)) as wallpaper:
+                return wallpaper.convert("RGBA")
+        except (AttributeError, OSError, TypeError, ValueError):
+            return None
+
+    def _obter_fundo_cabecalho(self, header, largura, altura):
+        """Obtém o fundo do desktop exatamente na posição atual do cabeçalho."""
+        try:
+            x = int(header.winfo_rootx())
+            y = int(header.winfo_rooty())
+        except (AttributeError, TypeError, ValueError, tk.TclError):
+            x, y = 0, 0
+
+        fundo = self._capturar_fundo_desktop(x, y, largura, altura)
+        if fundo is not None:
+            return fundo
+
+        wallpaper = self._capturar_papel_de_parede()
+        if wallpaper is None:
+            return None
+
+        try:
+            pw, ph = wallpaper.size
+            escala = max(largura / max(1, pw), altura / max(1, ph))
+            nw = max(largura, int(round(pw * escala)))
+            nh = max(altura, int(round(ph * escala)))
+            wallpaper = wallpaper.resize((nw, nh), Image.Resampling.LANCZOS)
+            left = max(0, (nw - largura) // 2)
+            top = max(0, (nh - altura) // 2)
+            return wallpaper.crop((left, top, left + largura, top + altura))
+        except (AttributeError, TypeError, ValueError):
+            return None
+
     def _configurar_material_cabecalho(self, header):
-        """Aplica um acabamento de vidro inspirado no Mica Alt somente ao cabeçalho."""
+        """Aplica vidro translúcido baseado no wallpaper real somente ao cabeçalho."""
         try:
             largura = max(int(header.winfo_width()), 320)
             altura = max(int(header.winfo_height()), 54)
@@ -2618,64 +2808,69 @@ class App:
 
         self._header_material_header = header
         dark = str(ctk.get_appearance_mode()).lower() == "dark"
-        base = (11, 79, 130) if dark else (25, 118, 201)
-        bottom = (8, 47, 73) if dark else (15, 108, 189)
+        fundo = self._obter_fundo_cabecalho(header, largura, altura)
 
-        # Base com variação vertical discreta.
-        image = Image.new("RGBA", (largura, altura), base + (255,))
-        pixels = image.load()
-        for y in range(altura):
-            t = y / max(altura - 1, 1)
-            t = t * t * (3.0 - 2.0 * t)
-            r = round(base[0] + (bottom[0] - base[0]) * t)
-            g = round(base[1] + (bottom[1] - base[1]) * t)
-            b = round(base[2] + (bottom[2] - base[2]) * t)
-            for x in range(largura):
-                pixels[x, y] = (r, g, b, 255)
-
-        # "Frosted glass": manchas grandes e suaves, mais visíveis que antes,
-        # mas ainda suficientemente difusas para não formar faixas.
-        glow = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(glow)
-        if dark:
-            light_fill = (135, 196, 232, 42)
-            light_fill_2 = (91, 160, 205, 28)
-            shade_fill = (0, 18, 31, 52)
+        if fundo is None:
+            base = (11, 79, 130) if dark else (25, 118, 201)
+            bottom = (8, 47, 73) if dark else (15, 108, 189)
+            image = Image.new("RGBA", (1, altura), (0, 0, 0, 0))
+            pixels = image.load()
+            for y_pos in range(altura):
+                t = y_pos / max(1, altura - 1)
+                t = t * t * (3.0 - 2.0 * t)
+                pixels[0, y_pos] = (
+                    round(base[0] + (bottom[0] - base[0]) * t),
+                    round(base[1] + (bottom[1] - base[1]) * t),
+                    round(base[2] + (bottom[2] - base[2]) * t),
+                    255,
+                )
+            image = image.resize((largura, altura))
         else:
-            light_fill = (255, 255, 255, 52)
-            light_fill_2 = (218, 240, 255, 38)
-            shade_fill = (8, 75, 125, 30)
+            # O Mica Alt é baseado no wallpaper; aqui reproduzimos isso no cabeçalho
+            # com blur + tint sobre pixels reais do desktop, sem tornar o restante da
+            # janela translúcido.
+            image = fundo.filter(ImageFilter.GaussianBlur(11 if not dark else 9))
+            tint_color = (25, 118, 201) if not dark else (11, 79, 130)
+            tint_alpha = 106 if not dark else 118
+            tint = Image.new("RGBA", (largura, altura), tint_color + (tint_alpha,))
+            image = Image.alpha_composite(image, tint)
 
-        draw.ellipse(
-            (-int(largura * 0.22), -int(altura * 0.62),
-             int(largura * 0.40), int(altura * 0.92)),
-            fill=light_fill,
-        )
-        draw.ellipse(
-            (int(largura * 0.38), -int(altura * 0.75),
-             int(largura * 1.03), int(altura * 0.83)),
-            fill=light_fill_2,
-        )
-        draw.ellipse(
-            (int(largura * 0.60), int(altura * 0.20),
-             int(largura * 1.24), int(altura * 1.28)),
-            fill=shade_fill,
-        )
-        glow = glow.filter(ImageFilter.GaussianBlur(max(10, int(altura * 0.22))))
-        image = Image.alpha_composite(image, glow)
+            sheen = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(sheen)
+            if dark:
+                draw.ellipse(
+                    (-int(largura * 0.18), -int(altura * 0.78),
+                     int(largura * 0.44), int(altura * 0.92)),
+                    fill=(145, 199, 231, 44),
+                )
+                draw.ellipse(
+                    (int(largura * 0.40), -int(altura * 0.72),
+                     int(largura * 1.12), int(altura * 0.90)),
+                    fill=(92, 160, 205, 28),
+                )
+            else:
+                draw.ellipse(
+                    (-int(largura * 0.18), -int(altura * 0.78),
+                     int(largura * 0.44), int(altura * 0.92)),
+                    fill=(255, 255, 255, 46),
+                )
+                draw.ellipse(
+                    (int(largura * 0.40), -int(altura * 0.72),
+                     int(largura * 1.12), int(altura * 0.90)),
+                    fill=(218, 240, 255, 34),
+                )
+            sheen = sheen.filter(ImageFilter.GaussianBlur(max(9, int(altura * 0.20))))
+            image = Image.alpha_composite(image, sheen)
 
-        # Granulação microscópica para evitar a aparência de cor chapada.
-        noise = Image.effect_noise((largura, altura), 7).convert("L")
-        noise = noise.point(lambda value: 118 + int(value * 0.02))
-        noise_rgba = Image.new("RGBA", (largura, altura), (255, 255, 255, 0))
-        noise_rgba.putalpha(noise)
-        noise_tint = Image.new(
-            "RGBA",
-            (largura, altura),
-            ((255, 255, 255, 255) if not dark else (170, 205, 225, 255)),
-        )
-        noise_tint.putalpha(noise_rgba.getchannel("A").point(lambda value: value // 12))
-        image = Image.alpha_composite(image, noise_tint)
+            noise = Image.effect_noise((largura, altura), 5).convert("L")
+            noise_alpha = noise.point(lambda value: 5 + int(value * 0.02))
+            noise_layer = Image.new(
+                "RGBA",
+                (largura, altura),
+                ((255, 255, 255, 255) if not dark else (180, 208, 225, 255)),
+            )
+            noise_layer.putalpha(noise_alpha)
+            image = Image.alpha_composite(image, noise_layer)
 
         photo = ImageTk.PhotoImage(image)
         self._header_material_photo = photo
@@ -2683,8 +2878,6 @@ class App:
         canvas.delete("all")
         canvas.create_image(0, 0, anchor="nw", image=photo)
 
-        # O canvas é criado antes dos controles; portanto fica naturalmente atrás
-        # dos elementos interativos do cabeçalho.
         try:
             header.tk.call("lower", canvas._w)
         except (AttributeError, OSError, tk.TclError):
