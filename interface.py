@@ -2343,9 +2343,6 @@ HISTORICO_COL_MINS = (82, 68, 8, 72, 72, 52, 100, 18, 0)
 
 class App:
     INICIAR_LABEL = "Iniciar"
-    HEADER_GLASS_ALPHA = 0.965
-    HEADER_TRANSPARENT_COLOR = "#010203"
-
     # Fluent 2 palettes. Dark mode usa um grafite próximo ao chrome moderno
     # do Windows/Edge, evitando preto puro.
     BG = ("#F5F5F5", "#24292E")
