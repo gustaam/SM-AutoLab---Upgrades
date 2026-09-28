@@ -1594,8 +1594,9 @@ class CanonicalRuntimeTests(unittest.TestCase):
         end=source.index("def deve_pausar", start)
         block=source[start:end]
         self.assertIn("self._atualizar_botoes_execucao(pausando=False)", block)
-        self.assertIn('self._finalizar_historico_execucao(resultado, "Erro na execução")', block)
-        self.assertIn('"Processo finalizado pelo usuário. Os códigos restantes estão disponíveis para reexecução."', block)
+        self.assertIn('self._finalizar_historico_execucao(resultado, "Finalizada pelo usuário")', block)
+        self.assertIn("self._marcar_planilha_para_limpeza_ao_fechar()", block)
+        self.assertIn('"Processo finalizado pelo usuário. A revisão será arquivada e a planilha será limpa ao fechar o aplicativo."', block)
 
 
     def test_botoes_de_execucao_usam_acoes_dinamicas(self):
