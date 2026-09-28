@@ -2413,6 +2413,9 @@ class App:
         self._planilha_historico_arquivo = Path.home() / "SM AutoLab" / "planilha_historico.json"
         self._planilha_salva_data = {}
         self._planilha_efetuou_alteracao = False
+        # Quando uma execução é encerrada (inclusive com erros), a planilha
+        # permanece disponível nesta sessão e é limpa somente no fechamento.
+        self._planilha_limpar_ao_fechar = False
         self._planilha_window = None
         self._planilha_tree = None
         self._planilha_data = {}
@@ -7067,12 +7070,18 @@ class App:
     def _carregar_planilha_interna(self):
         self._garantir_pasta_planilha()
         if not self._planilha_arquivo.exists():
+            self._planilha_limpar_ao_fechar = False
             return {}
         try:
             data=read_json_with_backup(self._planilha_arquivo, {})
+            if isinstance(data, dict):
+                self._planilha_limpar_ao_fechar = bool(data.get("cleanup_on_close", False))
+            else:
+                self._planilha_limpar_ao_fechar = False
             cells=data.get("cells", {}) if isinstance(data, dict) else {}
             return {str(k): str(v) for k,v in cells.items() if str(v) != ""}
         except Exception:
+            self._planilha_limpar_ao_fechar = False
             return {}
 
     def _salvar_planilha_interna_data(self, cells=None):
@@ -7088,6 +7097,7 @@ class App:
             "updated_at": datetime.now().isoformat(timespec="seconds"),
             "processed_fingerprint": "",
             "processed_at": "",
+            "cleanup_on_close": bool(getattr(self, "_planilha_limpar_ao_fechar", False)),
             "cells": snapshot,
         }
         atomic_write_json(self._planilha_arquivo, payload)
@@ -7210,9 +7220,70 @@ class App:
             }
             data["processed_fingerprint"] = self._planilha_fingerprint(cells)
             data["processed_at"] = datetime.now().isoformat(timespec="seconds")
+            data["cleanup_on_close"] = bool(getattr(self, "_planilha_limpar_ao_fechar", False))
             atomic_write_json(self._planilha_arquivo, data)
         except Exception:
             LOGGER.exception("Falha ao registrar a planilha interna como processada.")
+
+
+    def _marcar_planilha_para_limpeza_ao_fechar(self):
+        """Marca a revisão encerrada para ser removida somente no fechamento."""
+        self._planilha_limpar_ao_fechar = True
+        try:
+            self._garantir_pasta_planilha()
+            data = read_json_with_backup(self._planilha_arquivo, {})
+            if not isinstance(data, dict):
+                data = {}
+            data["version"] = 1
+            data["cells"] = {
+                str(chave): str(valor)
+                for chave, valor in (self._planilha_data or {}).items()
+                if str(valor) != ""
+            }
+            data["cleanup_on_close"] = True
+            data["processed_fingerprint"] = ""
+            data["processed_at"] = ""
+            atomic_write_json(self._planilha_arquivo, data)
+        except Exception:
+            LOGGER.exception("Falha ao marcar a planilha para limpeza no fechamento.")
+
+
+    def _limpar_planilha_interna_ao_fechar(self):
+        """Limpa a planilha salva após uma execução encerrada, preservando o histórico."""
+        if not getattr(self, "_planilha_limpar_ao_fechar", False):
+            return
+        try:
+            # O snapshot já deve existir, mas registrar novamente é idempotente
+            # e garante que a revisão permaneça disponível em Arquivos.
+            cells = self._carregar_planilha_interna()
+            if cells:
+                self._registrar_historico_planilha(cells)
+        except Exception:
+            LOGGER.exception("Falha ao preservar o snapshot antes de limpar a planilha.")
+
+        try:
+            self._garantir_pasta_planilha()
+            payload = {
+                "version": 1,
+                "updated_at": datetime.now().isoformat(timespec="seconds"),
+                "processed_fingerprint": "",
+                "processed_at": "",
+                "cleanup_on_close": False,
+                "cells": {},
+            }
+            atomic_write_json(self._planilha_arquivo, payload)
+            self._planilha_apagar_rascunho()
+            try:
+                from app import excluir_checkpoint_interno
+                excluir_checkpoint_interno()
+            except Exception:
+                pass
+            self._planilha_data = {}
+            self._planilha_salva_data = {}
+            self._planilha_efetuou_alteracao = False
+            self._planilha_limpar_ao_fechar = False
+        except Exception:
+            LOGGER.exception("Falha ao limpar a planilha interna no fechamento.")
 
 
     def _desmarcar_planilha_interna_processada(self):
@@ -7230,7 +7301,9 @@ class App:
             }
             data["processed_fingerprint"] = ""
             data["processed_at"] = ""
+            data["cleanup_on_close"] = False
             atomic_write_json(self._planilha_arquivo, data)
+            self._planilha_limpar_ao_fechar = False
         except Exception:
             LOGGER.exception("Falha ao remover o marcador de planilha processada.")
 
@@ -9406,6 +9479,11 @@ class App:
                 )
 
         self._fechar_menus()
+        # Uma nova execução assume o controle da revisão atual. Se a execução
+        # anterior havia sido finalizada com erros, ela não deve mais ser limpa
+        # automaticamente caso a nova tentativa falhe antes de terminar.
+        self._planilha_limpar_ao_fechar = False
+        self._desmarcar_planilha_interna_processada()
         self._iniciar_historico_execucao("Planilha interna",0,start)
         self._execucao_atual["origem"] = getattr(self, "_origem_reexecucao", "planilha_interna")
         if getattr(self, "_reexecucao_origem_id", None):
@@ -9562,11 +9640,12 @@ class App:
         if getattr(resultado, "finalizada_pelo_usuario", False) or self._finalizar_solicitado:
             self._configuracoes_bloqueadas_por_parada = False
             self._add_activity(
-                "Processo finalizado pelo usuário. Os códigos restantes estão disponíveis para reexecução.",
+                "Processo finalizado pelo usuário. A revisão será arquivada e a planilha será limpa ao fechar o aplicativo.",
                 self.WARNING,
             )
             self._desmarcar_planilha_interna_processada()
-            self._finalizar_historico_execucao(resultado, "Erro na execução")
+            self._marcar_planilha_para_limpeza_ao_fechar()
+            self._finalizar_historico_execucao(resultado, "Finalizada pelo usuário")
             try:
                 from app import excluir_checkpoint_interno
                 excluir_checkpoint_interno()
@@ -9575,8 +9654,12 @@ class App:
             self._aplicar_status("Processo finalizado com erros")
         elif processamento_concluido:
             self._configuracoes_bloqueadas_por_parada = False
-            self._add_activity("Processo finalizado.", self.SUCCESS)
-            self._marcar_planilha_interna_processada(self._planilha_data)
+            self._add_activity(
+                "Processo finalizado. A planilha será limpa ao fechar o aplicativo.",
+                self.SUCCESS,
+            )
+            self._desmarcar_planilha_interna_processada()
+            self._marcar_planilha_para_limpeza_ao_fechar()
             self._finalizar_historico_execucao(resultado, "Concluída")
             # Aplicar imediatamente: evita que a messagebox bloqueie a atualização
             # do cabeçalho deixando-o visualmente em "Processando".
@@ -9586,12 +9669,12 @@ class App:
             # Uma execução com qualquer erro NÃO consome a planilha salva.
             # Os códigos permanecem disponíveis para nova tentativa.
             self._add_activity(
-                "Processo finalizado com erros. A planilha salva foi preservada para nova tentativa.",
+                "Processo finalizado com erros. A revisão ficará disponível no histórico e a planilha será limpa ao fechar o aplicativo.",
                 self.WARNING,
             )
             self._desmarcar_planilha_interna_processada()
-            self._finalizar_historico_execucao(resultado, "Erro na execução")
-            self._marcar_planilha_interna_processada(self._planilha_data)
+            self._marcar_planilha_para_limpeza_ao_fechar()
+            self._finalizar_historico_execucao(resultado, "Concluída com erros")
             self._aplicar_status("Processo finalizado com erros")
 
         for item in resultado.itens:
@@ -10132,6 +10215,11 @@ class App:
                 logging.getLogger(__name__).exception(
                     "Falha ao salvar checkpoint durante o fechamento do aplicativo."
                 )
+
+        # Se uma execução foi efetivamente finalizada (mesmo com erros),
+        # preserva o snapshot em Arquivos e limpa a planilha operacional apenas
+        # agora, no fechamento do aplicativo.
+        self._limpar_planilha_interna_ao_fechar()
 
         # Consolida também o histórico quando o aplicativo é fechado sem uma
         # execução ativa, garantindo a migração do arquivo legado para o arquivo
