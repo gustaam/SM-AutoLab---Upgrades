@@ -1655,6 +1655,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("webdriver.Chrome(",source)
         self.assertNotIn("webdriver.ChromeOptions(",source)
 
+    def test_startup_espera_selenium_preparado_antes_de_liberar_o_splash(self):
+        source=(self.root/"main.py").read_text(encoding="utf-8")
+        self.assertIn("selenium_ready = threading.Event()", source)
+        self.assertIn("startup_ready = threading.Event()", source)
+        self.assertIn("selenium_ready.wait()", source)
+        self.assertIn("update_ready.wait()", source)
+        self.assertIn("run_splash(startup_ready)", source)
+
     def test_selenium_e_preparado_antes_da_primeira_execucao(self):
         source=(self.root/"main.py").read_text(encoding="utf-8")
         self.assertIn("from app import preparar_ambiente_selenium",source)
