@@ -60,7 +60,7 @@ class PlanilhaPersistenceTests(unittest.TestCase):
         self.assertIn("self._planilha_apagar_rascunho()", block)
         self.assertNotIn("A última planilha salva ainda não foi processada", block)
 
-    def test_execucao_com_erro_nao_marca_planilha_como_processada(self):
+    def test_execucao_com_erro_preserva_para_limpeza_no_fechamento(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
         start = source.index("def _finalizar(self, resultado):")
         end = source.index("def parar(self):", start)
@@ -69,7 +69,49 @@ class PlanilhaPersistenceTests(unittest.TestCase):
         self.assertIn("processamento_concluido = (", block)
         self.assertIn('int(getattr(resultado, "erros", 0) or 0) == 0', block)
         self.assertIn("self._desmarcar_planilha_interna_processada()", block)
-        self.assertIn('self._finalizar_historico_execucao(resultado, "Erro na execução")', block)
+        self.assertIn("self._marcar_planilha_para_limpeza_ao_fechar()", block)
+        self.assertIn('self._finalizar_historico_execucao(resultado, "Concluída com erros")', block)
+        self.assertNotIn("self._marcar_planilha_interna_processada(self._planilha_data)", block)
+
+    def test_limpeza_no_fechamento_esvazia_planilha(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            obj = App.__new__(App)
+            obj._planilha_arquivo = root / "SM AutoLab" / "planilha_interna.json"
+            obj._planilha_data = {"0,0": "1", "0,1": "ABC", "0,2": "Item"}
+            obj._planilha_salva_data = dict(obj._planilha_data)
+            obj._planilha_limpar_ao_fechar = True
+            obj._garantir_pasta_planilha = lambda: obj._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
+            obj._registrar_historico_planilha = lambda cells: None
+            obj._planilha_apagar_rascunho = lambda: None
+            obj._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
+            interface.atomic_write_json(
+                obj._planilha_arquivo,
+                {
+                    "version": 1,
+                    "updated_at": datetime.now().isoformat(timespec="seconds"),
+                    "processed_fingerprint": "",
+                    "processed_at": "",
+                    "cleanup_on_close": True,
+                    "cells": dict(obj._planilha_data),
+                },
+            )
+            with patch("app.excluir_checkpoint_interno"):
+                App._limpar_planilha_interna_ao_fechar(obj)
+
+            dados = interface.read_json_with_backup(obj._planilha_arquivo, {})
+            self.assertEqual(dados.get("cells"), {})
+            self.assertFalse(dados.get("cleanup_on_close"))
+            self.assertEqual(obj._planilha_data, {})
+            self.assertFalse(obj._planilha_limpar_ao_fechar)
+
+    def test_nova_execucao_cancela_limpeza_pendente(self):
+        source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
+        start = source.index("def _iniciar_automacao_interna(")
+        end = source.index("def _executar_interno", start)
+        block = source[start:end]
+        self.assertIn("self._planilha_limpar_ao_fechar = False", block)
+        self.assertIn("self._desmarcar_planilha_interna_processada()", block)
 
     def test_execucao_concluida_soh_marca_planilha_quando_todos_os_codigos_tiverem_sucesso(self):
         source = (Path(__file__).resolve().parents[1] / "interface.py").read_text(encoding="utf-8")
