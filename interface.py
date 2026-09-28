@@ -2599,151 +2599,32 @@ class App:
             return
         self._fechar_menus()
 
-    def _capturar_fundo_desktop(self, x, y, largura, altura):
-        """Captura o wallpaper do Desktop Window sem copiar a janela do próprio app."""
+    def _capturar_desktop_inicial(self):
+        """Captura o desktop enquanto a janela principal ainda está oculta."""
         if os.name != "nt":
             return None
-        largura = max(1, int(largura))
-        altura = max(1, int(altura))
-        desktop = desktop_dc = memory_dc = bitmap = previous = None
         try:
+            # O app é ocultado durante a construção inicial. Assim a captura
+            # contém o desktop real (incluindo janelas que estavam atrás), e
+            # não o próprio SM AutoLab.
+            if getattr(self, "app", None) is not None:
+                if self.app.winfo_viewable() and str(self.app.state()).lower() not in ("withdrawn", "iconic"):
+                    return None
+
+            imagem = ImageGrab.grab(all_screens=True)
+            if imagem is None:
+                return None
+
             user32 = ctypes.windll.user32
-            gdi32 = ctypes.windll.gdi32
-
-            user32.GetDesktopWindow.restype = wintypes.HWND
-            user32.GetDC.argtypes = [wintypes.HWND]
-            user32.GetDC.restype = wintypes.HDC
-            user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
-            user32.ReleaseDC.restype = ctypes.c_int
-
-            gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
-            gdi32.CreateCompatibleDC.restype = wintypes.HDC
-            gdi32.CreateCompatibleBitmap.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int]
-            gdi32.CreateCompatibleBitmap.restype = wintypes.HBITMAP
-            gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
-            gdi32.SelectObject.restype = wintypes.HGDIOBJ
-            gdi32.BitBlt.argtypes = [
-                wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
-                wintypes.HDC, ctypes.c_int, ctypes.c_int, wintypes.DWORD,
-            ]
-            gdi32.BitBlt.restype = wintypes.BOOL
-            gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
-            gdi32.DeleteObject.restype = wintypes.BOOL
-            gdi32.DeleteDC.argtypes = [wintypes.HDC]
-            gdi32.DeleteDC.restype = wintypes.BOOL
-
-            desktop = user32.GetDesktopWindow()
-            desktop_dc = user32.GetDC(desktop)
-            if not desktop_dc:
-                return None
-
-            memory_dc = gdi32.CreateCompatibleDC(desktop_dc)
-            if not memory_dc:
-                return None
-
-            bitmap = gdi32.CreateCompatibleBitmap(desktop_dc, largura, altura)
-            if not bitmap:
-                return None
-
-            previous = gdi32.SelectObject(memory_dc, bitmap)
-            if not gdi32.BitBlt(
-                memory_dc,
-                0, 0,
-                largura, altura,
-                desktop_dc,
-                int(x), int(y),
-                0x00CC0020,  # SRCCOPY
-            ):
-                return None
-
-            class _BITMAPINFOHEADER(ctypes.Structure):
-                _fields_ = [
-                    ("biSize", wintypes.DWORD),
-                    ("biWidth", wintypes.LONG),
-                    ("biHeight", wintypes.LONG),
-                    ("biPlanes", wintypes.WORD),
-                    ("biBitCount", wintypes.WORD),
-                    ("biCompression", wintypes.DWORD),
-                    ("biSizeImage", wintypes.DWORD),
-                    ("biXPelsPerMeter", wintypes.LONG),
-                    ("biYPelsPerMeter", wintypes.LONG),
-                    ("biClrUsed", wintypes.DWORD),
-                    ("biClrImportant", wintypes.DWORD),
-                ]
-
-            class _BITMAPINFO(ctypes.Structure):
-                _fields_ = [
-                    ("bmiHeader", _BITMAPINFOHEADER),
-                    ("bmiColors", wintypes.DWORD * 3),
-                ]
-
-            gdi32.GetDIBits.argtypes = [
-                wintypes.HDC,
-                wintypes.HBITMAP,
-                wintypes.UINT,
-                wintypes.UINT,
-                ctypes.c_void_p,
-                ctypes.POINTER(_BITMAPINFO),
-                wintypes.UINT,
-            ]
-            gdi32.GetDIBits.restype = ctypes.c_int
-
-            info = _BITMAPINFO()
-            info.bmiHeader.biSize = ctypes.sizeof(_BITMAPINFOHEADER)
-            info.bmiHeader.biWidth = largura
-            info.bmiHeader.biHeight = -altura
-            info.bmiHeader.biPlanes = 1
-            info.bmiHeader.biBitCount = 32
-            info.bmiHeader.biCompression = 0  # BI_RGB
-
-            buffer = ctypes.create_string_buffer(largura * altura * 4)
-            copied = gdi32.GetDIBits(
-                memory_dc,
-                bitmap,
-                0,
-                altura,
-                buffer,
-                ctypes.byref(info),
-                0,
-            )
-            if int(copied or 0) != altura:
-                return None
-
-            return Image.frombuffer(
-                "RGBA",
-                (largura, altura),
-                buffer,
-                "raw",
-                "BGRA",
-                0,
-                1,
-            ).copy()
-        except (AttributeError, OSError, TypeError, ValueError, ctypes.ArgumentError):
+            origem_x = int(user32.GetSystemMetrics(76))  # SM_XVIRTUALSCREEN
+            origem_y = int(user32.GetSystemMetrics(77))  # SM_YVIRTUALSCREEN
+            self._header_desktop_capture_origin = (origem_x, origem_y)
+            return imagem.convert("RGBA")
+        except (AttributeError, OSError, TypeError, ValueError):
             return None
-        finally:
-            try:
-                if memory_dc and previous:
-                    gdi32.SelectObject(memory_dc, previous)
-            except Exception:
-                pass
-            try:
-                if bitmap:
-                    gdi32.DeleteObject(bitmap)
-            except Exception:
-                pass
-            try:
-                if memory_dc:
-                    gdi32.DeleteDC(memory_dc)
-            except Exception:
-                pass
-            try:
-                if desktop_dc and desktop:
-                    user32.ReleaseDC(desktop, desktop_dc)
-            except Exception:
-                pass
 
     def _capturar_papel_de_parede(self):
-        """Fallback para o arquivo de wallpaper configurado no Windows."""
+        """Lê o wallpaper configurado no Windows para servir como fallback."""
         if os.name != "nt":
             return None
         try:
@@ -2754,24 +2635,50 @@ class App:
                 buffer,
                 0,
             )
-            if not ok or not str(buffer.value or "").strip():
+            caminho = str(buffer.value or "").strip()
+            if not ok or not caminho:
                 return None
-            with Image.open(str(buffer.value)) as wallpaper:
+            with Image.open(caminho) as wallpaper:
                 return wallpaper.convert("RGBA")
         except (AttributeError, OSError, TypeError, ValueError):
             return None
 
     def _obter_fundo_cabecalho(self, header, largura, altura):
-        """Obtém o fundo do desktop exatamente na posição atual do cabeçalho."""
+        """Obtém um recorte real do desktop, sem capturar o próprio aplicativo."""
         try:
             x = int(header.winfo_rootx())
             y = int(header.winfo_rooty())
         except (AttributeError, TypeError, ValueError, tk.TclError):
             x, y = 0, 0
 
-        fundo = self._capturar_fundo_desktop(x, y, largura, altura)
-        if fundo is not None:
-            return fundo
+        # A primeira renderização acontece com a janela principal oculta.
+        # Guardamos a captura completa e reutilizamos seus pixels nas
+        # redimensões seguintes, evitando capturar o próprio cabeçalho.
+        captura = getattr(self, "_header_desktop_capture", None)
+        if captura is None:
+            captura = self._capturar_desktop_inicial()
+            if captura is not None:
+                self._header_desktop_capture = captura
+
+        if captura is not None:
+            try:
+                origem_x, origem_y = getattr(
+                    self, "_header_desktop_capture_origin", (0, 0)
+                )
+                left = x - int(origem_x)
+                top = y - int(origem_y)
+                right = left + int(largura)
+                bottom = top + int(altura)
+
+                if (
+                    left >= 0
+                    and top >= 0
+                    and right <= captura.width
+                    and bottom <= captura.height
+                ):
+                    return captura.crop((left, top, right, bottom))
+            except (AttributeError, TypeError, ValueError):
+                pass
 
         wallpaper = self._capturar_papel_de_parede()
         if wallpaper is None:
@@ -2779,10 +2686,20 @@ class App:
 
         try:
             pw, ph = wallpaper.size
-            escala = max(largura / max(1, pw), altura / max(1, ph))
+            # Fallback compatível com o comportamento "Preencher" do Windows.
+            escala = max(
+                largura / max(1, pw),
+                altura / max(1, ph),
+            )
             nw = max(largura, int(round(pw * escala)))
             nh = max(altura, int(round(ph * escala)))
-            wallpaper = wallpaper.resize((nw, nh), Image.Resampling.LANCZOS)
+            wallpaper = wallpaper.resize(
+                (nw, nh),
+                Image.Resampling.LANCZOS,
+            )
+
+            # Usa a área central do wallpaper como referência. A captura real
+            # do desktop é priorizada sempre que estiver disponível.
             left = max(0, (nw - largura) // 2)
             top = max(0, (nh - altura) // 2)
             return wallpaper.crop((left, top, left + largura, top + altura))
@@ -2790,23 +2707,32 @@ class App:
             return None
 
     def _reposicionar_header_overlay(self, _event=None):
-        """Mantém o vidro nativo exatamente sobre a faixa reservada do cabeçalho."""
+        """Mantém o cabeçalho visual exatamente sobre o host dentro da janela."""
         overlay = getattr(self, "_header_overlay", None)
         host = getattr(self, "_header_overlay_host", None)
         if overlay is None or host is None:
             return
         try:
-            if self._closing or str(self.app.state()).lower() in ("iconic", "withdrawn") or not self.app.winfo_viewable():
+            if (
+                self._closing
+                or str(self.app.state()).lower() in ("iconic", "withdrawn")
+                or not self.app.winfo_viewable()
+            ):
                 overlay.withdraw()
                 return
+
             host.update_idletasks()
             largura = max(1, int(host.winfo_width()))
             altura = max(1, int(host.winfo_height()))
             x = int(host.winfo_rootx())
             y = int(host.winfo_rooty())
             overlay.geometry(f"{largura}x{altura}+{x}+{y}")
+
             if str(overlay.state()).lower() == "withdrawn":
                 overlay.deiconify()
+
+            # O overlay é a própria superfície visível do cabeçalho; seus
+            # controles são filhos dele, portanto permanecem acima do canvas.
             overlay.lift(self.app)
         except (AttributeError, OSError, TypeError, ValueError, tk.TclError):
             pass
@@ -2840,24 +2766,145 @@ class App:
         self._header_overlay = None
         self._header_overlay_host = None
         self._header_material_header = None
+        self._header_material_photo = None
+
+    def _renderizar_fundo_vidro_cabecalho(self, header, canvas, largura, altura):
+        """Renderiza o Mica Alt visual sobre pixels reais do desktop."""
+        dark = str(ctk.get_appearance_mode()).lower() == "dark"
+        fundo = self._obter_fundo_cabecalho(header, largura, altura)
+
+        if fundo is None:
+            # Fallback sólido somente quando o desktop não estiver acessível.
+            base = (11, 79, 130) if dark else (25, 118, 201)
+            bottom = (8, 47, 73) if dark else (15, 108, 189)
+            image = Image.new("RGBA", (1, altura), (0, 0, 0, 0))
+            pixels = image.load()
+            for y_pos in range(altura):
+                t = y_pos / max(1, altura - 1)
+                t = t * t * (3.0 - 2.0 * t)
+                pixels[0, y_pos] = (
+                    round(base[0] + (bottom[0] - base[0]) * t),
+                    round(base[1] + (bottom[1] - base[1]) * t),
+                    round(base[2] + (bottom[2] - base[2]) * t),
+                    255,
+                )
+            image = image.resize((largura, altura))
+        else:
+            # Blur moderado para preservar a silhueta dos objetos atrás da janela.
+            image = fundo.filter(ImageFilter.GaussianBlur(7 if not dark else 6))
+
+            # O azul é aplicado como uma camada translúcida já "fundida" na
+            # imagem final. Não há alpha global na janela e, portanto, botões
+            # e textos não ficam transparentes junto com o vidro.
+            tint_color = (25, 118, 201) if not dark else (11, 79, 130)
+            tint_alpha = 88 if not dark else 104
+            tint = Image.new(
+                "RGBA",
+                (largura, altura),
+                tint_color + (tint_alpha,),
+            )
+            image = Image.alpha_composite(image, tint)
+
+            # Reflexos suaves característicos de Mica Alt.
+            sheen = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(sheen)
+            if dark:
+                draw.ellipse(
+                    (-int(largura * 0.18), -int(altura * 0.82),
+                     int(largura * 0.44), int(altura * 0.96)),
+                    fill=(150, 202, 232, 42),
+                )
+                draw.ellipse(
+                    (int(largura * 0.40), -int(altura * 0.72),
+                     int(largura * 1.12), int(altura * 0.94)),
+                    fill=(92, 161, 205, 30),
+                )
+            else:
+                draw.ellipse(
+                    (-int(largura * 0.18), -int(altura * 0.82),
+                     int(largura * 0.44), int(altura * 0.96)),
+                    fill=(255, 255, 255, 50),
+                )
+                draw.ellipse(
+                    (int(largura * 0.40), -int(altura * 0.72),
+                     int(largura * 1.12), int(altura * 0.94)),
+                    fill=(218, 240, 255, 34),
+                )
+            sheen = sheen.filter(
+                ImageFilter.GaussianBlur(max(8, int(altura * 0.18)))
+            )
+            image = Image.alpha_composite(image, sheen)
+
+            # Ruído mínimo para evitar superfície digital chapada.
+            noise = Image.effect_noise((largura, altura), 5).convert("L")
+            noise_alpha = noise.point(lambda value: 4 + int(value * 0.018))
+            noise_layer = Image.new(
+                "RGBA",
+                (largura, altura),
+                ((255, 255, 255, 255) if not dark else (180, 208, 225, 255)),
+            )
+            noise_layer.putalpha(noise_alpha)
+            image = Image.alpha_composite(image, noise_layer)
+
+        photo = ImageTk.PhotoImage(image)
+        self._header_material_photo = photo
+
+        canvas.delete("all")
+        canvas.create_image(0, 0, anchor="nw", image=photo)
+
+        # Renderiza o texto sobre o próprio canvas para que não exista um
+        # CTkFrame opaco entre o vidro e o conteúdo.
+        compact = bool(getattr(header, "_sm_autolab_compact_header", False))
+        if compact:
+            title_font = ("Segoe UI", 20, "bold")
+            version_font = ("Segoe UI", 10, "bold")
+            title_y = int(altura * 0.48)
+            version_y = int(altura * 0.56)
+            title_x = 15
+            version_gap = 8
+            version_text = f"v{APP_VERSION}"
+        else:
+            title_font = ("Segoe UI", 23, "bold")
+            version_font = ("Segoe UI", 11, "bold")
+            title_y = 30
+            version_y = 36
+            title_x = 20
+            version_gap = 9
+            version_text = f"v{APP_VERSION}"
+
+        title_id = canvas.create_text(
+            title_x,
+            title_y,
+            anchor="w",
+            text="SM AutoLab",
+            fill=self.HEADER_TEXT[1 if dark else 0],
+            font=title_font,
+        )
+        bbox = canvas.bbox(title_id) or (title_x, title_y, title_x + 150, title_y + 24)
+        canvas.create_text(
+            bbox[2] + version_gap,
+            version_y,
+            anchor="w",
+            text=version_text,
+            fill=self.HEADER_SUBTEXT[1 if dark else 0],
+            font=version_font,
+        )
+
+        if not compact:
+            canvas.create_text(
+                20,
+                65,
+                anchor="w",
+                text="Automação de lançamentos Feegow",
+                fill=self.HEADER_SUBTEXT[1 if dark else 0],
+                font=("Segoe UI", 13),
+            )
 
     def _configurar_material_cabecalho(self, header_host):
-        """Cria vidro Mica Alt real somente na faixa do cabeçalho no Windows."""
+        """Cria a superfície visual Mica Alt do cabeçalho sem sobrepor controles."""
         self._header_material_header = header_host
 
-        # Em sistemas sem a composição do Windows, preserva o cabeçalho sólido
-        # existente sem criar uma janela auxiliar.
         if os.name != "nt":
-            header_host.configure(fg_color=self.HEADER)
-            return header_host
-
-        try:
-            # O transparentcolor cria um recorte real SOMENTE onde o host do
-            # cabeçalho pinta esta cor. O restante da janela continua opaco.
-            transparente = getattr(self, "HEADER_TRANSPARENT_COLOR", "#010203")
-            self.app.attributes("-transparentcolor", transparente)
-            header_host.configure(fg_color=transparente)
-        except (AttributeError, OSError, tk.TclError, TypeError, ValueError):
             header_host.configure(fg_color=self.HEADER)
             return header_host
 
@@ -2872,24 +2919,59 @@ class App:
                     fg_color=self.HEADER,
                     corner_radius=0,
                 )
-                overlay.attributes("-alpha", float(self.HEADER_GLASS_ALPHA))
-                overlay.bind("<Escape>", lambda _e: "break", add="+")
+
+                # O canvas é o primeiro filho do overlay e fica exclusivamente
+                # como plano de fundo. Os controles criados depois ficam acima.
+                canvas = Canvas(
+                    overlay,
+                    bd=0,
+                    highlightthickness=0,
+                    relief="flat",
+                    bg=self.HEADER[1 if str(ctk.get_appearance_mode()).lower() == "dark" else 0],
+                )
+                canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
+                overlay._sm_header_material_canvas = canvas
+
                 self._header_overlay = overlay
                 self._header_overlay_host = header_host
 
-                try:
-                    aplicar_backdrop_sistema(
-                        overlay,
-                        "mica_alt",
-                        dark=ctk.get_appearance_mode().lower() == "dark",
-                    )
-                except Exception:
-                    pass
+                self.app.bind(
+                    "<Configure>",
+                    self._reposicionar_header_overlay,
+                    add="+",
+                )
+                self.app.bind(
+                    "<Map>",
+                    self._mostrar_header_overlay,
+                    add="+",
+                )
+                self.app.bind(
+                    "<Unmap>",
+                    self._ocultar_header_overlay,
+                    add="+",
+                )
+                header_host.bind(
+                    "<Configure>",
+                    lambda _event: (
+                        self._renderizar_fundo_vidro_cabecalho(
+                            header_host,
+                            canvas,
+                            max(1, int(header_host.winfo_width())),
+                            max(1, int(header_host.winfo_height())),
+                        ),
+                        self._reposicionar_header_overlay(),
+                    ),
+                    add="+",
+                )
 
-                self.app.bind("<Configure>", self._reposicionar_header_overlay, add="+")
-                self.app.bind("<Map>", self._mostrar_header_overlay, add="+")
-                self.app.bind("<Unmap>", self._ocultar_header_overlay, add="+")
-                header_host.bind("<Configure>", self._reposicionar_header_overlay, add="+")
+                self.app.after_idle(
+                    lambda: self._renderizar_fundo_vidro_cabecalho(
+                        header_host,
+                        canvas,
+                        max(1, int(header_host.winfo_width())),
+                        max(1, int(header_host.winfo_height())),
+                    )
+                )
                 self.app.after_idle(self._reposicionar_header_overlay)
             except (AttributeError, OSError, tk.TclError, TypeError, ValueError):
                 header_host.configure(fg_color=self.HEADER)
@@ -2898,15 +2980,31 @@ class App:
         else:
             self._header_overlay_host = header_host
             try:
-                overlay.configure(fg_color=self.HEADER)
-                overlay.attributes("-alpha", float(self.HEADER_GLASS_ALPHA))
-                atualizar_backdrop_tema(
-                    overlay,
-                    ctk.get_appearance_mode().lower() == "dark",
+                overlay.configure(
+                    fg_color=self.HEADER,
+                    corner_radius=0,
                 )
+                canvas = getattr(overlay, "_sm_header_material_canvas", None)
+                if canvas is None or not canvas.winfo_exists():
+                    canvas = Canvas(
+                        overlay,
+                        bd=0,
+                        highlightthickness=0,
+                        relief="flat",
+                    )
+                    canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
+                    overlay._sm_header_material_canvas = canvas
+                self.app.after_idle(
+                    lambda: self._renderizar_fundo_vidro_cabecalho(
+                        header_host,
+                        canvas,
+                        max(1, int(header_host.winfo_width())),
+                        max(1, int(header_host.winfo_height())),
+                    )
+                )
+                self.app.after_idle(self._reposicionar_header_overlay)
             except Exception:
-                pass
-            self.app.after_idle(self._reposicionar_header_overlay)
+                header_host.configure(fg_color=self.HEADER)
 
         return overlay
 
@@ -2938,74 +3036,30 @@ class App:
         # Cabeçalho Fluent 2: maior e com ações de configuração.
         header_host = ctk.CTkFrame(
             self.app,
-            fg_color=self.HEADER_TRANSPARENT_COLOR if os.name == "nt" else self.HEADER,
+            fg_color=self.HEADER,
             corner_radius=0,
             height=84
         )
         header_host.pack(fill="x")
         header_host.pack_propagate(False)
+        header_host._sm_autolab_compact_header = False
         header = self._configurar_material_cabecalho(header_host)
 
-        title = ctk.CTkFrame(header, fg_color="transparent")
-        title.pack(side="left", padx=20, pady=11)
+        # O vidro é a própria superfície do header. Não criamos frames
+        # transparentes intermediários, pois eles poderiam restaurar um fundo
+        # sólido e esconder a textura do material.
 
-        title_row = ctk.CTkFrame(title, fg_color="transparent")
-        title_row.pack(anchor="w")
-
-        ctk.CTkLabel(
-            title_row,
-            text="SM AutoLab",
-            text_color=self.HEADER_TEXT,
-            font=("Segoe UI", 23, "bold")
-        ).pack(side="left")
-
-        ctk.CTkLabel(
-            title_row,
-            text=f"v{APP_VERSION}",
-            text_color=self.HEADER_SUBTEXT,
-            font=("Segoe UI", 11, "bold")
-        ).pack(side="left", padx=(9, 0), pady=(7, 0))
-
-        ctk.CTkLabel(
-            title,
-            text="Automação de lançamentos Feegow",
-            text_color=self.HEADER_SUBTEXT,
-            font=("Segoe UI", 13)
-        ).pack(anchor="w", pady=(1, 0))
-
-        right_header = ctk.CTkFrame(header, fg_color="transparent")
-        right_header.pack(side="right", padx=18, pady=17)
-
-        self.botao_configuracoes = ctk.CTkButton(
-            right_header,
-            text="Configurações",
-            command=self._fixar_menu_configuracoes,
-            width=128,
-            height=40,
-            corner_radius=8,
-            fg_color=self.HEADER_BUTTON,
-            hover_color=self.HEADER_BUTTON_HOVER,
-            border_width=1,
-            border_color=self.HEADER_BUTTON_BORDER,
-            text_color=self.TEXT,
-            font=("Segoe UI", 13, "bold")
-        )
-        self.botao_configuracoes.pack(side="left", padx=(0, 10))
-        self.botao_configuracoes.configure(command=self._alternar_menu_configuracoes)
-
-        # Status com geometria fixa. A animação ocorre somente dentro do
-        # canvas, sem alterar o tamanho do controle ou empurrar Configurações.
+        # Status com geometria fixa.
         self.status_pill = ctk.CTkFrame(
-            right_header,
+            header,
             width=190,
             height=40,
             corner_radius=20,
             fg_color=("#E7F5E7", "#21482A")
         )
-        self.status_pill.pack(side="left")
+        self.status_pill.pack(side="right", padx=(0, 18), pady=17)
         self.status_pill.pack_propagate(False)
 
-        # Indicador e texto centralizados como um conjunto.
         self.status_indicator = Canvas(
             self.status_pill,
             width=18,
@@ -3017,7 +3071,6 @@ class App:
         )
         self.status_indicator.place(x=31, y=13)
 
-        # Halo amplo e ponto central para um indicador mais limpo e legível.
         self._status_halo = self.status_indicator.create_oval(
             1, 1, 17, 17,
             fill="#BCE7C1",
@@ -3036,6 +3089,23 @@ class App:
             font=("Segoe UI", 13, "bold")
         )
         self.status_text.place(x=57, y=7)
+
+        self.botao_configuracoes = ctk.CTkButton(
+            header,
+            text="Configurações",
+            command=self._fixar_menu_configuracoes,
+            width=128,
+            height=40,
+            corner_radius=8,
+            fg_color=self.HEADER_BUTTON,
+            hover_color=self.HEADER_BUTTON_HOVER,
+            border_width=1,
+            border_color=self.HEADER_BUTTON_BORDER,
+            text_color=self.TEXT,
+            font=("Segoe UI", 13, "bold")
+        )
+        self.botao_configuracoes.pack(side="right", padx=(0, 10), pady=17)
+        self.botao_configuracoes.configure(command=self._alternar_menu_configuracoes)
 
         # Mantém a área principal rolável e o rodapé fixo para proteger
         # Iniciar/Parar em janelas compactas.
@@ -3363,24 +3433,14 @@ class App:
 
         header_host = ctk.CTkFrame(
             self.app,
-            fg_color=self.HEADER_TRANSPARENT_COLOR if os.name == "nt" else self.HEADER,
+            fg_color=self.HEADER,
             corner_radius=0,
             height=54
         )
         header_host.pack(fill="x")
         header_host.pack_propagate(False)
+        header_host._sm_autolab_compact_header = True
         header = self._configurar_material_cabecalho(header_host)
-
-        title_row = ctk.CTkFrame(header, fg_color="transparent")
-        title_row.pack(side="left", anchor="w", padx=15, pady=(8, 0))
-        ctk.CTkLabel(
-            title_row, text="SM AutoLab", text_color=self.HEADER_TEXT,
-            font=("Segoe UI", 20, "bold")
-        ).pack(side="left")
-        ctk.CTkLabel(
-            title_row, text=f"v{APP_VERSION}", text_color=self.HEADER_SUBTEXT,
-            font=("Segoe UI", 10, "bold")
-        ).pack(side="left", padx=(8, 0), pady=(6, 0))
 
         self.botao_configuracoes = ctk.CTkButton(
             header,
