@@ -184,7 +184,16 @@ class StartupSplash:
             self._running = False
             self.root.after(10, self.close)
             return
-        if elapsed >= 2.80:
+        # A primeira abertura após uma atualização pode exigir que o Selenium
+        # prepare/recupere o Chrome e o driver. Não encerre o splash no tempo
+        # visual padrão enquanto esse bootstrap ainda está em andamento.
+        # Mantemos um limite de segurança para não prender a aplicação caso
+        # o preparo do Selenium esteja indisponível.
+        if ready and elapsed >= 2.80:
+            self._running = False
+            self.root.after(10, self.close)
+            return
+        if elapsed >= 30.0:
             self._running = False
             self.root.after(10, self.close)
             return
