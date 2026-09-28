@@ -1663,6 +1663,14 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertIn("update_ready.wait()", source)
         self.assertIn("run_splash(startup_ready)", source)
 
+    def test_splash_nao_fecha_antes_do_bootstrap_selenium(self):
+        source=(self.root/"main.py").read_text(encoding="utf-8")
+        start=source.index("def _tick(self):")
+        end=source.index("def _center(self):", start)
+        block=source[start:end]
+        self.assertIn("if ready and elapsed >= 2.80:", block)
+        self.assertIn("if elapsed >= 30.0:", block)
+
     def test_selenium_e_preparado_antes_da_primeira_execucao(self):
         source=(self.root/"main.py").read_text(encoding="utf-8")
         self.assertIn("from app import preparar_ambiente_selenium",source)
