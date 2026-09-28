@@ -1655,27 +1655,28 @@ class CanonicalRuntimeTests(unittest.TestCase):
         self.assertNotIn("webdriver.Chrome(",source)
         self.assertNotIn("webdriver.ChromeOptions(",source)
 
-    def test_startup_espera_selenium_preparado_antes_de_liberar_o_splash(self):
+    def test_startup_prepara_selenium_antes_de_liberar_o_splash(self):
         source=(self.root/"main.py").read_text(encoding="utf-8")
-        self.assertIn("selenium_ready = threading.Event()", source)
-        self.assertIn("startup_ready = threading.Event()", source)
-        self.assertIn("selenium_ready.wait()", source)
-        self.assertIn("update_ready.wait()", source)
-        self.assertIn("run_splash(startup_ready)", source)
+        start=source.index("def _preverificar_atualizacao():")
+        end=source.index("threading.Thread(", start)
+        block=source[start:end]
+        self.assertIn("preparar_ambiente_selenium()", block)
+        self.assertIn("finally:", block)
+        self.assertIn("update_ready.set()", block)
+        self.assertIn("run_splash(update_ready)", source)
 
     def test_splash_nao_fecha_antes_do_bootstrap_selenium(self):
         source=(self.root/"main.py").read_text(encoding="utf-8")
         start=source.index("def _tick(self):")
         end=source.index("def _center(self):", start)
         block=source[start:end]
-        self.assertIn("if ready and elapsed >= 2.80:", block)
-        self.assertIn("if elapsed >= 30.0:", block)
+        self.assertIn("if ready and elapsed >= 2.80 or elapsed >= 30.0:", block)
 
     def test_selenium_e_preparado_antes_da_primeira_execucao(self):
         source=(self.root/"main.py").read_text(encoding="utf-8")
         self.assertIn("from app import preparar_ambiente_selenium",source)
-        self.assertIn("target=preparar_ambiente_selenium",source)
-        self.assertIn('name="SM-AutoLab-Selenium-Prewarm"',source)
+        self.assertIn("preparar_ambiente_selenium()",source)
+        self.assertIn('name="SM-AutoLab-Startup-Update"',source)
 
     def test_build_empacota_selenium_completo(self):
         for filename in ("build_windows.bat", ".github/workflows/release.yml"):
