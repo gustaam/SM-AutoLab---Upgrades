@@ -2485,6 +2485,10 @@ class App:
         self._ultimo_tamanho_app_config = None
         self._app_restore_job = None
         self._carregar_estado_persistente()
+        # Uma execução já finalizada deve deixar a planilha operacional vazia
+        # mesmo se o fechamento anterior foi interrompido antes da limpeza.
+        # Falhas/interrupções continuam pendentes e não entram neste caminho.
+        self._limpar_planilha_pendente_no_inicio()
         ctk.set_appearance_mode(self._tema)
         ctk.set_default_color_theme("blue")
         self.config_app()
@@ -7066,6 +7070,72 @@ class App:
 
     def _garantir_pasta_planilha(self):
         self._planilha_arquivo.parent.mkdir(parents=True, exist_ok=True)
+
+    def _limpar_planilha_pendente_no_inicio(self):
+        """Finaliza a limpeza que ficou pendente de um fechamento anterior."""
+        try:
+            self._garantir_pasta_planilha()
+            if not self._planilha_arquivo.exists():
+                self._planilha_limpar_ao_fechar = False
+                return
+
+            data = read_json_with_backup(self._planilha_arquivo, {})
+            if not isinstance(data, dict) or not bool(data.get("cleanup_on_close", False)):
+                return
+
+            # Nunca apaga dados de uma execução que ainda pode ser retomada.
+            pendente = getattr(self, "_execucao_atual", None)
+            if isinstance(pendente, dict):
+                status = str(pendente.get("status", "")).strip().casefold()
+                origem = str(pendente.get("origem", "")).strip()
+                if (
+                    origem == "planilha_interna"
+                    and (
+                        "em andamento" in status
+                        or "interrompida" in status
+                        or "parando" in status
+                    )
+                ):
+                    return
+
+            cells = data.get("cells", {})
+            if not isinstance(cells, dict):
+                cells = {}
+
+            # O histórico é a cópia permanente. A planilha operacional só é
+            # apagada depois que o snapshot tiver sido preservado.
+            cells = {
+                str(k): str(v)
+                for k, v in cells.items()
+                if str(v) != ""
+            }
+            if cells:
+                self._registrar_historico_planilha(cells)
+
+            atomic_write_json(
+                self._planilha_arquivo,
+                {
+                    "version": 1,
+                    "updated_at": datetime.now().isoformat(timespec="seconds"),
+                    "processed_fingerprint": "",
+                    "processed_at": "",
+                    "cleanup_on_close": False,
+                    "cells": {},
+                },
+            )
+            self._planilha_data = {}
+            self._planilha_salva_data = {}
+            self._planilha_efetuou_alteracao = False
+            self._planilha_limpar_ao_fechar = False
+
+            try:
+                from app import excluir_checkpoint_interno
+                excluir_checkpoint_interno()
+            except Exception:
+                pass
+        except Exception:
+            LOGGER.exception("Falha ao concluir a limpeza pendente da planilha no início.")
+
 
     def _carregar_planilha_interna(self):
         self._garantir_pasta_planilha()
